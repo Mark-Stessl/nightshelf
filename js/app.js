@@ -575,6 +575,7 @@
           <div><h2 class="section-title" style="margin:0">Trophäen</h2>${src ? `<div class="tiny">${src}</div>` : ''}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             ${list.length ? `<div class="chips" id="tFilter">${[['all', 'Alle'], ['open', 'Offen'], ['done', 'Verdient']].map(([k, v]) => `<button class="chip ${detailFilter.value === k ? 'on' : ''}" data-f="${k}">${v}</button>`).join('')}</div>` : ''}
+            ${list.length ? (list.every(t => t.done) ? `<button class="btn btn-sm" id="tAll" data-mode="reset">Alle zurücksetzen</button>` : `<button class="btn btn-sm btn-primary" id="tAll" data-mode="all">${I.check} Alle abhaken</button>`) : ''}
             <button class="btn btn-sm" id="tAdd">${I.plus} Eigene</button>
             <button class="btn btn-sm" id="tImp">${I.paste} Liste einfügen</button>
             <button class="btn btn-sm" id="tGen">${I.sparkle} Erstellen</button>
@@ -624,6 +625,25 @@
     if (item.type === 'game') {
       const g = () => Store.get(item.id);
       $('#tAdd').onclick = () => trophyEdit(g());
+      $('#tAll') && ($('#tAll').onclick = () => {
+        const game = g(); const all = $('#tAll').dataset.mode === 'all';
+        const open = game.trophies.filter(t => t.tier !== 'platinum' && !t.done).length;
+        confirmDialog(all
+          ? `Alle ${open} offenen Trophäen in „${esc(game.title)}“ werden als verdient markiert${game.trophies.some(t => t.tier === 'platinum') ? ', inklusive Platin' : ''}.`
+          : `Alle Trophäen in „${esc(game.title)}“ werden wieder auf offen gesetzt.`,
+          all ? 'Alle abhaken' : 'Zurücksetzen', () => {
+            const now = new Date().toISOString();
+            game.trophies.forEach(t => { if (t.tier === 'platinum') return; if (all && !t.done) { t.done = true; t.doneAt = now; } if (!all) { t.done = false; t.doneAt = null; } });
+            const platChange = Trophies.syncPlatinum(game.trophies);
+            Store.update(game.id, { trophies: game.trophies, status: platChange === 'earned' ? 'done' : game.status });
+            const plat = game.trophies.find(t => t.tier === 'platinum');
+            if (all) {
+              if (platChange === 'earned' && plat) trophyToast(plat, game);
+              else toast(`<div><b>${open} Trophäen verdient</b><small>${esc(game.title)}</small></div>`);
+            } else toast(`<div><b>Trophäen zurückgesetzt</b></div>`);
+            render();
+          });
+      });
       $('#tImp').onclick = () => trophyImport(g());
       $('#tGen').onclick = () => (g().trophies?.length ? trophyGenerate(g()) : trophyGenerate(g()));
       $('#tGen2') && ($('#tGen2').onclick = () => trophyGenerate(g()));
