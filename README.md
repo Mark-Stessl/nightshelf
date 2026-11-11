@@ -1,0 +1,32 @@
+# Nightshelf
+
+Persönliches Regal für Spiele, Serien und Filme – mit Trophäen-System im PlayStation-Stil.
+
+## Funktionen
+
+- **Spiele, Serien, Filme** mit Status, Bewertung (1–5 Sterne), Jahr, Notizen und optionalem Cover-Link
+- **Trophäen** in Bronze, Silber, Gold und Platin zum Abhaken
+  - Platin wird automatisch verdient, sobald alle anderen Trophäen abgehakt sind
+  - **Liste einfügen:** Trophäenliste von PSNProfiles, Exophase oder Steam kopieren und einfügen. Prozentwerte bestimmen die Stufe, bereits verdiente Trophäen (mit Datum) werden direkt abgehakt. Eigenes Format: `Name | Beschreibung | Gold`
+  - **Automatisch erstellen:** Für Spiele ohne Erfolge (z. B. Nintendo Switch) wird passend zum Genre eine eigene Liste erzeugt, die du bearbeiten kannst
+- **Trophäen-Level** aus gesammelten Punkten (Bronze 15, Silber 30, Gold 90, Platin 300)
+- **Backup** als JSON-Datei herunterladen und wieder einlesen (Seite „Daten“)
+
+## Daten
+
+Alles wird lokal im Browser gespeichert (localStorage). Für ein anderes Gerät: Backup herunterladen und dort einlesen.
+
+## Starten
+
+Keine Installation nötig: `index.html` im Browser öffnen oder über GitHub Pages ausliefern.
+
+## Farben
+
+| Rolle | Farbe |
+| --- | --- |
+| Hintergrund | `#0E0B16` |
+| Fläche | `#1A1526` |
+| Rand | `#2A2140` |
+| Violett | `#8B5CF6` |
+| Flieder | `#C4B5FD` |
+| Akzent / Platin | `#22D3EE` |
