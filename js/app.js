@@ -191,7 +191,7 @@
       title: isEdit ? `${TYPES[type].label} bearbeiten` : `${TYPES[type].label} hinzufügen`,
       wide: type === 'game' && !isEdit,
       body: `<form class="form" id="itemForm" novalidate>
-        <div class="field"><label>Titel</label><input class="input" name="title" value="${esc(d.title || '')}" placeholder="${type === 'game' ? 'Super Mario Odyssey' : type === 'series' ? 'Breaking Bad' : 'Dune: Part Two'}" autocomplete="off"><div class="field-error" id="titleErr"></div></div>
+        <div class="field"><label>Titel</label><div class="suggest-wrap"><input class="input" name="title" value="${esc(d.title || '')}" placeholder="${type === 'game' ? 'Super Mario Odyssey' : type === 'series' ? 'All of Us Are Dead' : 'Dune: Part Two'}" autocomplete="off"><div class="suggest" id="suggest" hidden></div></div><div class="field-error" id="titleErr"></div><div id="lookupInfo"></div></div>
         ${gameFields}
         <div class="grid-2">
           <div class="field"><label>Status</label><select class="input" name="status">${Object.entries(st).map(([k, v]) => `<option value="${k}" ${k === d.status ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
@@ -232,7 +232,71 @@
         const plat = form.elements.platform;
         if (plat && !isEdit) plat.onchange = () => { trophyMode = isPS(plat.value) ? 'paste' : 'auto'; renderTMode(); };
         renderTMode();
-        form.elements.title.oninput = () => { $('#titleErr', m).textContent = ''; };
+        let fetched = null;
+        const F = form.elements;
+        const sug = $('#suggest', m), info = $('#lookupInfo', m);
+        const keyHint = { movie: 'TMDB', game: 'RAWG' }[type];
+        if (!Lookup.hasKey(type)) info.innerHTML = `<div class="tiny" style="margin-top:4px">Tipp: Mit einem kostenlosen ${keyHint}-Schlüssel unter <a href="#/settings" data-close style="color:var(--lilac)">Daten</a> werden Cover und Infos automatisch ausgefüllt.</div>`;
+        let timer, seq = 0, hits = [], activeIdx = -1;
+        const hideSug = () => { sug.hidden = true; activeIdx = -1; };
+        const showSug = html => { sug.innerHTML = html; sug.hidden = false; };
+        async function runSearch(q) {
+          const my = ++seq;
+          showSug('<div class="suggest-msg">Suche…</div>');
+          try {
+            hits = await Lookup.search(type, q);
+            if (my !== seq) return;
+            if (!hits.length) { showSug('<div class="suggest-msg">Nichts gefunden. Du kannst trotzdem alles selbst eintragen.</div>'); return; }
+            showSug(hits.map((h, i) => `<button type="button" class="suggest-item" data-i="${i}">
+              <span class="suggest-thumb">${h.thumb ? `<img src="${esc(h.thumb)}" alt="" onerror="this.remove()">` : ''}</span>
+              <span class="suggest-text"><b>${esc(h.title)}</b><small>${esc(h.sub)}</small></span></button>`).join(''));
+            $$('.suggest-item', sug).forEach(b => b.onmousedown = e => { e.preventDefault(); pick(+b.dataset.i); });
+          } catch (err) {
+            if (my !== seq) return;
+            showSug(`<div class="suggest-msg">${err.message === 'key' ? `Der ${keyHint}-Schlüssel wird nicht akzeptiert. Prüfe ihn unter Daten.` : 'Keine Verbindung zur Datenbank. Du kannst alles selbst eintragen.'}</div>`);
+          }
+        }
+        async function pick(i) {
+          const h = hits[i]; if (!h) return;
+          hideSug();
+          F.title.value = h.title;
+          info.innerHTML = `<div class="tiny" style="margin-top:4px">Lade Infos…</div>`;
+          try {
+            const dt = await Lookup.detail(type, h);
+            fetched = dt;
+            if (dt.year) F.year.value = dt.year;
+            if (dt.cover) F.cover.value = dt.cover;
+            if (type === 'series' && dt.seasons) F.seasons.value = dt.seasons;
+            if (type === 'game') {
+              if (dt.genre && F.genre) F.genre.value = dt.genre;
+              if (dt.platforms?.length && !dt.platforms.includes(F.platform.value)) {
+                const pref = ['PS5', 'Switch 2', 'Switch', 'PS4', 'PC', 'Xbox', 'Mobile'].find(p => dt.platforms.includes(p));
+                if (pref) { F.platform.value = pref; F.platform.onchange && F.platform.onchange(); }
+              }
+            }
+            info.innerHTML = `<div class="fetched">${dt.cover ? `<img src="${esc(dt.cover)}" alt="">` : ''}<div><b>Infos übernommen</b><small>${esc([dt.released ? fmtDate(dt.released) : dt.year, (dt.genres || []).slice(0, 3).join(', '), dt.runtime ? dt.runtime + ' Min.' : '', dt.seasons ? dt.seasons + ' Staffeln' : ''].filter(Boolean).join(' · '))}</small></div>
+              <button type="button" class="btn btn-ghost btn-sm" id="undoFetch">Entfernen</button></div>`;
+            $('#undoFetch', m).onclick = () => { fetched = null; F.cover.value = ''; info.innerHTML = ''; };
+          } catch { info.innerHTML = `<div class="tiny" style="margin-top:4px">Details konnten nicht geladen werden.</div>`; }
+        }
+        F.title.oninput = () => {
+          $('#titleErr', m).textContent = '';
+          clearTimeout(timer);
+          const q = F.title.value.trim();
+          if (q.length < 2 || !Lookup.hasKey(type)) { seq++; hideSug(); return; }
+          timer = setTimeout(() => runSearch(q), 350);
+        };
+        F.title.onkeydown = e => {
+          const items = $$('.suggest-item', sug);
+          if (sug.hidden || !items.length) return;
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            activeIdx = (activeIdx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+            items.forEach((x, i) => x.classList.toggle('on', i === activeIdx));
+          } else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); pick(activeIdx); }
+          else if (e.key === 'Escape') { e.stopPropagation(); hideSug(); }
+        };
+        F.title.onblur = () => setTimeout(hideSug, 150);
 
         $('#saveBtn', m).onclick = e => {
           e.preventDefault();
@@ -248,6 +312,9 @@
           };
           if (type === 'game') { data.platform = form.elements.platform.value; data.genre = form.elements.genre.value; }
           if (type === 'series') { data.seasons = form.elements.seasons.value ? +form.elements.seasons.value : null; data.seasonSeen = form.elements.seasonSeen.value ? +form.elements.seasonSeen.value : null; }
+          if (fetched) {
+            ['genres', 'released', 'runtime', 'summary', 'external'].forEach(k => { if (fetched[k] != null && fetched[k] !== '') data[k] = fetched[k]; });
+          }
 
           if (isEdit) {
             Store.update(item.id, data);
@@ -482,6 +549,9 @@
     if (item.genre && item.type === 'game') meta.push(Trophies.GENRES[item.genre]);
     if (item.year) meta.push(item.year);
     if (item.type === 'series' && item.seasons) meta.push(`${item.seasons} Staffeln`);
+    if (item.runtime) meta.push(`${item.runtime} Min.`);
+    if (item.genres?.length && item.type !== 'game') meta.push(esc(item.genres.slice(0, 3).join(', ')));
+    if (item.released) meta.push(`Erschienen ${fmtDate(item.released)}`);
 
     let trophySection = '';
     let ring = '';
@@ -532,6 +602,7 @@
           <div class="hero-meta">${meta.join('<span class="dot"></span>')}</div>
           <div style="margin-top:12px">${starsInput(item.rating, 'heroRating')}</div>
           ${item.notes ? `<div class="hero-notes">${esc(item.notes)}</div>` : ''}
+          ${item.summary ? `<div class="hero-summary">${esc(item.summary)}</div>` : ''}
           ${ring}${seriesBlock}
           <div class="hero-actions">
             <select class="input" id="quickStatus" style="width:auto">${Object.entries(STATUS[item.type]).map(([k, v]) => `<option value="${k}" ${k === item.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
@@ -662,6 +733,14 @@
     const n = Store.all().length;
     view.innerHTML = `<div class="${A()}" style="max-width:720px">
       <div class="page-head"><div><h1 class="page-title">Daten</h1><p class="page-sub">${n} Einträge sind in diesem Browser gespeichert.</p></div></div>
+      <div class="panel"><h3>Automatische Infos</h3><p>Beim Hinzufügen werden Cover, Erscheinungsdatum und Genre automatisch gesucht. Serien funktionieren ohne Schlüssel. Für Filme und Spiele brauchst du je einen kostenlosen API-Schlüssel. Er bleibt nur in diesem Browser gespeichert.</p>
+        <div class="form">
+          <div class="field"><label>Serien · TVmaze</label><div class="key-ok">Aktiv, kein Schlüssel nötig</div></div>
+          <div class="field"><label>Filme · TMDB-Schlüssel</label><div class="key-row"><input class="input" id="kTmdb" placeholder="API-Schlüssel oder Lesezugriffs-Token" autocomplete="off" spellcheck="false"><button class="btn" data-test="movie">Testen</button></div>
+            <div class="tiny">Kostenlos auf <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener" style="color:var(--lilac)">themoviedb.org/settings/api</a></div><div class="tiny" id="tMovie"></div></div>
+          <div class="field"><label>Spiele · RAWG-Schlüssel</label><div class="key-row"><input class="input" id="kRawg" placeholder="API-Schlüssel" autocomplete="off" spellcheck="false"><button class="btn" data-test="game">Testen</button></div>
+            <div class="tiny">Kostenlos auf <a href="https://rawg.io/apidocs" target="_blank" rel="noopener" style="color:var(--lilac)">rawg.io/apidocs</a></div><div class="tiny" id="tGame"></div></div>
+        </div></div>
       <div class="panel"><h3>Sichern</h3><p>Lade alle Spiele, Serien, Filme und Trophäen als Datei herunter. Damit kannst du sie auf ein anderes Gerät mitnehmen oder ein Backup behalten.</p>
         <button class="btn btn-primary" id="exp">${I.download} Backup herunterladen</button></div>
       <div class="panel"><h3>Wiederherstellen</h3><p>Lies eine Nightshelf-Backupdatei ein. Beim Zusammenführen bleiben deine aktuellen Einträge erhalten.</p>
@@ -687,6 +766,18 @@
     };
     $('#impMerge').onchange = doImport('merge');
     $('#impReplace').onchange = doImport('replace');
+    const k = Lookup.keys();
+    $('#kTmdb').value = k.tmdb || ''; $('#kRawg').value = k.rawg || '';
+    const saveKeys = () => Lookup.setKeys({ tmdb: $('#kTmdb').value.trim(), rawg: $('#kRawg').value.trim() });
+    $('#kTmdb').oninput = saveKeys; $('#kRawg').oninput = saveKeys;
+    $$('[data-test]').forEach(b => b.onclick = async () => {
+      saveKeys();
+      const t = b.dataset.test, out = $(t === 'movie' ? '#tMovie' : '#tGame');
+      if (!Lookup.hasKey(t)) { out.innerHTML = '<span style="color:var(--danger)">Trag zuerst einen Schlüssel ein.</span>'; return; }
+      out.textContent = 'Teste…';
+      try { await Lookup.test(t); out.innerHTML = '<span style="color:var(--cyan)">Funktioniert</span>'; }
+      catch (e) { out.innerHTML = `<span style="color:var(--danger)">${e.message === 'key' ? 'Schlüssel wird nicht akzeptiert.' : 'Keine Verbindung.'}</span>`; }
+    });
     $('#wipe').onclick = () => confirmDialog('Alle Spiele, Serien, Filme und Trophäen in diesem Browser werden gelöscht.', 'Alles löschen', () => { Store.clear(); render(); });
   }
 
