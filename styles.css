@@ -429,3 +429,11 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 /* Echtes Cover liegt über dem erzeugten Platzhalter */
 .cover img, .list-row .thumb img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; }
 .cover-tag, .cover-plat, .cover-progress { z-index: 2; }
+
+/* PlayStation */
+.steps { margin: 0 0 16px; padding-left: 20px; color: var(--text-2); font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
+.steps a, .panel p a { color: var(--lilac); }
+.adv { margin-top: 16px; }
+.adv summary { cursor: pointer; font-size: 13px; color: var(--text-3); }
+.tt-dlc { color: var(--lilac); background: rgba(139, 92, 246, .14); }
+.btn:disabled { opacity: .6; cursor: progress; }

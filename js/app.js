@@ -18,7 +18,8 @@
     series: { active: 'Am Schauen', done: 'Fertig geschaut', planned: 'Merkliste', dropped: 'Abgebrochen' },
     movie:  { done: 'Gesehen', planned: 'Merkliste', dropped: 'Abgebrochen' },
   };
-  const PLATFORMS = ['PS5', 'PS4', 'Switch 2', 'Switch', 'PC', 'Steam Deck', 'Xbox', 'Mobile', 'Andere'];
+  const PLATFORMS = ['PS5', 'PS4', 'PS3', 'PS Vita', 'Switch 2', 'Switch', 'PC', 'Steam Deck', 'Xbox', 'Mobile', 'Andere'];
+  const psDefault = p => isPS(p) ? (PSN.connected() ? 'psn' : 'paste') : 'auto';
   const isPS = p => /^PS/.test(p || '');
 
   const I = {
@@ -39,6 +40,7 @@
     film: '<svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 9h16M4 15h16M8 5v4M12 5v4M16 5v4M8 15v4M12 15v4M16 15v4"/></svg>',
     download: '<svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
     upload: '<svg viewBox="0 0 24 24"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg>',
+    refresh: '<svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.9-3.9M4 5v4h4M4 13a8 8 0 0 0 14.9 3.9M20 19v-4h-4"/></svg>',
   };
   const typeIcon = t => ({ game: I.game, series: I.tv, movie: I.film }[t]);
 
@@ -164,7 +166,7 @@
     const isEdit = !!item;
     const d = item || { type, status: type === 'movie' ? 'done' : 'active', platform: 'PS5', genre: 'adventure' };
     const st = STATUS[type];
-    let trophyMode = isPS(d.platform) ? 'paste' : 'auto';
+    let trophyMode = psDefault(d.platform);
 
     const gameFields = type === 'game' ? `
       <div class="grid-2">
@@ -180,6 +182,7 @@
       <div class="field">
         <label>Trophäen</label>
         <div class="seg" id="tmode">
+          ${PSN.connected() ? '<button type="button" data-m="psn">Von PlayStation</button>' : ''}
           <button type="button" data-m="auto">${'Automatisch erstellen'}</button>
           <button type="button" data-m="paste">Liste einfügen</button>
           <button type="button" data-m="none">Später</button>
@@ -215,7 +218,9 @@
           const body = $('#tmodeBody', m);
           if (!body) return;
           $$('#tmode button', m).forEach(b => b.classList.toggle('on', b.dataset.m === trophyMode));
-          if (trophyMode === 'auto') {
+          if (trophyMode === 'psn') {
+            body.innerHTML = `<div class="hint-box">${I.trophy}<div>Die echte Trophäenliste wird von deinem PlayStation-Konto geladen, mit deinen schon verdienten Trophäen. Das klappt für Spiele, die du auf PS4 oder PS5 mindestens einmal gestartet hast.</div></div>`;
+          } else if (trophyMode === 'auto') {
             body.innerHTML = `<div class="hint-box">${I.sparkle}<div>Passend zum Genre wird eine Trophäenliste mit Bronze, Silber, Gold und Platin erstellt. Du kannst danach jede Trophäe umbenennen, löschen oder eigene hinzufügen.</div></div>
               <div class="field" style="margin-top:12px"><label>Umfang</label><select class="input" name="tsize"><option value="short">Kurz (7)</option><option value="normal" selected>Normal (12)</option><option value="long">Umfangreich (18)</option></select></div>`;
           } else if (trophyMode === 'paste') {
@@ -230,7 +235,7 @@
         }
         $$('#tmode button', m).forEach(b => b.onclick = () => { trophyMode = b.dataset.m; renderTMode(); });
         const plat = form.elements.platform;
-        if (plat && !isEdit) plat.onchange = () => { trophyMode = isPS(plat.value) ? 'paste' : 'auto'; renderTMode(); };
+        if (plat && !isEdit) plat.onchange = () => { trophyMode = psDefault(plat.value); renderTMode(); };
         renderTMode();
         let fetched = null;
         const F = form.elements;
@@ -298,7 +303,7 @@
         };
         F.title.onblur = () => setTimeout(hideSug, 150);
 
-        $('#saveBtn', m).onclick = e => {
+        $('#saveBtn', m).onclick = async e => {
           e.preventDefault();
           const title = form.elements.title.value.trim();
           if (!title) { $('#titleErr', m).textContent = 'Gib einen Titel ein.'; form.elements.title.focus(); return; }
@@ -322,7 +327,25 @@
             return;
           }
           if (type === 'game') {
-            if (trophyMode === 'auto') { data.trophies = Trophies.generate(title, data.genre, form.elements.tsize.value); data.trophySource = 'generated'; }
+            if (trophyMode === 'psn') {
+              const btn = $('#saveBtn', m);
+              btn.textContent = 'Lade Trophäen…'; btn.disabled = true;
+              try {
+                const r = await PSN.trophiesFor(title);
+                if (r) {
+                  data.trophies = r.trophies; data.trophySource = 'psn'; data.psnId = r.title.id; data.psnService = r.title.service;
+                  Trophies.syncPlatinum(data.trophies);
+                  if (data.trophies.find(t => t.tier === 'platinum')?.done) data.status = 'done';
+                } else {
+                  data.trophies = Trophies.generate(title, data.genre, 'normal'); data.trophySource = 'generated';
+                  setTimeout(() => toast(`<div><b>Nicht im PlayStation-Verlauf gefunden</b><small>Trophäen wurden automatisch erstellt</small></div>`), 400);
+                }
+              } catch (err) {
+                btn.textContent = 'Hinzufügen'; btn.disabled = false;
+                $('#titleErr', m).textContent = err.code === 'expired' ? 'PlayStation-Anmeldung abgelaufen. Verbinde dich unter Daten neu.' : 'PlayStation nicht erreichbar. Wähle eine andere Option.';
+                return;
+              }
+            } else if (trophyMode === 'auto') { data.trophies = Trophies.generate(title, data.genre, form.elements.tsize.value); data.trophySource = 'generated'; }
             else if (trophyMode === 'paste') {
               data.trophies = collectPreview($('#pastePreview', m), parsed);
               data.trophySource = 'imported';
@@ -477,7 +500,7 @@
     const s = libState[type];
     const items = Store.all(type);
     const head = `<div class="page-head"><div><h1 class="page-title">${TYPES[type].plural}</h1><p class="page-sub">${items.length} ${items.length === 1 ? 'Eintrag' : 'Einträge'}</p></div>
-      <button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button></div>`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}<button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button></div></div>`;
     if (!items.length) { view.innerHTML = head + emptyState(type); return; }
 
     const platforms = type === 'game' ? [...new Set(items.map(i => i.platform).filter(Boolean))] : [];
@@ -524,7 +547,7 @@
       <button class="check ${t.done ? 'on' : ''} ${isPlat ? 'auto' : ''}" data-toggle="${t.id}" aria-label="${t.done ? 'Als offen markieren' : 'Abhaken'}" ${isPlat ? 'title="Wird automatisch verdient"' : ''}>${I.check}</button>
       <div class="tbadge">${Trophies.icon(t.tier, 22)}</div>
       <div style="min-width:0">
-        <div class="trophy-name">${esc(t.name)} <span class="tier-tag tt-${t.tier}">${Trophies.TIERS[t.tier].label}</span></div>
+        <div class="trophy-name">${esc(t.name)} <span class="tier-tag tt-${t.tier}">${Trophies.TIERS[t.tier].label}</span>${t.dlc ? ' <span class="tier-tag tt-dlc">DLC</span>' : ''}</div>
         ${t.desc ? `<div class="trophy-desc">${esc(t.desc)}</div>` : ''}
         ${t.done && t.doneAt ? `<div class="tiny" style="margin-top:2px">Verdient am ${fmtDate(t.doneAt)}</div>` : ''}
       </div>
@@ -578,6 +601,7 @@
             ${list.length ? (list.every(t => t.done) ? `<button class="btn btn-sm" id="tAll" data-mode="reset">Alle zurücksetzen</button>` : `<button class="btn btn-sm btn-primary" id="tAll" data-mode="all">${I.check} Alle abhaken</button>`) : ''}
             <button class="btn btn-sm" id="tAdd">${I.plus} Eigene</button>
             <button class="btn btn-sm" id="tImp">${I.paste} Liste einfügen</button>
+            ${item.psnId && PSN.connected() ? `<button class="btn btn-sm" id="tPsn">${I.refresh} Von PlayStation</button>` : ''}
             <button class="btn btn-sm" id="tGen">${I.sparkle} Erstellen</button>
           </div>
         </div>
@@ -645,6 +669,12 @@
           });
       });
       $('#tImp').onclick = () => trophyImport(g());
+      $('#tPsn') && ($('#tPsn').onclick = async () => {
+        const b = $('#tPsn'); b.disabled = true; b.textContent = 'Lade…';
+        try { const r = await PSN.syncOne(g()); toast(r ? `<div><b>Trophäen aktualisiert</b><small>${r.filter(t => t.done).length} von ${r.length} verdient</small></div>` : `<div><b>Nicht im PlayStation-Verlauf gefunden</b></div>`); }
+        catch (err) { toast(`<div><b>${err.code === 'expired' ? 'PlayStation-Anmeldung abgelaufen' : 'PlayStation nicht erreichbar'}</b><small>${err.code === 'expired' ? 'Unter Daten neu verbinden' : 'Später nochmal versuchen'}</small></div>`); }
+        render();
+      });
       $('#tGen').onclick = () => (g().trophies?.length ? trophyGenerate(g()) : trophyGenerate(g()));
       $('#tGen2') && ($('#tGen2').onclick = () => trophyGenerate(g()));
       $('#tImp2') && ($('#tImp2').onclick = () => trophyImport(g()));
@@ -754,6 +784,7 @@
     const n = Store.all().length;
     view.innerHTML = `<div class="${A()}" style="max-width:720px">
       <div class="page-head"><div><h1 class="page-title">Daten</h1><p class="page-sub">${n} Einträge sind in diesem Browser gespeichert.</p></div></div>
+      <div class="panel" id="psnPanel"></div>
       <div class="panel"><h3>Automatische Infos</h3><p>Beim Hinzufügen werden Cover, Erscheinungsdatum und Genre automatisch gesucht. Serien und Spiele funktionieren ohne Schlüssel. Für Filme brauchst du einen kostenlosen TMDB-Schlüssel. Er bleibt nur in diesem Browser gespeichert.</p>
         <div class="form">
           <div class="field"><label>Serien · TVmaze</label><div class="key-ok">Aktiv, kein Schlüssel nötig</div></div>
@@ -787,6 +818,7 @@
     };
     $('#impMerge').onchange = doImport('merge');
     $('#impReplace').onchange = doImport('replace');
+    renderPsnPanel();
     const k = Lookup.keys();
     $('#kTmdb').value = k.tmdb || '';
     const saveKeys = () => Lookup.setKeys({ ...Lookup.keys(), tmdb: $('#kTmdb').value.trim() });
@@ -801,6 +833,80 @@
     });
     $('#wipe').onclick = () => confirmDialog('Alle Spiele, Serien, Filme und Trophäen in diesem Browser werden gelöscht.', 'Alles löschen', () => { Store.clear(); render(); });
   }
+
+  /* ---------- PlayStation ---------- */
+  function renderPsnPanel() {
+    const el = $('#psnPanel'); if (!el) return;
+    const st = PSN.state();
+    const on = PSN.connected();
+    el.innerHTML = `<h3>PlayStation</h3>
+      ${on ? `<p>Verbunden. Die Anmeldung gilt bis ${fmtDate(new Date(st.refreshExpiresAt).toISOString())}.${st.lastSync ? ` Zuletzt synchronisiert: ${new Date(st.lastSync).toLocaleString('de-AT', { dateStyle: 'medium', timeStyle: 'short' })}.` : ''}</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" data-psnsync>${I.refresh} Jetzt synchronisieren</button><button class="btn btn-ghost btn-danger" id="psnOff">Trennen</button></div>`
+      : `<p>Hol dir alle Spiele, die du auf PS4 und PS5 gespielt hast, mit der echten Trophäenliste und deinen schon verdienten Trophäen.</p>
+        <ol class="steps">
+          <li>Melde dich auf <a href="https://www.playstation.com" target="_blank" rel="noopener">playstation.com</a> an.</li>
+          <li>Öffne danach im selben Browser <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noopener">ca.account.sony.com/api/v1/ssocookie</a>.</li>
+          <li>Kopiere den angezeigten Text (oder nur den Wert hinter „npsso“) und füge ihn hier ein.</li>
+        </ol>
+        <div class="field"><label>NPSSO-Code</label><div class="key-row"><input class="input" id="npsso" type="password" placeholder="64 Zeichen" autocomplete="off" spellcheck="false"><button class="btn btn-primary" id="psnOn">Verbinden</button></div>
+          <div class="tiny">Behandle den Code wie ein Passwort und gib ihn niemandem. Er wird nur einmal zum Anmelden verwendet und nicht gespeichert.</div><div class="field-error" id="psnErr"></div></div>`}
+      <details class="adv"><summary>Erweitert</summary>
+        <div class="field" style="margin-top:10px"><label>Server-Adresse</label><input class="input" id="psnWorker" value="${esc(PSN.worker())}" placeholder="https://nightshelf-psn.….workers.dev" spellcheck="false"></div>
+      </details>`;
+    $('#psnWorker').onchange = e => PSN.save({ worker: e.target.value.trim() });
+    $('#psnOff') && ($('#psnOff').onclick = () => { PSN.disconnect(); renderPsnPanel(); toast('<div><b>PlayStation getrennt</b></div>'); });
+    $('#psnOn') && ($('#psnOn').onclick = async () => {
+      const b = $('#psnOn'), err = $('#psnErr'), val = $('#npsso').value.trim();
+      err.textContent = '';
+      if (!val) { err.textContent = 'Füge zuerst den NPSSO-Code ein.'; return; }
+      if (!$('#psnWorker').value.trim()) { err.textContent = 'Es ist noch keine Server-Adresse eingetragen.'; return; }
+      b.disabled = true; b.textContent = 'Verbinde…';
+      try {
+        await PSN.connect(val, $('#psnWorker').value);
+        renderPsnPanel();
+        toast('<div><b>Mit PlayStation verbunden</b></div>');
+        runPsnSync();
+      } catch (e) {
+        b.disabled = false; b.textContent = 'Verbinden';
+        err.textContent = e.code === 'npsso_invalid' || e.code === 'auth_failed' ? 'Der Code wird nicht akzeptiert. Hol dir einen neuen (Schritt 2).' : e.code === 'network' ? 'Server nicht erreichbar. Prüfe die Server-Adresse.' : 'Verbinden hat nicht geklappt: ' + e.message;
+      }
+    });
+  }
+
+  let syncing = false;
+  function runPsnSync() {
+    if (syncing) return;
+    syncing = true;
+    openModal({
+      title: 'PlayStation synchronisieren',
+      body: `<div id="syncBody"><p class="muted" style="margin:0 0 12px">Lade deine Spieleliste…</p><div class="bar"><i id="syncBar" style="width:2%"></i></div><p class="tiny" id="syncName" style="margin-top:10px">&nbsp;</p></div>`,
+      foot: `<button class="btn" data-close>Im Hintergrund</button>`,
+      onMount: () => {
+        PSN.syncAll({
+          onProgress: ({ i, total, name }) => {
+            const bar = $('#syncBar'), nm = $('#syncName'), p = $('#syncBody p');
+            if (bar) bar.style.width = Math.round(i / total * 100) + '%';
+            if (nm) nm.textContent = `${i} von ${total}: ${name}`;
+            if (p) p.textContent = 'Lade Trophäen…';
+          },
+        }).then(r => {
+          syncing = false;
+          const body = $('#syncBody');
+          const msg = `${r.added} neue Spiele, ${r.updated} aktualisiert, ${r.earned} verdiente Trophäen${r.failed ? `, ${r.failed} konnten nicht geladen werden` : ''}.`;
+          if (body) body.innerHTML = `<div class="hint-box">${I.check}<div><b style="color:var(--text)">Fertig</b><br>${msg}</div></div>`;
+          else toast(`<div><b>PlayStation synchronisiert</b><small>${msg}</small></div>`);
+          render();
+        }).catch(e => {
+          syncing = false;
+          const body = $('#syncBody');
+          const msg = e.code === 'expired' ? 'Die Anmeldung ist abgelaufen. Verbinde dich unter Daten neu.' : e.code === 'no_worker' ? 'Es ist keine Server-Adresse eingetragen.' : 'PlayStation war nicht erreichbar. Versuch es später nochmal.';
+          if (body) body.innerHTML = `<p class="field-error" style="margin:0">${msg}</p>`; else toast(`<div><b>Sync fehlgeschlagen</b><small>${msg}</small></div>`);
+          render();
+        });
+      },
+    });
+  }
+  document.addEventListener('click', e => { if (e.target.closest('[data-psnsync]')) { e.preventDefault(); runPsnSync(); } });
 
   /* ---------- Router ---------- */
   function render() {

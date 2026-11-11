@@ -22,7 +22,7 @@ const Trophies = (() => {
   function syncPlatinum(list) {
     const plat = list.find(t => t.tier === 'platinum');
     if (!plat) return null;
-    const others = list.filter(t => t.tier !== 'platinum');
+    const others = list.filter(t => t.tier !== 'platinum' && !t.dlc);
     const shouldBe = others.length > 0 && others.every(t => t.done);
     if (shouldBe !== !!plat.done) {
       plat.done = shouldBe;
