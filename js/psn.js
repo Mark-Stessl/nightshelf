@@ -1,7 +1,7 @@
 /* Nightshelf – PlayStation-Synchronisierung über den eigenen Cloudflare Worker */
 const PSN = (() => {
   const KEY = 'nightshelf.psn';
-  const DEFAULT_WORKER = '';
+  const DEFAULT_WORKER = 'https://nightshelf-psn.stesslmark4.workers.dev';
   let titleCache = null;
 
   function state() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } }
