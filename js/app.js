@@ -274,7 +274,7 @@
                 if (pref) { F.platform.value = pref; F.platform.onchange && F.platform.onchange(); }
               }
             }
-            info.innerHTML = `<div class="fetched">${dt.cover ? `<img src="${esc(dt.cover)}" alt="">` : ''}<div><b>Infos übernommen</b><small>${esc([dt.released ? fmtDate(dt.released) : dt.year, (dt.genres || []).slice(0, 3).join(', '), dt.runtime ? dt.runtime + ' Min.' : '', dt.seasons ? dt.seasons + ' Staffeln' : ''].filter(Boolean).join(' · '))}</small></div>
+            info.innerHTML = `<div class="fetched">${dt.cover ? `<img src="${esc(dt.cover)}" alt="">` : ''}<div><b>Infos übernommen</b><small>${esc([dt.released ? fmtDate(dt.released) : dt.year, (dt.genres || []).slice(0, 3).join(', '), dt.runtime ? dt.runtime + ' Min.' : '', dt.seasons ? dt.seasons + (dt.seasons === 1 ? ' Staffel' : ' Staffeln') : ''].filter(Boolean).join(' · '))}</small></div>
               <button type="button" class="btn btn-ghost btn-sm" id="undoFetch">Entfernen</button></div>`;
             $('#undoFetch', m).onclick = () => { fetched = null; F.cover.value = ''; info.innerHTML = ''; };
           } catch { info.innerHTML = `<div class="tiny" style="margin-top:4px">Details konnten nicht geladen werden.</div>`; }
@@ -548,7 +548,7 @@
     if (item.platform) meta.push(esc(item.platform));
     if (item.genre && item.type === 'game') meta.push(Trophies.GENRES[item.genre]);
     if (item.year) meta.push(item.year);
-    if (item.type === 'series' && item.seasons) meta.push(`${item.seasons} Staffeln`);
+    if (item.type === 'series' && item.seasons) meta.push(`${item.seasons} ${item.seasons === 1 ? 'Staffel' : 'Staffeln'}`);
     if (item.runtime) meta.push(`${item.runtime} Min.`);
     if (item.genres?.length && item.type !== 'game') meta.push(esc(item.genres.slice(0, 3).join(', ')));
     if (item.released) meta.push(`Erschienen ${fmtDate(item.released)}`);
