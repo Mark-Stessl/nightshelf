@@ -81,7 +81,7 @@ const Lookup = (() => {
     const data = await getJSON(url);
     const pages = Object.values(data.query?.pages || {}).sort((a, b) => a.index - b.index);
     return pages
-      .filter(p => /video game|\bgame\b/i.test(p.description || '') && !/series|film|novel|character|franchise|album|soundtrack/i.test(p.description || ''))
+      .filter(p => /video game|\bgame\b/i.test(p.description || '') && !/series|film|novel|character|franchise|album|soundtrack|award|show|esports|tournament|company|developer|engine/i.test(p.description || ''))
       .slice(0, 6)
       .map(p => {
         const y = (p.description || '').match(/(19|20)\d{2}/);
