@@ -437,3 +437,8 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 .adv summary { cursor: pointer; font-size: 13px; color: var(--text-3); }
 .tt-dlc { color: var(--lilac); background: rgba(139, 92, 246, .14); }
 .btn:disabled { opacity: .6; cursor: progress; }
+
+/* Trophäen-Zähler im Level-Kasten bleiben auch bei großen Zahlen innerhalb */
+.level-card .tier-counts { justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; font-size: 12.5px; }
+.level-card .tier-counts span { gap: 3px; white-space: nowrap; }
+.level-card { overflow: hidden; }

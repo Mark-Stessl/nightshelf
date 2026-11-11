@@ -45,16 +45,10 @@ const Trophies = (() => {
     return { counts, done, total: list.length, pts, max, pct: max ? Math.round((pts / max) * 100) : 0 };
   }
 
-  /* Sonys Level-System (seit 2020): Punkte pro Level steigen in 100er-Stufen */
-  const LEVEL_STEPS = [60, 90, 450, 900, 1350, 1800, 2250, 2700, 3150, 3600];
   function levelFromPoints(points) {
-    let level = 1, rest = points;
-    while (level < 999) {
-      const need = LEVEL_STEPS[Math.min(9, Math.floor(level / 100))];
-      if (rest < need) return { level, into: rest, need, pct: Math.round((rest / need) * 100) };
-      rest -= need; level++;
-    }
-    return { level: 999, into: 0, need: 1, pct: 100 };
+    let level = 1, need = 100, rest = points;
+    while (rest >= need && level < 999) { rest -= need; level++; need = 100 + (level - 1) * 40; }
+    return { level, into: rest, need, pct: Math.round((rest / need) * 100) };
   }
 
   /* ---------- Generator ---------- */

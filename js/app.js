@@ -84,7 +84,7 @@
   }
 
   function tierCountsHTML(c) {
-    return Trophies.ORDER.map(t => `<span style="color:${Trophies.TIERS[t].color}">${Trophies.icon(t, 15)} ${c[t]}</span>`).join('');
+    return Trophies.ORDER.map(t => `<span style="color:${Trophies.TIERS[t].color}">${Trophies.icon(t, 13)} ${c[t]}</span>`).join('');
   }
 
   function renderSidebarLevel() {
