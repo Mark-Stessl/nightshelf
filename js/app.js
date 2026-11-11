@@ -456,7 +456,7 @@
   function cardHTML(item) {
     const meta = [];
     if (item.type === 'game' && item.platform) meta.push(esc(item.platform));
-    if (item.type === 'series' && item.seasons) meta.push(`${item.seasonSeen || 0}/${item.seasons} Staffeln`);
+    if (item.type === 'series' && item.seasons) meta.push(`${item.seasonSeen || 0}/${item.seasons} ${item.seasons === 1 ? 'Staffel' : 'Staffeln'}`);
     if (item.year) meta.push(item.year);
     let extra = '';
     if (item.type === 'game' && item.trophies?.length) {
