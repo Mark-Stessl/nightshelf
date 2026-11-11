@@ -1,4 +1,4 @@
-/* Nightshelf – automatische Daten: TVmaze (Serien), TMDB (Filme), RAWG (Spiele) */
+/* Nightshelf – automatische Daten: TVmaze (Serien), TMDB (Filme), Wikipedia/Wikidata (Spiele) */
 const Lookup = (() => {
   const KEY = 'nightshelf.keys';
   function keys() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } }
@@ -61,51 +61,59 @@ const Lookup = (() => {
     };
   }
 
-  /* ---------- Spiele: RAWG ---------- */
+  /* ---------- Spiele: Wikipedia + Wikidata (ohne Schlüssel) ---------- */
   const PLATFORM_MAP = [
-    [/playstation 5/i, 'PS5'], [/playstation 4/i, 'PS4'], [/nintendo switch 2/i, 'Switch 2'], [/nintendo switch/i, 'Switch'],
-    [/^pc$/i, 'PC'], [/xbox/i, 'Xbox'], [/ios|android/i, 'Mobile'],
+    [/^playstation 5$/i, 'PS5'], [/^playstation 4$/i, 'PS4'], [/nintendo switch 2/i, 'Switch 2'], [/^nintendo switch$/i, 'Switch'],
+    [/^(microsoft windows|linux|macos|steam)$/i, 'PC'], [/steam deck/i, 'Steam Deck'], [/xbox (series|one)/i, 'Xbox'], [/^(ios|android)$/i, 'Mobile'],
   ];
-  const GENRE_MAP = {
-    'role-playing-games-rpg': 'rpg', platformer: 'platformer', shooter: 'shooter', racing: 'racing', sports: 'sports',
-    fighting: 'fighting', strategy: 'strategy', puzzle: 'puzzle', simulation: 'sim', family: 'party', casual: 'sim',
-    adventure: 'adventure', action: 'adventure', arcade: 'party', board_games: 'party',
-  };
-  function mapPlatforms(list) {
-    const out = [];
-    (list || []).forEach(p => { const hit = PLATFORM_MAP.find(([re]) => re.test(p.platform?.name || '')); if (hit && !out.includes(hit[1])) out.push(hit[1]); });
-    return out;
-  }
-  function mapGenre(game) {
-    const tags = (game.tags || []).map(t => t.slug);
-    if (tags.some(t => /horror/.test(t))) return 'horror';
-    if (tags.includes('sandbox') || tags.includes('crafting')) return 'sandbox';
-    const slugs = (game.genres || []).map(g => g.slug);
-    const order = ['role-playing-games-rpg', 'platformer', 'shooter', 'racing', 'sports', 'fighting', 'strategy', 'puzzle', 'simulation', 'family', 'arcade', 'casual', 'adventure', 'action'];
-    const best = order.find(s => slugs.includes(s));
-    return best ? GENRE_MAP[best] : 'other';
-  }
+  const GENRE_RULES = [
+    [/role-playing/i, 'rpg'], [/platform game|platformer/i, 'platformer'], [/shooter/i, 'shooter'], [/racing|kart/i, 'racing'],
+    [/sports|football|basketball|golf|tennis/i, 'sports'], [/fighting|beat 'em up/i, 'fighting'], [/strategy|tactics|4x/i, 'strategy'],
+    [/puzzle/i, 'puzzle'], [/horror/i, 'horror'], [/sandbox|survival game|city-building|crafting/i, 'sandbox'], [/party/i, 'party'],
+    [/simulation|life sim|farming/i, 'sim'], [/adventure|hack and slash|action game|metroidvania|soulslike|stealth/i, 'adventure'],
+  ];
+  const WIKI = 'https://en.wikipedia.org/w/api.php?format=json&origin=*';
+  const WD = 'https://www.wikidata.org/w/api.php?format=json&origin=*';
+  const cleanTitle = t => t.replace(/\s*\((?:\d{4} )?video game\)$/i, '').trim();
+
   async function searchGames(q) {
-    const k = (keys().rawg || '').trim(); if (!k) throw new Error('nokey');
-    const data = await getJSON(`https://api.rawg.io/api/games?key=${encodeURIComponent(k)}&search=${encodeURIComponent(q)}&page_size=6&search_precise=true`);
-    return (data.results || []).map(g => ({
-      source: 'rawg', id: g.id, title: g.name, year: year(g.released),
-      cover: g.background_image || '', thumb: g.background_image || '', raw: g,
-      sub: [year(g.released), mapPlatforms(g.platforms).join(', ')].filter(Boolean).join(' · '),
-    }));
+    const url = `${WIKI}&action=query&generator=search&gsrsearch=${encodeURIComponent(q + ' video game')}&gsrlimit=12&prop=pageimages|description|pageprops&piprop=thumbnail&pithumbsize=600&pilicense=any&ppprop=wikibase_item`;
+    const data = await getJSON(url);
+    const pages = Object.values(data.query?.pages || {}).sort((a, b) => a.index - b.index);
+    return pages
+      .filter(p => /video game|\bgame\b/i.test(p.description || '') && !/series|film|novel|character|franchise|album|soundtrack/i.test(p.description || ''))
+      .slice(0, 6)
+      .map(p => {
+        const y = (p.description || '').match(/(19|20)\d{2}/);
+        const img = (p.thumbnail?.source || '').replace(/\?utm_[^]*$/, '');
+        return { source: 'wikipedia', id: p.pageid, qid: p.pageprops?.wikibase_item, title: cleanTitle(p.title),
+          year: y ? +y[0] : null, cover: img, thumb: img, sub: p.description || '' };
+      });
   }
   async function detailGame(hit) {
-    const g = hit.raw || {};
-    return {
-      title: hit.title, year: hit.year, cover: hit.cover,
-      platforms: mapPlatforms(g.platforms), genre: mapGenre(g),
-      genres: (g.genres || []).map(x => x.name), released: g.released || null, external: `rawg:${hit.id}`,
-    };
+    const out = { title: hit.title, year: hit.year, cover: hit.cover, platforms: [], genre: 'other', genres: [], released: null, external: `wikidata:${hit.qid || hit.id}` };
+    if (!hit.qid) return out;
+    const e = await getJSON(`${WD}&action=wbgetentities&ids=${hit.qid}&props=claims`).catch(() => null);
+    const c = e?.entities?.[hit.qid]?.claims || {};
+    const ids = arr => (arr || []).map(x => x.mainsnak?.datavalue?.value?.id).filter(Boolean);
+    const dates = (c.P577 || []).map(x => x.mainsnak?.datavalue?.value?.time).filter(Boolean).sort();
+    if (dates[0]) { const d = dates[0].replace(/^\+/, '').slice(0, 10); out.released = d.endsWith('-00-00') ? null : d.replace(/-00$/, '-01'); out.year = +d.slice(0, 4); }
+    const pIds = ids(c.P400), gIds = ids(c.P136);
+    const all = [...new Set([...pIds, ...gIds])].slice(0, 50);
+    if (all.length) {
+      const l = await getJSON(`${WD}&action=wbgetentities&ids=${all.join('|')}&props=labels&languages=en&languagefallback=1`).catch(() => null);
+      const label = id => l?.entities?.[id]?.labels?.en?.value || '';
+      pIds.map(label).forEach(n => { const hitP = PLATFORM_MAP.find(([re]) => re.test(n)); if (hitP && !out.platforms.includes(hitP[1])) out.platforms.push(hitP[1]); });
+      out.genres = gIds.map(label).filter(Boolean);
+      const g = GENRE_RULES.find(([re]) => out.genres.some(n => re.test(n)));
+      if (g) out.genre = g[1];
+    }
+    return out;
   }
 
   const SEARCH = { series: searchSeries, movie: searchMovies, game: searchGames };
   const DETAIL = { series: detailSeries, movie: detailMovie, game: detailGame };
-  const NEEDS = { movie: 'tmdb', game: 'rawg' };
+  const NEEDS = { movie: 'tmdb' };
 
   return {
     keys, setKeys,

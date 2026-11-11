@@ -9,6 +9,7 @@ Persönliches Regal für Spiele, Serien und Filme – mit Trophäen-System im Pl
   - Platin wird automatisch verdient, sobald alle anderen Trophäen abgehakt sind
   - **Liste einfügen:** Trophäenliste von PSNProfiles, Exophase oder Steam kopieren und einfügen. Prozentwerte bestimmen die Stufe, bereits verdiente Trophäen (mit Datum) werden direkt abgehakt. Eigenes Format: `Name | Beschreibung | Gold`
   - **Automatisch erstellen:** Für Spiele ohne Erfolge (z. B. Nintendo Switch) wird passend zum Genre eine eigene Liste erzeugt, die du bearbeiten kannst
+- **Automatische Infos** beim Hinzufügen: Cover, Erscheinungsdatum, Genre usw. – Serien über TVmaze, Spiele über Wikipedia/Wikidata (beide ohne Schlüssel), Filme über TMDB (kostenloser Schlüssel unter „Daten“)
 - **Trophäen-Level** aus gesammelten Punkten (Bronze 15, Silber 30, Gold 90, Platin 300)
 - **Backup** als JSON-Datei herunterladen und wieder einlesen (Seite „Daten“)
 

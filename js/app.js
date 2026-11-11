@@ -235,7 +235,7 @@
         let fetched = null;
         const F = form.elements;
         const sug = $('#suggest', m), info = $('#lookupInfo', m);
-        const keyHint = { movie: 'TMDB', game: 'RAWG' }[type];
+        const keyHint = { movie: 'TMDB' }[type];
         if (!Lookup.hasKey(type)) info.innerHTML = `<div class="tiny" style="margin-top:4px">Tipp: Mit einem kostenlosen ${keyHint}-Schlüssel unter <a href="#/settings" data-close style="color:var(--lilac)">Daten</a> werden Cover und Infos automatisch ausgefüllt.</div>`;
         let timer, seq = 0, hits = [], activeIdx = -1;
         const hideSug = () => { sug.hidden = true; activeIdx = -1; };
@@ -603,6 +603,7 @@
           <div style="margin-top:12px">${starsInput(item.rating, 'heroRating')}</div>
           ${item.notes ? `<div class="hero-notes">${esc(item.notes)}</div>` : ''}
           ${item.summary ? `<div class="hero-summary">${esc(item.summary)}</div>` : ''}
+          ${item.external ? `<div class="tiny" style="margin-top:8px">Infos von ${{ tvmaze: 'TVmaze', tmdb: 'TMDB', wikidata: 'Wikipedia / Wikidata', rawg: 'RAWG' }[item.external.split(':')[0]] || 'externer Datenbank'}</div>` : ''}
           ${ring}${seriesBlock}
           <div class="hero-actions">
             <select class="input" id="quickStatus" style="width:auto">${Object.entries(STATUS[item.type]).map(([k, v]) => `<option value="${k}" ${k === item.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
@@ -733,13 +734,12 @@
     const n = Store.all().length;
     view.innerHTML = `<div class="${A()}" style="max-width:720px">
       <div class="page-head"><div><h1 class="page-title">Daten</h1><p class="page-sub">${n} Einträge sind in diesem Browser gespeichert.</p></div></div>
-      <div class="panel"><h3>Automatische Infos</h3><p>Beim Hinzufügen werden Cover, Erscheinungsdatum und Genre automatisch gesucht. Serien funktionieren ohne Schlüssel. Für Filme und Spiele brauchst du je einen kostenlosen API-Schlüssel. Er bleibt nur in diesem Browser gespeichert.</p>
+      <div class="panel"><h3>Automatische Infos</h3><p>Beim Hinzufügen werden Cover, Erscheinungsdatum und Genre automatisch gesucht. Serien und Spiele funktionieren ohne Schlüssel. Für Filme brauchst du einen kostenlosen TMDB-Schlüssel. Er bleibt nur in diesem Browser gespeichert.</p>
         <div class="form">
           <div class="field"><label>Serien · TVmaze</label><div class="key-ok">Aktiv, kein Schlüssel nötig</div></div>
           <div class="field"><label>Filme · TMDB-Schlüssel</label><div class="key-row"><input class="input" id="kTmdb" placeholder="API-Schlüssel oder Lesezugriffs-Token" autocomplete="off" spellcheck="false"><button class="btn" data-test="movie">Testen</button></div>
             <div class="tiny">Kostenlos auf <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener" style="color:var(--lilac)">themoviedb.org/settings/api</a></div><div class="tiny" id="tMovie"></div></div>
-          <div class="field"><label>Spiele · RAWG-Schlüssel</label><div class="key-row"><input class="input" id="kRawg" placeholder="API-Schlüssel" autocomplete="off" spellcheck="false"><button class="btn" data-test="game">Testen</button></div>
-            <div class="tiny">Kostenlos auf <a href="https://rawg.io/apidocs" target="_blank" rel="noopener" style="color:var(--lilac)">rawg.io/apidocs</a></div><div class="tiny" id="tGame"></div></div>
+          <div class="field"><label>Spiele · Wikipedia</label><div class="key-ok">Aktiv, kein Schlüssel nötig</div>
         </div></div>
       <div class="panel"><h3>Sichern</h3><p>Lade alle Spiele, Serien, Filme und Trophäen als Datei herunter. Damit kannst du sie auf ein anderes Gerät mitnehmen oder ein Backup behalten.</p>
         <button class="btn btn-primary" id="exp">${I.download} Backup herunterladen</button></div>
@@ -747,6 +747,7 @@
         <div style="display:flex;gap:8px;flex-wrap:wrap"><label class="btn">${I.upload} Datei zusammenführen<input type="file" accept=".json,application/json" id="impMerge" hidden></label>
         <label class="btn btn-ghost">Datei ersetzt alles<input type="file" accept=".json,application/json" id="impReplace" hidden></label></div>
         <div class="field-error" id="impErr" style="margin-top:8px"></div></div>
+      <div class="panel"><h3>Quellen</h3><p style="margin:0">Serien-Infos von <a href="https://www.tvmaze.com" target="_blank" rel="noopener" style="color:var(--lilac)">TVmaze</a> (CC BY-SA), Film-Infos von <a href="https://www.themoviedb.org" target="_blank" rel="noopener" style="color:var(--lilac)">TMDB</a>, Spiele-Infos von <a href="https://www.wikipedia.org" target="_blank" rel="noopener" style="color:var(--lilac)">Wikipedia</a> und <a href="https://www.wikidata.org" target="_blank" rel="noopener" style="color:var(--lilac)">Wikidata</a>. Dieses Produkt nutzt die TMDB-API, ist aber nicht von TMDB unterstützt oder zertifiziert.</p></div>
       <div class="panel"><h3>Zurücksetzen</h3><p>Löscht alle Einträge in diesem Browser. Lade vorher ein Backup herunter.</p>
         <button class="btn btn-danger" id="wipe">${I.trash} Alles löschen</button></div>
     </div>`;
@@ -767,12 +768,12 @@
     $('#impMerge').onchange = doImport('merge');
     $('#impReplace').onchange = doImport('replace');
     const k = Lookup.keys();
-    $('#kTmdb').value = k.tmdb || ''; $('#kRawg').value = k.rawg || '';
-    const saveKeys = () => Lookup.setKeys({ tmdb: $('#kTmdb').value.trim(), rawg: $('#kRawg').value.trim() });
-    $('#kTmdb').oninput = saveKeys; $('#kRawg').oninput = saveKeys;
+    $('#kTmdb').value = k.tmdb || '';
+    const saveKeys = () => Lookup.setKeys({ ...Lookup.keys(), tmdb: $('#kTmdb').value.trim() });
+    $('#kTmdb').oninput = saveKeys;
     $$('[data-test]').forEach(b => b.onclick = async () => {
       saveKeys();
-      const t = b.dataset.test, out = $(t === 'movie' ? '#tMovie' : '#tGame');
+      const t = b.dataset.test, out = $('#tMovie');
       if (!Lookup.hasKey(t)) { out.innerHTML = '<span style="color:var(--danger)">Trag zuerst einen Schlüssel ein.</span>'; return; }
       out.textContent = 'Teste…';
       try { await Lookup.test(t); out.innerHTML = '<span style="color:var(--cyan)">Funktioniert</span>'; }
