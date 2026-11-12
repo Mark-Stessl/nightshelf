@@ -194,10 +194,11 @@ const Lookup = (() => {
   }
 
   /* Viele Anime auf einmal zuordnen und zu Reihen (Prequel/Sequel-Ketten) gruppieren */
-  const GROUP_FIELDS = 'id title { romaji english } format episodes genres startDate { year month day } coverImage { extraLarge large } relations { edges { relationType node { id type format } } }';
+  const GROUP_FIELDS = 'id title { romaji english } synonyms format episodes genres startDate { year month day } coverImage { extraLarge large } relations { edges { relationType node { id type format } } }';
   function seasonFromMedia(m, label) {
     return { anilistId: m.id, title: m.title?.english || m.title?.romaji, label, format: m.format, episodes: m.episodes || null, year: m.startDate?.year || null, cover: m.coverImage?.extraLarge || m.coverImage?.large || '' };
   }
+  const normT = t => (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
   async function matchAnimeList(entries, onProgress = () => {}) {
     const media = new Map();
     const matched = new Array(entries.length).fill(null);
@@ -212,11 +213,17 @@ const Lookup = (() => {
         part.forEach((ei, k) => {
           vars['q' + k] = entries[ei].title;
           defs.push(`$q${k}: String`);
-          body.push(`a${k}: Media(search: $q${k}, type: ANIME${withFilter ? filterFor(entries[ei]) : ''}) { ${GROUP_FIELDS} }`);
+          body.push(`a${k}: Page(perPage: 4) { media(search: $q${k}, type: ANIME, sort: SEARCH_MATCH${withFilter ? filterFor(entries[ei]) : ''}) { ${GROUP_FIELDS} } }`);
         });
         let data = null;
         try { data = await anilist(`query(${defs.join(', ')}) { ${body.join(' ')} }`, vars); } catch {}
-        part.forEach((ei, k) => { const m = data?.['a' + k]; if (m) { media.set(m.id, m); matched[ei] = m.id; } });
+        part.forEach((ei, k) => {
+          const list = data?.['a' + k]?.media || [];
+          const want = normT(entries[ei].title);
+          const names = m => [m.title?.english, m.title?.romaji, ...(m.synonyms || [])].map(normT);
+          const m = list.find(x => names(x).includes(want)) || list.find(x => names(x).some(n => n && (n.startsWith(want) || want.startsWith(n)))) || list[0];
+          if (m) { media.set(m.id, m); matched[ei] = m.id; }
+        });
         if (withFilter) onProgress({ phase: 'match', done: Math.min(idxs.length, i + CHUNK), total: idxs.length });
         await new Promise(r => setTimeout(r, 400));
       }
