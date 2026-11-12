@@ -202,20 +202,28 @@ const Lookup = (() => {
     const media = new Map();
     const matched = new Array(entries.length).fill(null);
     const CHUNK = 8;
-    for (let i = 0; i < entries.length; i += CHUNK) {
-      const part = entries.slice(i, i + CHUNK);
-      const vars = {}, defs = [], body = [];
-      part.forEach((e, k) => {
-        vars['q' + k] = e.title;
-        defs.push(`$q${k}: String`);
-        body.push(`a${k}: Media(search: $q${k}, type: ANIME${e.movie ? ', format: MOVIE' : ''}) { ${GROUP_FIELDS} }`);
-      });
-      let data = null;
-      try { data = await anilist(`query(${defs.join(', ')}) { ${body.join(' ')} }`, vars); } catch {}
-      part.forEach((e, k) => { const m = data?.['a' + k]; if (m) { media.set(m.id, m); matched[i + k] = m.id; } });
-      onProgress({ phase: 'match', done: Math.min(entries.length, i + CHUNK), total: entries.length });
-      await new Promise(r => setTimeout(r, 400));
-    }
+    const filterFor = e => e.movie ? ', format: MOVIE'
+      : /\bTV\b|Streaming|\bSub\b|\bDub\b|\bEP\d/i.test(e.format || '') ? ', format_in: [TV, TV_SHORT, ONA]'
+      : /\b(RLS|OVA|Event)\b/i.test(e.format || '') ? ', format_in: [OVA, SPECIAL, ONA, MOVIE]' : '';
+    const searchBatch = async (idxs, withFilter) => {
+      for (let i = 0; i < idxs.length; i += CHUNK) {
+        const part = idxs.slice(i, i + CHUNK);
+        const vars = {}, defs = [], body = [];
+        part.forEach((ei, k) => {
+          vars['q' + k] = entries[ei].title;
+          defs.push(`$q${k}: String`);
+          body.push(`a${k}: Media(search: $q${k}, type: ANIME${withFilter ? filterFor(entries[ei]) : ''}) { ${GROUP_FIELDS} }`);
+        });
+        let data = null;
+        try { data = await anilist(`query(${defs.join(', ')}) { ${body.join(' ')} }`, vars); } catch {}
+        part.forEach((ei, k) => { const m = data?.['a' + k]; if (m) { media.set(m.id, m); matched[ei] = m.id; } });
+        if (withFilter) onProgress({ phase: 'match', done: Math.min(idxs.length, i + CHUNK), total: idxs.length });
+        await new Promise(r => setTimeout(r, 400));
+      }
+    };
+    await searchBatch(entries.map((_, i) => i), true);
+    const retry = matched.map((m, i) => m ? null : i).filter(i => i !== null);
+    if (retry.length) await searchBatch(retry, false);
     const link = (m, type) => (m?.relations?.edges || []).filter(e => e.relationType === type && e.node.type === 'ANIME' && SEASON_FORMATS.includes(e.node.format)).map(e => e.node.id);
     for (let round = 0; round < 20; round++) {
       const missing = new Set();
