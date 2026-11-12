@@ -230,7 +230,7 @@
           if (trophyMode === 'psn') {
             body.innerHTML = `<div class="hint-box">${I.trophy}<div>Die echte Trophäenliste wird von deinem PlayStation-Konto geladen, mit deinen schon verdienten Trophäen. Das klappt für Spiele, die du auf PS4 oder PS5 mindestens einmal gestartet hast.</div></div>`;
           } else if (trophyMode === 'auto') {
-            body.innerHTML = `<div class="hint-box">${I.sparkle}<div>Passend zum Genre wird eine Trophäenliste mit Bronze, Silber, Gold und Platin erstellt. Du kannst danach jede Trophäe umbenennen, löschen oder eigene hinzufügen.</div></div>
+            body.innerHTML = aiBlockedToday() ? `<div class="hint-box quota">${I.info}<div><b>Heute nicht mehr möglich.</b> ${aiQuotaText()} Wähle „Später“ und erstelle die Trophäen dann auf der Spielseite.</div></div>` : `<div class="hint-box">${I.sparkle}<div>Die KI liest sich Infos zum Spiel durch und erstellt Trophäen, die genau zu diesem Spiel passen, mit Bronze, Silber, Gold und Platin. Du kannst danach jede Trophäe umbenennen, löschen oder eigene hinzufügen.</div></div>
               <div class="field" style="margin-top:12px"><label>Umfang</label><select class="input" name="tsize"><option value="short">Kurz (7)</option><option value="normal" selected>Normal (12)</option><option value="long">Umfangreich (18)</option></select></div>`;
           } else if (trophyMode === 'paste') {
             body.innerHTML = `<div class="hint-box">${I.paste}<div>Kopiere die Trophäenliste z. B. von PSNProfiles, Exophase oder der Steam-Erfolgsseite und füge sie hier ein. Prozentwerte werden erkannt und für die Stufe genutzt, verdiente Trophäen (mit Datum) werden direkt abgehakt. Eigenes Format geht auch: <code>Name | Beschreibung | Gold</code></div></div>
@@ -356,7 +356,19 @@
                 $('#titleErr', m).textContent = err.code === 'expired' ? 'PlayStation-Anmeldung abgelaufen. Verbinde dich unter Daten neu.' : 'PlayStation nicht erreichbar. Wähle eine andere Option.';
                 return;
               }
-            } else if (trophyMode === 'auto') { data.trophies = Trophies.generate(title, data.genre, form.elements.tsize.value); data.trophySource = 'generated'; }
+            } else if (trophyMode === 'auto') {
+              const btn = $('#saveBtn', m);
+              btn.textContent = 'Analysiere Spiel…'; btn.disabled = true;
+              const r = await smartTrophies(title, data.genre, data.platform, form.elements.tsize?.value || 'normal');
+              if (r.reason === 'ai_quota') {
+                btn.textContent = 'Hinzufügen'; btn.disabled = false;
+                renderTMode();
+                $('#titleErr', m).textContent = 'Heute nicht mehr möglich: ' + aiQuotaText() + ' Wähle „Später“, um das Spiel ohne Trophäen anzulegen.';
+                return;
+              }
+              data.trophies = r.trophies; data.trophySource = r.ai ? 'ai' : 'generated';
+              if (!r.ai) setTimeout(() => toast(`<div><b>Genre-Vorlage verwendet</b><small>Die KI war gerade nicht erreichbar</small></div>`), 400);
+            }
             else if (trophyMode === 'paste') {
               data.trophies = collectPreview($('#pastePreview', m), parsed);
               data.trophySource = 'imported';
@@ -474,21 +486,64 @@
     });
   }
 
+  const AI_KEY = 'nightshelf.aiQuota';
+  const utcDay = () => new Date().toISOString().slice(0, 10);
+  const aiBlockedToday = () => { try { return localStorage.getItem(AI_KEY) === utcDay(); } catch { return false; } };
+  function aiResetTime() {
+    const d = new Date(); d.setUTCHours(24, 0, 0, 0);
+    return d.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
+  }
+  const aiQuotaText = () => `Die KI-Trophäen sind für heute aufgebraucht. Ab ${aiResetTime()} Uhr geht es wieder.`;
+
+  async function smartTrophies(title, genre, platform, size = 'normal') {
+    if (aiBlockedToday()) return { trophies: null, ai: false, reason: 'ai_quota' };
+    try {
+      const res = await fetch(`${PSN.worker()}/achievements`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, genre: Trophies.GENRES[genre] || '', platform: platform || '', size }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !Array.isArray(data.trophies) || !data.trophies.length) throw Object.assign(new Error(data.error || 'ai'), { code: data.error });
+      const trophies = data.trophies.map(t => ({ id: Store.uid(), name: t.name, desc: t.desc || '', tier: Trophies.TIERS[t.tier] ? t.tier : 'bronze', done: false }));
+      const rank = { platinum: 0, gold: 1, silver: 2, bronze: 3 };
+      trophies.sort((a, b) => rank[a.tier] - rank[b.tier]);
+      return { trophies, ai: true };
+    } catch (e) {
+      if (e.code === 'ai_quota') { try { localStorage.setItem(AI_KEY, utcDay()); } catch {} return { trophies: null, ai: false, reason: 'ai_quota' }; }
+      return { trophies: Trophies.generate(title, genre, size), ai: false, reason: e.code };
+    }
+  }
+
   function trophyGenerate(game) {
     openModal({
       title: 'Trophäen erstellen',
       body: `<div class="form">
-        <div class="hint-box">${I.sparkle}<div>Erstellt eine neue Liste passend zum Genre. Deine bisherigen Trophäen für ${esc(game.title)} werden dabei ersetzt.</div></div>
+        <div class="hint-box">${I.sparkle}<div>Erstellt eine neue Liste für ${esc(game.title)}. Deine bisherigen Trophäen werden dabei ersetzt.</div></div>
+        <div class="field"><label>Art</label><div class="seg" id="gMode"><button type="button" data-m="ai" class="${aiBlockedToday() ? '' : 'on'}">Passend zum Spiel (KI)</button><button type="button" data-m="genre" class="${aiBlockedToday() ? 'on' : ''}">Genre-Vorlage</button></div></div>
+        ${aiBlockedToday() ? `<div class="hint-box quota">${I.info}<div><b>Heute nicht mehr möglich.</b> ${aiQuotaText()}</div></div>` : ''}
         <div class="grid-2">
           <div class="field"><label>Genre</label><select class="input" id="gGenre">${Object.entries(Trophies.GENRES).map(([k, v]) => `<option value="${k}" ${k === game.genre ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-          <div class="field"><label>Umfang</label><select class="input" id="gSize"><option value="short">Kurz (7)</option><option value="normal" selected>Normal (12)</option><option value="long">Umfangreich (18)</option></select></div>
-        </div></div>`,
+          <div class="field"><label>Umfang</label><select class="input" id="gSize"><option value="short">Kurz</option><option value="normal" selected>Normal</option><option value="long">Umfangreich</option></select></div>
+        </div><div class="field-error" id="gErr"></div></div>`,
       foot: `<button class="btn btn-ghost" data-close>Abbrechen</button><button class="btn btn-primary" id="gBtn">${I.sparkle} Erstellen</button>`,
       onMount: (m, close) => {
-        $('#gBtn', m).onclick = () => {
-          const genre = $('#gGenre', m).value;
-          Store.update(game.id, { genre, trophies: Trophies.generate(game.title, genre, $('#gSize', m).value), trophySource: 'generated' });
-          close(); render();
+        let mode = aiBlockedToday() ? 'genre' : 'ai';
+        $$('#gMode button', m).forEach(b => b.onclick = () => { mode = b.dataset.m; $('#gErr', m).textContent = ''; $$('#gMode button', m).forEach(x => x.classList.toggle('on', x === b)); });
+        $('#gBtn', m).onclick = async () => {
+          const genre = $('#gGenre', m).value, size = $('#gSize', m).value;
+          if (mode === 'genre') {
+            Store.update(game.id, { genre, trophies: Trophies.generate(game.title, genre, size), trophySource: 'generated' });
+            close(); render(); return;
+          }
+          const b = $('#gBtn', m); b.disabled = true; b.textContent = 'Analysiere Spiel…';
+          const r = await smartTrophies(game.title, genre, game.platform, size);
+          if (!r.ai) {
+            b.disabled = false; b.innerHTML = `${I.sparkle} Erstellen`;
+            $('#gErr', m).textContent = r.reason === 'ai_quota' ? 'Heute nicht mehr möglich: ' + aiQuotaText() : 'Die KI war gerade nicht erreichbar. Versuch es nochmal oder nimm die Genre-Vorlage.';
+            return;
+          }
+          Store.update(game.id, { genre, trophies: r.trophies, trophySource: 'ai' });
+          close(); render(); toast(`<div><b>${r.trophies.length} Trophäen erstellt</b><small>passend zu ${esc(game.title)}</small></div>`);
         };
       },
     });
@@ -788,7 +843,7 @@
         <div class="tier-box">${Trophies.ORDER.filter(t => p.counts[t][1]).map(t => `<div class="tier-stat"><div class="t">${Trophies.icon(t, 14)} ${Trophies.TIERS[t].label}</div><b>${p.counts[t][0]}<span class="muted" style="font-size:13px;font-weight:500"> / ${p.counts[t][1]}</span></b></div>`).join('')}</div>
       </div>` : '';
 
-      const src = { generated: 'Automatisch erstellt', imported: 'Importiert', custom: 'Eigene Liste' }[item.trophySource] || '';
+      const src = { generated: 'Genre-Vorlage', ai: 'Von der KI passend zum Spiel erstellt', imported: 'Importiert', custom: 'Eigene Liste', psn: 'Von PlayStation' }[item.trophySource] || '';
       const sorted = list.slice().sort((a, b) => Trophies.ORDER.indexOf(a.tier) - Trophies.ORDER.indexOf(b.tier));
       const filtered = sorted.filter(t => detailFilter.value === 'all' || (detailFilter.value === 'open' ? !t.done : t.done));
       trophySection = `<section class="section">

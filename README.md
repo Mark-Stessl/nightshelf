@@ -8,7 +8,7 @@ Persönliches Regal für Spiele, Serien und Filme – mit Trophäen-System im Pl
 - **Trophäen** in Bronze, Silber, Gold und Platin zum Abhaken
   - Platin wird automatisch verdient, sobald alle anderen Trophäen abgehakt sind
   - **Liste einfügen:** Trophäenliste von PSNProfiles, Exophase oder Steam kopieren und einfügen. Prozentwerte bestimmen die Stufe, bereits verdiente Trophäen (mit Datum) werden direkt abgehakt. Eigenes Format: `Name | Beschreibung | Gold`
-  - **Automatisch erstellen:** Für Spiele ohne Erfolge (z. B. Nintendo Switch) wird passend zum Genre eine eigene Liste erzeugt, die du bearbeiten kannst
+  - **Automatisch erstellen:** Für Spiele ohne Erfolge (z. B. Nintendo Switch) erstellt eine KI (Cloudflare Workers AI, Llama 3.3 70B) anhand der Wikipedia-Infos zum Spiel eine passende Liste; ohne KI greift eine Genre-Vorlage
 - **Automatische Infos** beim Hinzufügen: Cover, Erscheinungsdatum, Genre usw. – Serien über TVmaze, Spiele über Wikipedia/Wikidata (beide ohne Schlüssel), Filme über TMDB (kostenloser Schlüssel unter „Daten“)
 - **PlayStation-Sync:** alle PS4/PS5-Spiele mit echter Trophäenliste und verdienten Trophäen über einen eigenen Cloudflare Worker (`worker/psn-worker.js`). Anmeldung mit dem NPSSO-Code unter „Daten“; Tokens bleiben nur im Browser.
 - **Anime mit Staffeln:** Beim Hinzufügen werden alle Staffeln und Filme einer Reihe von AniList geladen; pro Staffel Tabs mit eigenem Folgen-Zähler.
