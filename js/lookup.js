@@ -22,12 +22,25 @@ const Lookup = (() => {
       thumb: show.image?.medium || '', sub: [year(show.premiered), (show.genres || []).slice(0, 2).join(', '), show.network?.name || show.webChannel?.name].filter(Boolean).join(' · '),
     }));
   }
+  async function seriesSeasons(showId, fallbackCover = '') {
+    const seasons = (await getJSON(`https://api.tvmaze.com/shows/${showId}/seasons`)).filter(x => x.premiereDate);
+    const out = [];
+    for (const x of seasons) {
+      let episodes = x.episodeOrder || null;
+      if (!episodes) {
+        const eps = await getJSON(`https://api.tvmaze.com/seasons/${x.id}/episodes`).catch(() => []);
+        episodes = eps.filter(e => e.type !== 'insignificant_special').length || null;
+      }
+      out.push({ tvmazeId: x.id, label: `Staffel ${x.number}`, title: x.name || '', episodes, year: year(x.premiereDate), cover: x.image?.original || x.image?.medium || fallbackCover || '', format: 'TV' });
+    }
+    return out;
+  }
   async function detailSeries(hit) {
-    const seasons = await getJSON(`https://api.tvmaze.com/shows/${hit.id}/seasons`).catch(() => []);
+    const seasonList = await seriesSeasons(hit.id, hit.cover).catch(() => []);
     const show = await getJSON(`https://api.tvmaze.com/shows/${hit.id}`).catch(() => ({}));
     return {
-      title: hit.title, year: hit.year, cover: hit.cover,
-      seasons: seasons.filter(s => s.premiereDate).length || seasons.length || null,
+      title: hit.title, year: hit.year, cover: hit.cover, seasonList,
+      seasons: seasonList.length || null,
       genres: show.genres || [], released: show.premiered || null,
       summary: strip(show.summary), external: `tvmaze:${hit.id}`,
     };
@@ -182,6 +195,6 @@ const Lookup = (() => {
     search: (type, q) => SEARCH[type](q),
     detail: (type, hit) => DETAIL[type](hit),
     async test(type) { await SEARCH[type]('star'); return true; },
-    animeByIds, animeSeasons,
+    animeByIds, animeSeasons, seriesSeasons,
   };
 })();

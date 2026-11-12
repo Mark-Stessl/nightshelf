@@ -44,6 +44,7 @@
     film: '<svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 9h16M4 15h16M8 5v4M12 5v4M16 5v4M8 15v4M12 15v4M16 15v4"/></svg>',
     download: '<svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
     upload: '<svg viewBox="0 0 24 24"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg>',
+    chart: '<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
     refresh: '<svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.9-3.9M4 5v4h4M4 13a8 8 0 0 0 14.9 3.9M20 19v-4h-4"/></svg>',
   };
   const typeIcon = t => ({ game: I.game, series: I.tv, anime: I.anime, movie: I.film }[t]);
@@ -177,7 +178,7 @@
         <div class="field"><label>Plattform</label><select class="input" name="platform">${PLATFORMS.map(p => `<option ${p === d.platform ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
         <div class="field"><label>Genre</label><select class="input" name="genre">${Object.entries(Trophies.GENRES).map(([k, v]) => `<option value="${k}" ${k === d.genre ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       </div>` : '';
-    const seriesFields = type === 'series' ? `
+    const seriesFields = type === 'series' && d.seasonList?.some(x => x.episodes) ? `<p class="tiny" style="margin:0">Staffeln und Folgen bearbeitest du direkt auf der Seite der Serie.</p>` : type === 'series' ? `
       <div class="grid-2">
         <div class="field"><label>Staffeln gesamt</label><input class="input" name="seasons" type="number" min="0" value="${d.seasons || ''}" placeholder="5"></div>
         <div class="field"><label>Gesehen bis Staffel</label><input class="input" name="seasonSeen" type="number" min="0" value="${d.seasonSeen || ''}" placeholder="3"></div>
@@ -214,6 +215,7 @@
           <div class="field"><label>Bewertung</label>${starsInput(d.rating)}</div>
           <div class="field"><label>Cover-Bild (Link, optional)</label><input class="input" name="cover" value="${esc(d.cover || '')}" placeholder="https://…/cover.jpg"></div>
         </div>
+        <div class="field" id="finField"><label>Fertig am <span class="tiny">(optional, für die Statistik)</span></label><input class="input" name="finishedAt" type="date" value="${(d.finishedAt || (!isEdit && d.status === 'done' ? new Date().toISOString() : '')).slice(0, 10)}" max="${new Date().toISOString().slice(0, 10)}"></div>
         <div class="field"><label>Notizen</label><textarea class="input" name="notes" placeholder="Was hat dir gefallen?">${esc(d.notes || '')}</textarea></div>
         ${trophySection}
       </form>`,
@@ -326,8 +328,10 @@
             notes: form.elements.notes.value.trim(),
           };
           if (type === 'game') { data.platform = form.elements.platform.value; data.genre = form.elements.genre.value; }
+          const fin = form.elements.finishedAt.value;
+          data.finishedAt = fin ? (isEdit && item.finishedAt?.slice(0, 10) === fin ? item.finishedAt : new Date(fin + 'T12:00:00').toISOString()) : null;
           if (type === 'anime' && form.elements.episodes) { data.episodes = form.elements.episodes.value ? +form.elements.episodes.value : null; data.episodesSeen = form.elements.episodesSeen.value ? +form.elements.episodesSeen.value : null; }
-          if (type === 'series') { data.seasons = form.elements.seasons.value ? +form.elements.seasons.value : null; data.seasonSeen = form.elements.seasonSeen.value ? +form.elements.seasonSeen.value : null; }
+          if (type === 'series' && form.elements.seasons) { data.seasons = form.elements.seasons.value ? +form.elements.seasons.value : null; data.seasonSeen = form.elements.seasonSeen.value ? +form.elements.seasonSeen.value : null; }
           if (fetched) {
             ['genres', 'released', 'runtime', 'summary', 'external', 'anilistId'].forEach(k => { if (fetched[k] != null && fetched[k] !== '') data[k] = fetched[k]; });
           }
@@ -379,6 +383,11 @@
               data.trophySource = 'imported';
               Trophies.syncPlatinum(data.trophies);
             }
+          }
+          if (type === 'series' && fetched?.seasonList?.length) {
+            const doneUpTo = data.status === 'done' ? fetched.seasonList.length : (data.seasonSeen || 0);
+            data.seasonList = fetched.seasonList.map((x, i) => ({ ...x, id: Store.uid(), seen: i < doneUpTo ? (x.episodes || 0) : 0, complete: i < doneUpTo }));
+            Object.assign(data, seasonTotals(data.seasonList), { seasons: data.seasonList.length, seasonSeen: Math.min(doneUpTo, data.seasonList.length) });
           }
           if (type === 'anime' && fetched?.anilistId) {
             const btn = $('#saveBtn', m);
@@ -649,7 +658,7 @@
     const meta = [];
     if (item.type === 'game' && item.platform) meta.push(esc(item.platform));
     if (item.type === 'series' && item.seasons) meta.push(`${item.seasonSeen || 0}/${item.seasons} ${item.seasons === 1 ? 'Staffel' : 'Staffeln'}`);
-    if (item.type === 'anime' && item.seasonList?.length > 1) { const cur = currentSeason(item); meta.push(`${cur.label} · ${cur.seen || 0}/${cur.episodes || '?'}`); }
+    if (['anime', 'series'].includes(item.type) && item.seasonList?.length > 1 && item.seasonList.some(x => x.episodes)) { const cur = currentSeason(item); meta.length = 0; meta.push(`${cur.label} · ${seasonDone(cur) ? '✓' : `${cur.seen || 0}/${cur.episodes || '?'}`}`); }
     else if (item.type === 'anime' && (item.episodes || item.episodesSeen)) meta.push(`${item.episodesSeen || 0}/${item.episodes || '?'} Folgen`);
     if (item.year) meta.push(item.year);
     let extra = '';
@@ -734,11 +743,16 @@
 
   const detailFilter = { value: 'all' };
 
-  /* ---------- Anime-Staffeln ---------- */
+  /* ---------- Staffeln (Anime und Serien) ---------- */
   const seasonTab = {};
+  const isImplicit = x => String(x.id).startsWith('implicit');
   function seasonsOf(item) {
     if (item.seasonList?.length) return item.seasonList;
-    return [{ id: 'main', title: item.title, label: 'Staffel 1', format: 'TV', episodes: item.episodes || null, seen: item.episodesSeen || 0, year: item.year || null, cover: item.cover || '' }];
+    if (item.type === 'series') {
+      const n = Math.max(1, item.seasons || 1);
+      return Array.from({ length: n }, (_, i) => ({ id: `implicit-${i + 1}`, title: item.title, label: `Staffel ${i + 1}`, episodes: null, seen: 0, complete: i < (item.seasonSeen || 0), year: null, cover: '' }));
+    }
+    return [{ id: 'implicit-1', title: item.title, label: 'Staffel 1', format: 'TV', episodes: item.episodes || null, seen: item.episodesSeen || 0, year: item.year || null, cover: item.cover || '' }];
   }
   function seasonTotals(list) {
     const known = list.filter(x => x.episodes);
@@ -750,24 +764,31 @@
   function distributeSeen(list, seen, allDone) {
     let rest = seen;
     list.forEach(x => {
-      if (allDone) { x.seen = x.episodes || x.seen || 0; return; }
+      if (allDone) { x.seen = x.episodes || x.seen || 0; x.complete = true; return; }
       const take = x.episodes ? Math.min(x.episodes, rest) : rest;
       x.seen = take; rest -= take;
     });
   }
-  const seasonDone = x => !!x.episodes && (x.seen || 0) >= x.episodes;
+  const seasonDone = x => !!x.complete || (!!x.episodes && (x.seen || 0) >= x.episodes);
   function currentSeason(item) {
     const list = seasonsOf(item);
     return list.find(x => (x.seen || 0) > 0 && !seasonDone(x)) || list.find(x => !seasonDone(x)) || list[list.length - 1];
   }
   function saveSeasons(item, list, { autoStatus = true } = {}) {
-    const patch = { seasonList: list, ...seasonTotals(list) };
+    list.forEach(x => { if (x.episodes && (x.seen || 0) < x.episodes && x.complete) x.complete = false; });
+    const tot = seasonTotals(list);
+    const patch = { seasonList: list, ...tot };
+    if (item.type === 'series') { patch.seasons = list.length; patch.seasonSeen = list.filter(seasonDone).length; }
+    const before = item.episodesSeen ?? seasonTotals(seasonsOf(item)).episodesSeen;
+    const delta = tot.episodesSeen - (before || 0);
+    if (autoStatus && delta > 0) patch.watchLog = [...(item.watchLog || []), { at: new Date().toISOString(), n: delta }].slice(-3000);
     if (autoStatus && !['dropped', 'paused'].includes(item.status)) {
       if (list.every(seasonDone)) patch.status = 'done';
-      else if (list.some(x => (x.seen || 0) > 0)) patch.status = 'active';
+      else if (list.some(x => (x.seen || 0) > 0 || seasonDone(x))) patch.status = 'active';
     }
     return Store.update(item.id, patch);
   }
+  const seasonSource = item => item.type === 'anime' ? 'AniList' : 'TVmaze';
 
   function seasonSection(item) {
     const list = seasonsOf(item);
@@ -775,17 +796,20 @@
     seasonTab[item.id] = activeId;
     const sea = list.find(x => x.id === activeId);
     const tot = seasonTotals(list);
-    const pct = sea.episodes ? Math.min(100, Math.round((sea.seen || 0) / sea.episodes * 100)) : 0;
+    const pct = seasonDone(sea) ? 100 : sea.episodes ? Math.min(100, Math.round((sea.seen || 0) / sea.episodes * 100)) : 0;
     const totPct = tot.episodes ? Math.min(100, Math.round(tot.episodesSeen / tot.episodes * 100)) : 0;
     const coverSrc = sea.cover || item.cover;
+    const unit = item.type === 'anime' ? (list.length === 1 ? 'Teil' : 'Teile') : (list.length === 1 ? 'Staffel' : 'Staffeln');
+    const noEpisodes = list.every(x => !x.episodes);
     return `<section class="section">
       <div class="trophy-head">
-        <div><h2 class="section-title" style="margin:0">Staffeln</h2><div class="tiny">${list.length} ${list.length === 1 ? 'Teil' : 'Teile'} · ${tot.episodesSeen}/${tot.episodes || '?'} Folgen gesehen${tot.episodes ? ` · ${totPct} %` : ''}</div></div>
+        <div><h2 class="section-title" style="margin:0">Staffeln</h2><div class="tiny">${list.length} ${unit}${noEpisodes ? ` · ${list.filter(seasonDone).length} fertig` : ` · ${tot.episodesSeen}/${tot.episodes || '?'} Folgen gesehen${tot.episodes ? ` · ${totPct} %` : ''}`}</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-sm" id="sAdd">${I.plus} Staffel</button>
-          <button class="btn btn-sm" id="sLoad">${I.refresh} Von AniList laden</button>
+          <button class="btn btn-sm ${noEpisodes ? 'btn-primary' : ''}" id="sLoad">${I.refresh} Von ${seasonSource(item)} laden</button>
         </div>
       </div>
+      ${noEpisodes ? `<div class="hint-box" style="margin-bottom:14px">${I.info}<div>Lade die Staffeln von ${seasonSource(item)}, dann bekommst du Folgenzahlen und Cover pro Staffel. Deine fertigen Staffeln bleiben abgehakt.</div></div>` : ''}
       <div class="season-tabs" role="tablist">${list.map(x => `<button class="season-tab ${x.id === activeId ? 'on' : ''} ${seasonDone(x) ? 'done' : ''}" role="tab" aria-selected="${x.id === activeId}" data-season="${x.id}">
         <span>${esc(x.label)}</span><small>${seasonDone(x) ? '✓' : `${x.seen || 0}/${x.episodes || '?'}`}</small></button>`).join('')}</div>
       <div class="season-panel ${A()}">
@@ -800,7 +824,7 @@
           </div>
           <div class="bar" style="max-width:420px"><i style="width:${pct}%"></i></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
-            ${seasonDone(sea) ? `<button class="btn btn-sm" id="sReset">Zurücksetzen</button>` : `<button class="btn btn-sm btn-primary" id="sDone" ${sea.episodes ? '' : 'title="Trag zuerst die Folgenzahl ein"'}>${I.check} Ganz gesehen</button>`}
+            ${seasonDone(sea) ? `<button class="btn btn-sm" id="sReset">Zurücksetzen</button>` : `<button class="btn btn-sm btn-primary" id="sDone">${I.check} Ganz gesehen</button>`}
             <button class="btn btn-sm" id="sEdit">${I.edit} Bearbeiten</button>
             ${list.length > 1 ? `<button class="btn btn-sm btn-ghost btn-danger" id="sDel">${I.trash} Entfernen</button>` : ''}
           </div>
@@ -809,11 +833,17 @@
     </section>`;
   }
 
+  function materialize(it) { return seasonsOf(it).map(x => ({ ...x, id: isImplicit(x) ? Store.uid() : x.id })); }
+
   function bindSeasons(item) {
     const fresh = () => Store.get(item.id);
-    const withList = fn => { const it = fresh(); const list = seasonsOf(it).map(x => ({ ...x, id: x.id === 'main' ? Store.uid() : x.id })); const idx = list.findIndex((x, i) => (seasonsOf(it)[i].id) === seasonTab[it.id]); fn(list, Math.max(0, idx)); seasonTab[it.id] = list[Math.max(0, idx)].id; saveSeasons(it, list); render(); };
+    const withList = fn => {
+      const it = fresh(); const orig = seasonsOf(it); const list = materialize(it);
+      const idx = Math.max(0, orig.findIndex(x => x.id === seasonTab[it.id]));
+      fn(list, idx); seasonTab[it.id] = list[idx].id; saveSeasons(it, list); render();
+    };
     $$('[data-season]').forEach(b => b.onclick = () => { seasonTab[item.id] = b.dataset.season; render(); });
-    const setSeen = v => withList((list, i) => { const x = list[i]; x.seen = Math.max(0, x.episodes ? Math.min(x.episodes, v) : v); });
+    const setSeen = v => withList((list, i) => { const x = list[i]; x.seen = Math.max(0, x.episodes ? Math.min(x.episodes, v) : v); if (!x.episodes || x.seen < x.episodes) x.complete = false; });
     $('#epMinus').onclick = () => setSeen((+$('#epInput').value || 0) - 1);
     $('#epPlus').onclick = () => {
       const it = fresh(); const cur = seasonsOf(it).find(x => x.id === seasonTab[it.id]);
@@ -824,17 +854,16 @@
     $('#epInput').onchange = e => setSeen(Math.round(+e.target.value || 0));
     $('#sDone') && ($('#sDone').onclick = () => {
       const it = fresh(); const cur = seasonsOf(it).find(x => x.id === seasonTab[it.id]);
-      if (!cur.episodes) { seasonEdit(it); return; }
-      withList((list, i) => { list[i].seen = list[i].episodes; });
+      withList((list, i) => { if (list[i].episodes) list[i].seen = list[i].episodes; list[i].complete = true; });
       toast(`<div><b>${esc(cur.label)} fertig</b><small>${esc(it.title)}</small></div>`);
     });
-    $('#sReset') && ($('#sReset').onclick = () => withList((list, i) => { list[i].seen = 0; }));
+    $('#sReset') && ($('#sReset').onclick = () => withList((list, i) => { list[i].seen = 0; list[i].complete = false; }));
     $('#sEdit').onclick = () => seasonEdit(fresh());
     $('#sAdd').onclick = () => seasonEdit(fresh(), true);
     $('#sDel') && ($('#sDel').onclick = () => {
       const it = fresh(); const cur = seasonsOf(it).find(x => x.id === seasonTab[it.id]);
       confirmDialog(`„${esc(cur.label)}“ wird aus ${esc(it.title)} entfernt.`, 'Entfernen', () => {
-        const list = seasonsOf(it).filter(x => x.id !== cur.id);
+        const list = materialize(it).filter((x, i) => seasonsOf(it)[i].id !== cur.id);
         delete seasonTab[it.id]; saveSeasons(it, list); render();
       });
     });
@@ -842,22 +871,33 @@
       const b = $('#sLoad'); b.disabled = true; b.textContent = 'Lade…';
       const it = fresh();
       try {
-        let id = it.anilistId || (it.external?.startsWith('anilist:') ? +it.external.split(':')[1] : null);
-        if (!id) { const hits = await Lookup.search('anime', it.title); id = hits[0]?.id; }
-        const loaded = id ? await Lookup.animeSeasons(id) : [];
-        if (!loaded.length) { toast('<div><b>Nichts auf AniList gefunden</b></div>'); render(); return; }
+        let loaded = [], patch = {};
+        if (it.type === 'anime') {
+          let id = it.anilistId || (it.external?.startsWith('anilist:') ? +it.external.split(':')[1] : null);
+          if (!id) { const hits = await Lookup.search('anime', it.title); id = hits[0]?.id; }
+          loaded = id ? await Lookup.animeSeasons(id) : [];
+          patch = { anilistId: id };
+        } else {
+          let id = it.external?.startsWith('tvmaze:') ? +it.external.split(':')[1] : null;
+          if (!id) { const hits = await Lookup.search('series', it.title); id = hits[0]?.id; }
+          loaded = id ? await Lookup.seriesSeasons(id, it.cover) : [];
+          if (id && !it.external) patch = { external: `tvmaze:${id}` };
+        }
+        if (!loaded.length) { toast(`<div><b>Nichts auf ${seasonSource(it)} gefunden</b></div>`); render(); return; }
         const old = seasonsOf(it);
-        const seenTotal = old.reduce((a, x) => a + (x.seen || 0), 0);
-        const list = loaded.map(x => {
-          const prev = old.find(o => o.anilistId && o.anilistId === x.anilistId);
-          return { ...x, id: prev?.id || Store.uid(), seen: prev ? prev.seen : 0 };
+        const srcKey = it.type === 'anime' ? 'anilistId' : 'tvmazeId';
+        const matched = old.some(o => o[srcKey]);
+        const list = loaded.map((x, i) => {
+          const prev = matched ? old.find(o => o[srcKey] && o[srcKey] === x[srcKey]) : (it.type === 'series' ? old[i] : null);
+          const done = prev && seasonDone(prev);
+          return { ...x, id: (prev && !isImplicit(prev)) ? prev.id : Store.uid(), seen: done ? (x.episodes || prev.seen || 0) : Math.min(prev?.seen || 0, x.episodes || Infinity), complete: !!done };
         });
-        if (!old.some(o => o.anilistId)) distributeSeen(list, seenTotal, it.status === 'done');
+        if (!matched && it.type === 'anime') distributeSeen(list, old.reduce((a, x) => a + (x.seen || 0), 0), it.status === 'done');
         delete seasonTab[it.id];
-        Store.update(it.id, { anilistId: id });
+        if (Object.keys(patch).length) Store.update(it.id, patch);
         saveSeasons(Store.get(it.id), list, { autoStatus: false });
-        toast(`<div><b>${list.length} ${list.length === 1 ? 'Teil' : 'Teile'} geladen</b><small>${esc(it.title)}</small></div>`);
-      } catch { toast('<div><b>AniList nicht erreichbar</b><small>Später nochmal versuchen</small></div>'); }
+        toast(`<div><b>${list.length} ${it.type === 'anime' ? (list.length === 1 ? 'Teil' : 'Teile') : (list.length === 1 ? 'Staffel' : 'Staffeln')} geladen</b><small>${esc(it.title)}</small></div>`);
+      } catch { toast(`<div><b>${seasonSource(it)} nicht erreichbar</b><small>Später nochmal versuchen</small></div>`); }
       render();
     };
   }
@@ -888,9 +928,9 @@
           const episodes = F.episodes.value ? +F.episodes.value : null;
           const seen = Math.max(0, episodes ? Math.min(episodes, +F.seen.value || 0) : +F.seen.value || 0);
           const patch = { label, title: F.title.value.trim() || item.title, year: F.year.value ? +F.year.value : null, episodes, seen };
-          const next = list.map(x => ({ ...x, id: x.id === 'main' ? Store.uid() : x.id }));
+          const next = materialize(item);
           if (isNew) { const s2 = { id: Store.uid(), format: 'TV', cover: '', ...patch }; next.push(s2); seasonTab[item.id] = s2.id; }
-          else { const i = list.findIndex(x => x.id === cur.id); Object.assign(next[i], patch); seasonTab[item.id] = next[i].id; }
+          else { const i = list.findIndex(x => x.id === cur.id); Object.assign(next[i], patch); if (episodes && seen < episodes) next[i].complete = false; seasonTab[item.id] = next[i].id; }
           saveSeasons(item, next);
           close(); render();
         };
@@ -952,7 +992,7 @@
     if (item.type === 'anime' && item.episodes && !item.seasonList?.length) {
       seriesBlock = `<div style="margin-top:18px;max-width:360px"><div class="tiny" style="margin-bottom:6px">Fortschritt: Folge ${item.episodesSeen || 0} von ${item.episodes}</div><div class="bar"><i style="width:${Math.min(100, Math.round((item.episodesSeen || 0) / item.episodes * 100))}%"></i></div></div>`;
     }
-    if (item.type === 'series' && item.seasons) {
+    if (false && item.type === 'series' && item.seasons) {
       seriesBlock = `<div style="margin-top:18px;max-width:360px"><div class="tiny" style="margin-bottom:6px">Fortschritt: Staffel ${item.seasonSeen || 0} von ${item.seasons}</div><div class="bar"><i style="width:${Math.min(100, Math.round((item.seasonSeen || 0) / item.seasons * 100))}%"></i></div></div>`;
     }
 
@@ -977,11 +1017,11 @@
           </div>
         </div>
       </div>
-      ${trophySection}${item.type === 'anime' ? seasonSection(item) : ''}
+      ${trophySection}${['anime', 'series'].includes(item.type) ? seasonSection(item) : ''}
     </div>`;
 
     bindStars(view);
-    if (item.type === 'anime') bindSeasons(item);
+    if (['anime', 'series'].includes(item.type)) bindSeasons(item);
     $('[data-stars="heroRating"]').addEventListener('change', e => { Store.update(item.id, { rating: e.detail }); });
     $('#quickStatus').onchange = e => { Store.update(item.id, { status: e.target.value }); render(); };
     $('#editBtn').onclick = () => itemForm(item.type, item);
@@ -1069,7 +1109,7 @@
     const platCount = s.counts.platinum;
     view.innerHTML = `<div class="${A()}">
       <div class="page-head"><div><h1 class="page-title">${greet}</h1><p class="page-sub">${total} Einträge in deinem Regal</p></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">${ORDER_TYPES.map(t => `<button class="btn ${t === 'game' ? 'btn-primary' : ''}" data-add="${t}">${I.plus} ${TYPES[t].label}</button>`).join('')}</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="#/stats">${I.chart} Statistik</a>${ORDER_TYPES.map(t => `<button class="btn ${t === 'game' ? 'btn-primary' : ''}" data-add="${t}">${I.plus} ${TYPES[t].label}</button>`).join('')}</div></div>
       <div class="stats">
         <a class="stat feature" href="#/trophies"><div class="stat-label">${I.trophy} Trophäen-Level</div><div class="stat-value">${s.level.level}</div><div class="bar" style="margin-top:8px"><i style="width:${s.level.pct}%"></i></div><div class="stat-hint" style="margin-top:6px">${s.earned} von ${s.total} Trophäen</div></a>
         <a class="stat" href="#/trophies"><div class="stat-label">${Trophies.icon('platinum', 16)} Platin</div><div class="stat-value" style="color:var(--platinum)">${platCount}</div><div class="stat-hint">${games.filter(g => g.status === 'done').length} Spiele durchgespielt</div></a>
@@ -1083,7 +1123,8 @@
           let sub = TYPES[i.type].label;
           if (i.type === 'game' && i.trophies?.length) { const p = Trophies.progress(i.trophies); sub += ` · ${p.done}/${p.total} Trophäen`; }
           if (i.type === 'series' && i.seasons) sub += ` · Staffel ${i.seasonSeen || 0}/${i.seasons}`;
-          if (i.type === 'anime' && i.seasonList?.length > 1) { const cur = currentSeason(i); sub += ` · ${cur.label} · Folge ${cur.seen || 0}/${cur.episodes || '?'}`; }
+          if (['anime', 'series'].includes(i.type) && i.seasonList?.some(x => x.episodes)) { const cur = currentSeason(i); sub = `${TYPES[i.type].label} · ${cur.label} · Folge ${cur.seen || 0}/${cur.episodes || '?'}`; }
+          else if (i.type === 'anime' && i.seasonList?.length > 1) { const cur = currentSeason(i); sub += ` · ${cur.label} · Folge ${cur.seen || 0}/${cur.episodes || '?'}`; }
           else if (i.type === 'anime' && i.episodes) sub += ` · Folge ${i.episodesSeen || 0}/${i.episodes}`;
           return listRow(i, sub);
         }).join('') : '<div class="list-empty">Nichts in Arbeit. Setz bei einem Spiel oder einer Serie den Status auf „Am Spielen“ oder „Am Schauen“.</div>'}</div></div>
@@ -1103,7 +1144,7 @@
     const games = Store.all('game').filter(g => g.trophies?.length);
     const recent = recentTrophies(12);
     view.innerHTML = `<div class="${A()}">
-      <div class="page-head"><div><h1 class="page-title">Trophäen</h1><p class="page-sub">${s.earned} von ${s.total} verdient · ${s.pts.toLocaleString('de-AT')} Punkte</p></div></div>
+      <div class="page-head"><div><h1 class="page-title">Trophäen</h1><p class="page-sub">${s.earned} von ${s.total} verdient · ${s.pts.toLocaleString('de-AT')} Punkte</p></div><a class="btn" href="#/stats">${I.chart} Statistik & Jahresrückblick</a></div>
       <div class="stats">
         <div class="stat feature"><div class="stat-label">${I.trophy} Level</div><div class="stat-value">${s.level.level}</div><div class="bar" style="margin-top:8px"><i style="width:${s.level.pct}%"></i></div><div class="stat-hint" style="margin-top:6px">Noch ${s.level.need - s.level.into} Punkte bis Level ${s.level.level + 1}</div></div>
         ${Trophies.ORDER.map(t => `<div class="stat"><div class="stat-label">${Trophies.icon(t, 16)} ${Trophies.TIERS[t].label}</div><div class="stat-value" style="color:${Trophies.TIERS[t].color}">${s.counts[t]}</div><div class="stat-hint">${Trophies.TIERS[t].points} Punkte pro Stück</div></div>`).join('')}
@@ -1122,6 +1163,158 @@
           : '<div class="list-empty">Noch nichts verdient.</div>'}</div></div>
       </div>
     </div>`;
+  }
+
+  /* ---------- Statistik & Jahresrückblick ---------- */
+  const statsState = { year: String(new Date().getFullYear()) };
+  const MONTHS = ['Jän', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  const MONTHS_LONG = ['Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  const yearOf = iso => iso ? new Date(iso).getFullYear() : null;
+
+  function collectStats(year) {
+    const all = year === 'all';
+    const inPeriod = iso => !!iso && (all || String(yearOf(iso)) === year);
+    const items = Store.all();
+    const trophies = [];
+    items.filter(i => i.type === 'game').forEach(g => (g.trophies || []).forEach(t => { if (t.done && t.doneAt) trophies.push({ t, g }); }));
+    trophies.sort((a, b) => a.t.doneAt.localeCompare(b.t.doneAt));
+    const plats = trophies.filter(x => x.t.tier === 'platinum').map((x, i) => ({ ...x, n: i + 1 }));
+    const periodTrophies = trophies.filter(x => inPeriod(x.t.doneAt));
+    const years = new Set([String(new Date().getFullYear())]);
+    trophies.forEach(x => years.add(String(yearOf(x.t.doneAt))));
+    items.forEach(i => { if (i.finishedAt) years.add(String(yearOf(i.finishedAt))); (i.watchLog || []).forEach(w => years.add(String(yearOf(w.at)))); });
+
+    // Balken: Monate eines Jahres oder Jahre insgesamt
+    let buckets;
+    if (all) {
+      const ys = [...years].map(Number).sort((a, b) => a - b);
+      const from = ys[0], to = ys[ys.length - 1];
+      buckets = Array.from({ length: to - from + 1 }, (_, i) => ({ key: from + i, label: String(from + i), long: String(from + i), tiers: { platinum: 0, gold: 0, silver: 0, bronze: 0 }, episodes: 0 }));
+    } else {
+      buckets = MONTHS.map((m, i) => ({ key: i, label: m, long: `${MONTHS_LONG[i]} ${year}`, tiers: { platinum: 0, gold: 0, silver: 0, bronze: 0 }, episodes: 0 }));
+    }
+    const bucketOf = iso => { const d = new Date(iso); return all ? buckets.find(b => b.key === d.getFullYear()) : buckets[d.getMonth()]; };
+    periodTrophies.forEach(x => { const b = bucketOf(x.t.doneAt); if (b) b.tiers[x.t.tier]++; });
+    let episodes = 0;
+    items.forEach(i => (i.watchLog || []).forEach(w => { if (inPeriod(w.at)) { episodes += w.n; const b = bucketOf(w.at); if (b) b.episodes += w.n; } }));
+
+    const finished = items.filter(i => inPeriod(i.finishedAt)).sort((a, b) => b.finishedAt.localeCompare(a.finishedAt));
+    const rare = periodTrophies.filter(x => x.t.rarity != null).sort((a, b) => a.t.rarity - b.t.rarity).slice(0, 5);
+    const rated = (all ? items : finished).filter(i => i.rating).sort((a, b) => b.rating - a.rating || (b.finishedAt || '').localeCompare(a.finishedAt || '')).slice(0, 6);
+    const tierCount = { platinum: 0, gold: 0, silver: 0, bronze: 0 };
+    periodTrophies.forEach(x => tierCount[x.t.tier]++);
+    const busiest = buckets.reduce((best, b) => { const n = Object.values(b.tiers).reduce((a, c) => a + c, 0); return n > best.n ? { n, b } : best; }, { n: 0, b: null });
+    return {
+      all, years: [...years].sort().reverse(), buckets, trophies: periodTrophies, tierCount, episodes,
+      plats: plats.filter(x => inPeriod(x.t.doneAt)).reverse(), allPlats: plats.length, finished, rare, rated, busiest,
+      undatedFinished: all ? items.filter(i => i.status === 'done' && !i.finishedAt).length : 0,
+    };
+  }
+
+  function niceTicks(values) {
+    const max = Math.max(1, ...values);
+    const mag = Math.pow(10, Math.floor(Math.log10(max)));
+    const step = max <= 4 ? 1 : max <= 10 ? 2 : [0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10].map(f => f * mag).filter(Number.isInteger).find(st => max / st <= 5) || mag * 10;
+    const top = Math.ceil(max / step) * step;
+    const ticks = []; for (let v = 0; v <= top; v += step) ticks.push(v);
+    return { top, ticks };
+  }
+
+  function stackedChart(st) {
+    const order = ['bronze', 'silver', 'gold', 'platinum'];
+    const totals = st.buckets.map(b => order.reduce((a, t) => a + b.tiers[t], 0));
+    const { top, ticks } = niceTicks(totals);
+    return `<div class="chart" role="img" aria-label="Verdiente Trophäen ${st.all ? 'pro Jahr' : 'pro Monat'}: ${st.buckets.map((b, i) => `${b.long} ${totals[i]}`).join(', ')}">
+      <div class="chart-legend">${order.slice().reverse().map(t => `<span>${Trophies.icon(t, 14)} ${Trophies.TIERS[t].label}</span>`).join('')}</div>
+      <div class="chart-plot">
+        <div class="chart-grid">${ticks.slice().reverse().map(v => `<div class="tick"><span>${v}</span></div>`).join('')}</div>
+        <div class="chart-bars" style="--cols:${st.buckets.length}">${st.buckets.map((b, i) => `
+          <div class="chart-col" data-tip="${esc(b.long)}|${order.slice().reverse().map(t => `${Trophies.TIERS[t].label}: ${b.tiers[t]}`).join('|')}|Gesamt: ${totals[i]}">
+            <div class="stack" style="height:${totals[i] / top * 100}%">${order.filter(t => b.tiers[t]).map(t => `<i style="flex:${b.tiers[t]};background:${Trophies.TIERS[t].hex}"></i>`).join('')}</div>
+          </div>`).join('')}</div>
+      </div>
+      <div class="chart-x" style="--cols:${st.buckets.length}">${st.buckets.map(b => `<span>${b.label}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  function simpleChart(st, key, label) {
+    const vals = st.buckets.map(b => b[key]);
+    const { top: max, ticks } = niceTicks(vals);
+    return `<div class="chart" role="img" aria-label="${label}: ${st.buckets.map((b, i) => `${b.long} ${vals[i]}`).join(', ')}">
+      <div class="chart-plot">
+        <div class="chart-grid">${ticks.slice().reverse().map(v => `<div class="tick"><span>${v.toLocaleString('de-AT')}</span></div>`).join('')}</div>
+        <div class="chart-bars" style="--cols:${st.buckets.length}">${st.buckets.map((b, i) => `
+          <div class="chart-col" data-tip="${esc(b.long)}|${label}: ${vals[i]}"><div class="stack" style="height:${vals[i] / max * 100}%">${vals[i] ? `<i style="flex:1;background:var(--violet)"></i>` : ''}</div></div>`).join('')}</div>
+      </div>
+      <div class="chart-x" style="--cols:${st.buckets.length}">${st.buckets.map(b => `<span>${b.label}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  function viewStats() {
+    const st = collectStats(statsState.year);
+    if (!st.all && !st.years.includes(statsState.year)) statsState.year = st.years[0];
+    const period = st.all ? 'insgesamt' : `in ${statsState.year}`;
+    const byType = t => st.finished.filter(i => i.type === t).length;
+    view.innerHTML = `<div class="${A()}">
+      <div class="page-head"><div><h1 class="page-title">${st.all ? 'Statistik' : `Dein ${statsState.year}`}</h1><p class="page-sub">${st.all ? 'Alles, was du je gespielt und geschaut hast' : 'Dein Jahresrückblick'}</p></div>
+        <div class="chips" id="yearChips">${st.years.map(y => `<button class="chip ${statsState.year === y ? 'on' : ''}" data-y="${y}">${y}</button>`).join('')}<button class="chip ${st.all ? 'on' : ''}" data-y="all">Gesamt</button></div></div>
+
+      <div class="stats">
+        <div class="stat feature"><div class="stat-label">${I.trophy} Trophäen ${period}</div><div class="stat-value">${st.trophies.length.toLocaleString('de-AT')}</div><div class="stat-hint">${['gold', 'silver', 'bronze'].map(t => `${st.tierCount[t]} ${Trophies.TIERS[t].label}`).join(' · ')}</div></div>
+        <div class="stat"><div class="stat-label">${Trophies.icon('platinum', 16)} Platin</div><div class="stat-value" style="color:var(--platinum)">${st.tierCount.platinum}</div><div class="stat-hint">${st.allPlats} insgesamt</div></div>
+        <div class="stat"><div class="stat-label">${I.check} Abgeschlossen</div><div class="stat-value">${st.finished.length}</div><div class="stat-hint">${[['game', 'Spiele'], ['series', 'Serien'], ['anime', 'Anime'], ['movie', 'Filme']].filter(([t]) => byType(t)).map(([t, l]) => `${byType(t)} ${l}`).join(' · ') || 'noch nichts mit Datum'}</div></div>
+        <div class="stat"><div class="stat-label">${I.tv} Folgen gesehen</div><div class="stat-value">${st.episodes.toLocaleString('de-AT')}</div><div class="stat-hint">Serien und Anime</div></div>
+      </div>
+
+      <section class="section"><h2 class="section-title">Trophäen ${st.all ? 'pro Jahr' : 'pro Monat'}${st.busiest.b ? `<span class="tiny" style="font-family:var(--font)">Stärkster ${st.all ? 'Jahrgang' : 'Monat'}: ${esc(st.busiest.b.long)} mit ${st.busiest.n}</span>` : ''}</h2>
+        <div class="panel chart-panel">${st.trophies.length ? stackedChart(st) : '<div class="list-empty">In diesem Zeitraum hast du noch keine Trophäen mit Datum.</div>'}</div></section>
+
+      <div class="two-col section">
+        <div><h2 class="section-title">Platin-Chronik</h2><div class="list-card">${st.plats.length ? st.plats.map(({ t, g, n }) => `
+          <a class="list-row" href="#/item/${g.id}"><div class="plat-n">#${n}</div><div class="thumb">${coverHTML(g, { noTitle: true })}</div>
+            <div class="grow"><div class="title">${esc(g.title)}</div><div class="sub">${esc(t.name)} · ${fmtDate(t.doneAt)}</div></div></a>`).join('')
+          : '<div class="list-empty">Keine Platin-Trophäe in diesem Zeitraum.</div>'}</div></div>
+        <div>
+          <h2 class="section-title">Seltenste Trophäen</h2><div class="list-card" style="margin-bottom:26px">${st.rare.length ? st.rare.map(({ t, g }) => `
+            <a class="list-row" href="#/item/${g.id}"><div class="tbadge">${Trophies.icon(t.tier, 22)}</div><div class="grow"><div class="title">${esc(t.name)}</div><div class="sub">${esc(g.title)}</div></div><b class="rare-pct">${String(t.rarity).replace('.', ',')} %</b></a>`).join('')
+            : '<div class="list-empty">Seltenheit gibt es nur für Trophäen von PlayStation oder eingefügte Listen.</div>'}</div>
+          <h2 class="section-title">${st.all ? 'Bestbewertet' : 'Highlights des Jahres'}</h2><div class="list-card">${st.rated.length ? st.rated.map(i => listRow(i, `${TYPES[i.type].label} · <span class="stars-mini">${'★'.repeat(i.rating)}</span>`)).join('')
+            : '<div class="list-empty">Bewerte, was du abgeschlossen hast, dann erscheint es hier.</div>'}</div>
+        </div>
+      </div>
+
+      <section class="section"><h2 class="section-title">Folgen ${st.all ? 'pro Jahr' : 'pro Monat'}</h2>
+        <div class="panel chart-panel">${st.episodes ? simpleChart(st, 'episodes', 'Folgen') : '<div class="list-empty">Gezählt wird ab jetzt: Jede Folge, die du bei Serien und Anime mit + abhakst, landet hier.</div>'}</div></section>
+
+      <section class="section"><h2 class="section-title">Abgeschlossen ${period}</h2><div class="list-card">${st.finished.length ? st.finished.slice(0, 30).map(i => listRow(i, `${TYPES[i.type].label} · ${fmtDate(i.finishedAt)}`)).join('')
+        : '<div class="list-empty">Noch nichts mit Datum. Wenn du etwas auf „Durchgespielt“, „Fertig geschaut“ oder „Gesehen“ setzt, wird das Datum gespeichert.</div>'}</div>
+        ${st.undatedFinished ? `<p class="tiny" style="margin-top:8px">${st.undatedFinished} abgeschlossene Einträge haben kein Datum. Du kannst es beim Bearbeiten unter „Fertig am“ nachtragen.</p>` : ''}</section>
+    </div>`;
+
+    $$('#yearChips .chip').forEach(c => c.onclick = () => { statsState.year = c.dataset.y; animate = true; render(); animate = false; });
+    bindChartTips();
+  }
+
+  function bindChartTips() {
+    let tip = $('#chartTip');
+    if (!tip) { tip = document.createElement('div'); tip.id = 'chartTip'; tip.className = 'chart-tip'; tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip); }
+    const show = (col, x, y) => {
+      const [head, ...rows] = col.dataset.tip.split('|');
+      tip.innerHTML = `<b>${head}</b>${rows.map(r => `<span>${r}</span>`).join('')}`;
+      tip.style.opacity = '1';
+      const r = tip.getBoundingClientRect();
+      tip.style.left = Math.min(window.innerWidth - r.width - 8, Math.max(8, x - r.width / 2)) + 'px';
+      tip.style.top = Math.max(8, y - r.height - 14) + 'px';
+      $$('.chart-col.hover').forEach(c => c.classList.remove('hover')); col.classList.add('hover');
+    };
+    const hide = () => { tip.style.opacity = '0'; $$('.chart-col.hover').forEach(c => c.classList.remove('hover')); };
+    $$('.chart-col').forEach(col => {
+      col.onmouseenter = e => show(col, e.clientX, col.getBoundingClientRect().top + col.offsetHeight - (col.querySelector('.stack')?.offsetHeight || 0));
+      col.onmousemove = e => show(col, e.clientX, col.getBoundingClientRect().top + col.offsetHeight - (col.querySelector('.stack')?.offsetHeight || 0));
+      col.onmouseleave = hide;
+      col.onclick = e => show(col, e.clientX, col.getBoundingClientRect().top + col.offsetHeight - (col.querySelector('.stack')?.offsetHeight || 0));
+    });
+    window.addEventListener('scroll', hide, { once: true });
   }
 
   function viewSettings() {
@@ -1263,12 +1456,14 @@
     let active = route || 'home';
     if (route === 'item') { const it = Store.get(param); active = it ? TYPES[it.type].route : 'home'; }
     $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === active));
+    const tipEl = $('#chartTip'); if (tipEl) tipEl.style.opacity = '0';
 
     if (!route) viewHome();
     else if (route === 'games') viewLibrary('game');
     else if (route === 'series') viewLibrary('series');
     else if (route === 'movies') viewLibrary('movie');
     else if (route === 'anime') viewLibrary('anime');
+    else if (route === 'stats') viewStats();
     else if (route === 'trophies') viewTrophies();
     else if (route === 'settings') viewSettings();
     else if (route === 'item') viewDetail(param);

@@ -111,7 +111,10 @@ const PSN = (() => {
     Trophies.syncPlatinum(list);
     const plat = list.find(x => x.tier === 'platinum');
     const patch = { trophies: list, trophySource: 'psn', psnId: t.id, psnService: t.service };
-    if ((plat && plat.done) || (!plat && list.length && list.every(x => x.done))) patch.status = 'done';
+    if ((plat && plat.done) || (!plat && list.length && list.every(x => x.done))) {
+      patch.status = 'done';
+      patch.finishedAt = (plat && plat.doneAt) || list.map(x => x.doneAt).filter(Boolean).sort().pop() || item.finishedAt || null;
+    }
     return Store.update(item.id, patch);
   }
 

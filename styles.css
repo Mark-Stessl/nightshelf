@@ -498,3 +498,28 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 .sync-opt { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
 .sync-opt .btn { align-self: flex-start; }
 @media (max-width: 820px) { .sync-options { grid-template-columns: 1fr; } }
+
+/* Statistik */
+.chart-panel { padding: 18px 18px 14px; }
+.chart-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); margin-bottom: 12px; }
+.chart-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.chart-plot { position: relative; height: 200px; margin-left: 30px; }
+.chart-grid { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+.chart-grid .tick { position: relative; border-top: 1px solid var(--line); height: 0; }
+.chart-grid .tick span { position: absolute; right: calc(100% + 8px); top: -8px; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.chart-bars { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--cols), 1fr); align-items: end; }
+.chart-col { height: 100%; display: flex; align-items: flex-end; justify-content: center; cursor: default; border-radius: 6px; }
+.chart-col.hover { background: rgba(139, 92, 246, .08); }
+.stack { width: min(24px, 70%); display: flex; flex-direction: column-reverse; gap: 2px; min-height: 0; }
+.stack i { display: block; min-height: 3px; }
+.stack i:last-child { border-radius: 4px 4px 0 0; }
+.chart-x { display: grid; grid-template-columns: repeat(var(--cols), 1fr); margin: 8px 0 0 30px; font-size: 11px; color: var(--text-3); text-align: center; }
+.chart-tip { position: fixed; z-index: 70; pointer-events: none; opacity: 0; transition: opacity .12s; display: flex; flex-direction: column; gap: 2px; padding: 9px 12px; border-radius: 10px; background: rgba(26, 21, 38, .97); border: 1px solid var(--line-2); box-shadow: 0 12px 30px -10px rgba(0, 0, 0, .7); font-size: 12px; color: var(--text-2); }
+.chart-tip b { color: var(--text); font-size: 13px; margin-bottom: 2px; }
+.plat-n { font-family: var(--display); font-weight: 700; font-size: 13px; color: var(--platinum); min-width: 30px; text-align: right; }
+.rare-pct { font-family: var(--display); font-size: 14px; color: var(--cyan); }
+@media (max-width: 820px) {
+  .nav-desktop { display: none !important; }
+  .chart-plot { height: 160px; }
+  .chart-x span:nth-child(even) { visibility: hidden; }
+}

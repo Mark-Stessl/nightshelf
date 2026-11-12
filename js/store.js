@@ -43,6 +43,7 @@ const Store = (() => {
   function update(id, patch) {
     const item = get(id);
     if (!item) return null;
+    if (patch.status === 'done' && item.status !== 'done' && !('finishedAt' in patch)) patch = { ...patch, finishedAt: now() };
     Object.assign(item, patch, { updatedAt: now() });
     save();
     return item;
