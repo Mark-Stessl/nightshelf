@@ -639,6 +639,14 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   .hero-stars { margin-top: 8px !important; }
   .hero-actions { margin-top: 4px; }
   .hero-actions #quickStatus { flex: 1 1 auto; min-width: 0; }
+  .hero-actions { flex-wrap: nowrap; }
+  .hero-actions #delBtn { font-size: 0; gap: 0; width: 40px; padding: 0; flex-shrink: 0; }
+  .hero-actions #editBtn { flex-shrink: 0; }
+  .card-meta .dot:has(+ .stars-mini), .card-meta .dot:last-child { display: none; }
+  .season-panel { grid-template-columns: 72px 1fr; gap: 12px; padding: 12px; }
+  .ep-stepper { gap: 8px; flex-wrap: wrap; }
+  .ep-count span { white-space: nowrap; }
+  .ep-count input { width: 58px; }
   .hero-summary, .hero-notes { font-size: 13.5px; }
 
   /* Listen */
