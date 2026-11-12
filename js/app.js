@@ -847,7 +847,7 @@
             const inc = rows.filter(r => r.include && !r.existing);
             const skipN = rows.filter(r => r.existing).length;
             const sum = $('#lcSum');
-            if (sum) sum.textContent = `${entries.length} Einträge → ${rows.length} Anime · ${inc.length} werden hinzugefügt${skipN ? ` · ${skipN} schon in deinem Regal (bleiben unverändert)` : ''}${rows.some(r => r.unmatched && !r.existing) ? ` · ${rows.filter(r => r.unmatched && !r.existing).length} nicht auf AniList gefunden` : ''}`;
+            if (sum) sum.textContent = `${entries.length} Einträge → ${rows.length} Anime · ${inc.length} ${inc.length === 1 ? 'wird' : 'werden'} hinzugefügt${skipN ? ` · ${skipN} schon in deinem Regal (bleiben unverändert)` : ''}${rows.some(r => r.unmatched && !r.existing) ? ` · ${rows.filter(r => r.unmatched && !r.existing).length} nicht auf AniList gefunden` : ''}`;
               go.textContent = inc.length ? `${inc.length} hinzufügen` : 'Nichts Neues'; go.disabled = !inc.length;
           };
           step.innerHTML = `<p class="muted" id="lcSum" style="margin:0 0 12px"></p>
