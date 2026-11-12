@@ -157,9 +157,15 @@
         ${foot ? `<div class="modal-foot">${foot}</div>` : ''}
       </div>`;
     requestAnimationFrame(() => root.classList.add('open'));
+    // Handy: Fenster immer am sichtbaren Bereich ausrichten (iOS schiebt die Ansicht sonst bei Tastatur/Fokus hoch)
+    const vv = window.visualViewport;
+    const touch = window.matchMedia('(max-width: 820px)').matches;
+    const fit = () => { if (!vv) return; root.style.top = `${vv.offsetTop}px`; root.style.height = `${vv.height}px`; root.style.bottom = 'auto'; };
+    if (vv && touch) { vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); fit(); }
     const close = () => {
       root.classList.remove('open');
-      setTimeout(() => { if (!root.classList.contains('open')) { root.innerHTML = ''; unlockScroll(); } }, 280);
+      if (vv && touch) { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); }
+      setTimeout(() => { if (!root.classList.contains('open')) { root.innerHTML = ''; root.style.top = root.style.height = root.style.bottom = ''; unlockScroll(); } }, 280);
       document.removeEventListener('keydown', onKey);
     };
     const onKey = e => { if (e.key === 'Escape') close(); };
@@ -168,8 +174,9 @@
     $$('[data-close]', root).forEach(b => b.onclick = close);
     const modal = $('.modal', root);
     onMount && onMount(modal, close);
+    // Am Handy nicht automatisch ins erste Feld springen: das öffnet die Tastatur und verschiebt die Ansicht
     const first = $('input, textarea, select', modal);
-    first && setTimeout(() => first.focus(), 120);
+    if (first && !window.matchMedia('(pointer: coarse)').matches) setTimeout(() => first.focus(), 120);
     return close;
   }
 

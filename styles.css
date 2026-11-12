@@ -727,3 +727,11 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   .sync-opt .tiny, .sync-opt p { font-size: 12px; }
   .panel .page-sub, .main > div > .page-head .page-sub { font-size: 13px; }
 }
+
+/* Datumsfeld bleibt in seiner Spalte (iOS gibt ihm sonst eine feste Mindestbreite) */
+.input[type="date"] { display: block; width: 100%; min-width: 0; max-width: 100%; -webkit-appearance: none; appearance: none; text-align: left; }
+.input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+@media (max-width: 820px) {
+  /* Fenster: immer mit Abstand zur Statusleiste, Höhe richtet sich nach dem sichtbaren Bereich */
+  .modal { max-height: calc(100% - env(safe-area-inset-top) - 36px); }
+}
