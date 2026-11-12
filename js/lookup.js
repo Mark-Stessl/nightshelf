@@ -331,8 +331,32 @@ const Lookup = (() => {
     return { groups: merged, unmatched: entries.filter((_, i) => !matched[i]) };
   }
 
-  const SEARCH = { series: searchSeries, movie: searchMovies, game: searchGames, anime: searchAnime };
-  const DETAIL = { series: detailSeries, movie: detailMovie, game: detailGame, anime: detailAnime };
+  /* ---------- Manga: MangaDex über den eigenen Server ---------- */
+  async function workerGet(path) {
+    const r = await fetch(PSN.worker() + path, { headers: Sync.header() });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 403) throw new Error('key');
+    if (!r.ok) throw new Error('http');
+    return d;
+  }
+  async function searchManga(q) {
+    const d = await workerGet(`/manga/search?q=${encodeURIComponent(q)}`);
+    return (d.results || []).map(m => ({
+      source: 'mangadex', id: m.id, title: m.title, year: m.year, cover: m.cover, thumb: m.thumb, raw: m,
+      sub: [m.kind, m.year, { ongoing: 'laufend', completed: 'abgeschlossen', hiatus: 'pausiert', cancelled: 'eingestellt' }[m.status] || m.status, m.altTitle].filter(Boolean).join(' · '),
+    }));
+  }
+  async function detailManga(hit) {
+    const d = await workerGet(`/manga/series?id=${hit.id}`);
+    return {
+      title: d.title || hit.title, year: d.year, cover: d.cover || hit.cover, genres: d.genres || [], summary: d.summary || '',
+      latest: d.latest, completed: d.completed, mdStatus: d.status, lastUpload: d.lastUpload, kind: d.kind, authors: d.authors || [],
+      mangadexId: d.id || hit.id, external: `mangadex:${d.id || hit.id}`,
+    };
+  }
+
+  const SEARCH = { series: searchSeries, movie: searchMovies, game: searchGames, anime: searchAnime, manga: searchManga };
+  const DETAIL = { series: detailSeries, movie: detailMovie, game: detailGame, anime: detailAnime, manga: detailManga };
   const NEEDS = { movie: 'tmdb' };
 
   return {

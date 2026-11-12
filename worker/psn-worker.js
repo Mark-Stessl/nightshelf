@@ -17,8 +17,9 @@
  * den Header X-Nightshelf-Key. Gespeichert wird nur der SHA-256-Hash des Schlüssels.
  *   POST /achievements { title, platform, genre, size } -> KI-Trophäenliste (Wikipedia + Workers AI)
  *   GET  /ai-usage                    -> heute verbrauchte Neurons (Schätzung aus Token-Zahlen)
- *   GET  /manga/search?q=             -> Manga-Suche über MangaUpdates
- *   POST /manga/latest { ids }        -> aktuelle Kapitelzahl für bis zu 40 Manga
+ *   GET  /manga/search?q=             -> Manga-Suche über MangaDex
+ *   GET  /manga/series?id=            -> Details + höchstes Kapitel (alle Sprachen)
+ *   POST /manga/latest { ids }        -> höchstes Kapitel für bis zu 40 Manga
  */
 
 const ALLOWED_ORIGINS = [
@@ -33,17 +34,37 @@ const CLIENT_BASIC = 'Basic MDk1MTUxNTktNzIzNy00MzcwLTliNDAtMzgwNmU2N2MwODkxOnVj
 const REDIRECT_URI = 'com.scee.psxandroid.scecompcall://redirect';
 const SCOPE = 'psn:mobile.v2.core psn:clientapp';
 const TROPHY_API = 'https://m.np.playstation.com/api/trophy/v1';
-const MU_API = 'https://api.mangaupdates.com/v1';
-const MU_HEADERS = { 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': 'Nightshelf/1.0 (https://mark-stessl.github.io/nightshelf/)' };
-function muSeries(x, full = false) {
-  const strip = t => String(t || '').replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#039;/g, "'").replace(/\s+/g, ' ').trim();
+const MD_API = 'https://api.mangadex.org';
+const MD_HEADERS = { Accept: 'application/json', 'User-Agent': 'Nightshelf/1.0 (https://mark-stessl.github.io/nightshelf/)' };
+const MD_RATINGS = 'contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica';
+const mdGet = async path => {
+  const r = await fetch(MD_API + path, { headers: MD_HEADERS });
+  if (!r.ok) { const e = new Error('md ' + r.status); e.status = 502; e.code = 'md_error'; throw e; }
+  return r.json();
+};
+function mdManga(m) {
+  const a = m.attributes || {};
+  const pick = obj => obj?.en || obj?.['ja-ro'] || Object.values(obj || {})[0] || '';
+  const alt = (a.altTitles || []).map(pick).filter(Boolean);
+  const title = a.title?.en || alt.find(t => /^[\x20-\x7E]+$/.test(t)) || pick(a.title);
+  const coverRel = (m.relationships || []).find(r => r.type === 'cover_art');
+  const file = coverRel?.attributes?.fileName;
+  const authors = (m.relationships || []).filter(r => r.type === 'author' && r.attributes?.name).map(r => r.attributes.name);
+  const kind = { ja: 'Manga', ko: 'Manhwa', zh: 'Manhua', 'zh-hk': 'Manhua' }[a.originalLanguage] || 'Comic';
   return {
-    id: String(x.series_id), title: strip(x.title), type: x.type || '', year: x.year ? +x.year : null,
-    cover: x.image?.url?.original || x.image?.url?.thumb || '', thumb: x.image?.url?.thumb || x.image?.url?.original || '',
-    latest: x.latest_chapter ?? null, completed: !!x.completed, status: strip(x.status),
-    genres: (x.genres || []).map(g => g.genre).slice(0, 6),
-    ...(full ? { summary: strip(x.description).slice(0, 3000), authors: (x.authors || []).map(a => a.name).slice(0, 3) } : {}),
+    id: m.id, title, altTitle: alt.find(t => t !== title) || '', kind, year: a.year || null,
+    status: a.status || '', completed: a.status === 'completed', lastChapter: a.lastChapter ? parseFloat(a.lastChapter) || null : null,
+    cover: file ? `https://uploads.mangadex.org/covers/${m.id}/${file}.512.jpg` : '',
+    thumb: file ? `https://uploads.mangadex.org/covers/${m.id}/${file}.256.jpg` : '',
+    genres: (a.tags || []).filter(t => t.attributes?.group === 'genre').map(t => t.attributes.name?.en).filter(Boolean).slice(0, 6),
+    summary: String(a.description?.en || pick(a.description) || '').replace(/\[[^\]]*\]\([^)]*\)/g, '').replace(/[*_#>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 3000),
+    authors: [...new Set(authors)].slice(0, 3),
   };
+}
+async function mdLatest(id) {
+  const agg = await mdGet(`/manga/${id}/aggregate`);
+  const nums = Object.values(agg.volumes || {}).flatMap(v => Object.keys(v.chapters || {})).map(Number).filter(n => Number.isFinite(n));
+  return nums.length ? Math.max(...nums) : null;
 }
 const AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const AI_DAILY_LIMIT = 10000;
@@ -98,28 +119,35 @@ export default {
       if (url.pathname === '/manga/search') {
         const q = (url.searchParams.get('q') || '').trim().slice(0, 100);
         if (q.length < 2) return json({ results: [] });
-        const r = await fetch(`${MU_API}/series/search`, { method: 'POST', headers: MU_HEADERS, body: JSON.stringify({ search: q, perpage: 8 }) });
-        if (!r.ok) return json({ error: 'mu_error', status: r.status }, 502);
-        const d = await r.json();
-        return json({ results: (d.results || []).map(x => muSeries(x.record)) });
+        const d = await mdGet(`/manga?limit=8&order[relevance]=desc&includes[]=cover_art&${MD_RATINGS}&title=${encodeURIComponent(q)}`);
+        return json({ results: (d.data || []).map(mdManga) });
       }
 
       if (url.pathname === '/manga/series') {
-        const id = url.searchParams.get('id');
-        if (!/^\d+$/.test(id || '')) return json({ error: 'id_invalid' }, 400);
-        const r = await fetch(`${MU_API}/series/${id}`, { headers: MU_HEADERS });
-        if (!r.ok) return json({ error: 'mu_error', status: r.status }, 502);
-        return json(muSeries(await r.json(), true));
+        const id = url.searchParams.get('id') || '';
+        if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: 'id_invalid' }, 400);
+        const [d, latest, feed] = await Promise.all([
+          mdGet(`/manga/${id}?includes[]=cover_art&includes[]=author`),
+          mdLatest(id),
+          mdGet(`/chapter?limit=1&order[readableAt]=desc&manga=${id}&${MD_RATINGS}`).catch(() => ({})),
+        ]);
+        const m = mdManga(d.data);
+        return json({ ...m, latest: Math.max(latest || 0, m.lastChapter || 0) || null, lastUpload: feed.data?.[0]?.attributes?.readableAt || null });
       }
 
       if (url.pathname === '/manga/latest' && request.method === 'POST') {
         const { ids } = await request.json().catch(() => ({}));
-        const list = (Array.isArray(ids) ? ids : []).filter(i => /^\d+$/.test(String(i))).slice(0, 40);
+        const list = (Array.isArray(ids) ? ids : []).filter(i => /^[0-9a-f-]{36}$/.test(String(i))).slice(0, 40);
         const out = {};
+        let meta = {};
+        try {
+          const d = await mdGet(`/manga?limit=100&${MD_RATINGS}&contentRating[]=pornographic&${list.map(i => 'ids[]=' + i).join('&')}`);
+          (d.data || []).forEach(m => { meta[m.id] = { status: m.attributes.status, lastChapter: parseFloat(m.attributes.lastChapter) || null }; });
+        } catch {}
         for (const id of list) {
           try {
-            const r = await fetch(`${MU_API}/series/${id}`, { headers: MU_HEADERS });
-            if (r.ok) { const d = await r.json(); out[id] = { latest: d.latest_chapter ?? null, completed: !!d.completed, status: d.status || '' }; }
+            const latest = await mdLatest(id);
+            out[id] = { latest: Math.max(latest || 0, meta[id]?.lastChapter || 0) || null, status: meta[id]?.status || '', completed: meta[id]?.status === 'completed' };
           } catch {}
         }
         return json({ series: out });

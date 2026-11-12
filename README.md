@@ -12,6 +12,7 @@ Persönliches Regal für Spiele, Serien und Filme – mit Trophäen-System im Pl
 - **Automatische Infos** beim Hinzufügen: Cover, Erscheinungsdatum, Genre usw. – Serien über TVmaze, Spiele über Wikipedia/Wikidata (beide ohne Schlüssel), Filme über TMDB (kostenloser Schlüssel unter „Daten“)
 - **PlayStation-Sync:** alle PS4/PS5-Spiele mit echter Trophäenliste und verdienten Trophäen über einen eigenen Cloudflare Worker (`worker/psn-worker.js`). Anmeldung mit dem NPSSO-Code unter „Daten“; Tokens bleiben nur im Browser.
 - **Serien und Anime mit Staffeln:** Staffeln (Serien über TVmaze) bzw. alle Teile einer Reihe (Anime über AniList) als Tabs mit eigenem Folgen-Zähler.
+- **Manga:** Suche über MangaDex (via Worker), Kapitel-Zähler; die aktuelle Kapitelzahl laufender Manga wird automatisch aktualisiert (höchstes Kapitel über alle Sprachen, Zahl sinkt nie).
 - **Statistik & Jahresrückblick:** Trophäen pro Monat/Jahr, Platin-Chronik, seltenste Trophäen, abgeschlossene Einträge und gesehene Folgen.
 - **Anime-Reihen:** Beim Hinzufügen werden alle Staffeln und Filme einer Reihe von AniList geladen; pro Staffel Tabs mit eigenem Folgen-Zähler.
 - **Trophäen-Level** aus gesammelten Punkten (Bronze 15, Silber 30, Gold 90, Platin 300)

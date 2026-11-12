@@ -12,15 +12,17 @@
     game:   { label: 'Spiel',  plural: 'Spiele', route: 'games' },
     series: { label: 'Serie',  plural: 'Serien', route: 'series' },
     anime:  { label: 'Anime',  plural: 'Anime',  route: 'anime' },
+    manga:  { label: 'Manga',  plural: 'Manga',  route: 'manga' },
     movie:  { label: 'Film',   plural: 'Filme',  route: 'movies' },
   };
   const STATUS = {
     game:   { active: 'Am Spielen', done: 'Durchgespielt', planned: 'Backlog', dropped: 'Abgebrochen' },
     series: { active: 'Am Schauen', done: 'Fertig geschaut', planned: 'Merkliste', dropped: 'Abgebrochen' },
     anime:  { active: 'Am Schauen', done: 'Fertig geschaut', paused: 'Pausiert', planned: 'Merkliste', dropped: 'Abgebrochen' },
+    manga:  { active: 'Am Lesen', done: 'Fertig gelesen', paused: 'Pausiert', planned: 'Leseliste', dropped: 'Abgebrochen' },
     movie:  { done: 'Gesehen', planned: 'Merkliste', dropped: 'Abgebrochen' },
   };
-  const ORDER_TYPES = ['game', 'series', 'anime', 'movie'];
+  const ORDER_TYPES = ['game', 'series', 'anime', 'manga', 'movie'];
   const PLATFORMS = ['PS5', 'PS4', 'PS3', 'PS Vita', 'Switch 2', 'Switch', 'PC', 'Steam Deck', 'Xbox', 'Mobile', 'Andere'];
   const psDefault = p => isPS(p) ? (PSN.connected() ? 'psn' : 'paste') : 'auto';
   const isPS = p => /^PS/.test(p || '');
@@ -40,6 +42,7 @@
     trophy: '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"/></svg>',
     game: '<svg viewBox="0 0 24 24"><path d="M6 8h12a4 4 0 0 1 4 4v1a4 4 0 0 1-7 2.6L14 15h-4l-1 .6A4 4 0 0 1 2 13v-1a4 4 0 0 1 4-4zM7 11v3M5.5 12.5h3M16 12h.01M18 14h.01"/></svg>',
     tv: '<svg viewBox="0 0 24 24"><path d="M3 7h18v12H3zM8 3l4 4 4-4"/></svg>',
+    book: '<svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h6"/></svg>',
     anime: '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.9l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/></svg>',
     film: '<svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 9h16M4 15h16M8 5v4M12 5v4M16 5v4M8 15v4M12 15v4M16 15v4"/></svg>',
     download: '<svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
@@ -47,7 +50,7 @@
     chart: '<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
     refresh: '<svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.9-3.9M4 5v4h4M4 13a8 8 0 0 0 14.9 3.9M20 19v-4h-4"/></svg>',
   };
-  const typeIcon = t => ({ game: I.game, series: I.tv, anime: I.anime, movie: I.film }[t]);
+  const typeIcon = t => ({ game: I.game, series: I.tv, anime: I.anime, manga: I.book, movie: I.film }[t]);
 
   /* ---------- Hilfen ---------- */
   function hash(str) { let h = 0; for (const c of str || '') h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); }
@@ -183,6 +186,11 @@
         <div class="field"><label>Staffeln gesamt</label><input class="input" name="seasons" type="number" min="0" value="${d.seasons || ''}" placeholder="5"></div>
         <div class="field"><label>Gesehen bis Staffel</label><input class="input" name="seasonSeen" type="number" min="0" value="${d.seasonSeen || ''}" placeholder="3"></div>
       </div>` : '';
+    const mangaFields = type === 'manga' ? `
+      <div class="grid-2">
+        <div class="field"><label>Kapitel aktuell</label><input class="input" name="chapters" type="number" min="0" step="any" value="${d.chapters ?? ''}" placeholder="368"></div>
+        <div class="field"><label>Gelesen bis Kapitel</label><input class="input" name="chaptersRead" type="number" min="0" step="any" value="${d.chaptersRead ?? ''}" placeholder="120"></div>
+      </div>` : '';
     const animeFields = type === 'anime' && d.seasonList?.length ? `<p class="tiny" style="margin:0">Folgen und Staffeln bearbeitest du direkt auf der Seite des Anime.</p>` : type === 'anime' ? `
       <div class="grid-2">
         <div class="field"><label>Folgen gesamt</label><input class="input" name="episodes" type="number" min="0" value="${d.episodes || ''}" placeholder="24"></div>
@@ -210,7 +218,7 @@
           <div class="field"><label>Status</label><select class="input" name="status">${Object.entries(st).map(([k, v]) => `<option value="${k}" ${k === d.status ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
           <div class="field"><label>Jahr</label><input class="input" name="year" type="number" min="1950" max="2100" value="${d.year || ''}" placeholder="2024"></div>
         </div>
-        ${seriesFields}${animeFields}
+        ${seriesFields}${animeFields}${mangaFields}
         <div class="grid-2">
           <div class="field"><label>Bewertung</label>${starsInput(d.rating)}</div>
           <div class="field"><label>Cover-Bild (Link, optional)</label><input class="input" name="cover" value="${esc(d.cover || '')}" placeholder="https://…/cover.jpg"></div>
@@ -284,6 +292,7 @@
             if (dt.cover) F.cover.value = dt.cover;
             if (type === 'series' && dt.seasons) F.seasons.value = dt.seasons;
             if (type === 'anime' && dt.episodes) F.episodes.value = dt.episodes;
+            if (type === 'manga' && dt.latest) F.chapters.value = dt.latest;
             if (type === 'game') {
               if (dt.genre && F.genre) F.genre.value = dt.genre;
               if (dt.platforms?.length && !dt.platforms.includes(F.platform.value)) {
@@ -291,7 +300,7 @@
                 if (pref) { F.platform.value = pref; F.platform.onchange && F.platform.onchange(); }
               }
             }
-            info.innerHTML = `<div class="fetched">${dt.cover ? `<img src="${esc(dt.cover)}" alt="">` : ''}<div><b>Infos übernommen</b><small>${esc([dt.released ? fmtDate(dt.released) : dt.year, (dt.genres || []).slice(0, 3).join(', '), dt.runtime ? dt.runtime + ' Min.' : '', dt.seasons ? dt.seasons + (dt.seasons === 1 ? ' Staffel' : ' Staffeln') : '', dt.episodes ? dt.episodes + ' Folgen' : ''].filter(Boolean).join(' · '))}</small></div>
+            info.innerHTML = `<div class="fetched">${dt.cover ? `<img src="${esc(dt.cover)}" alt="">` : ''}<div><b>Infos übernommen</b><small>${esc([dt.released ? fmtDate(dt.released) : dt.year, (dt.genres || []).slice(0, 3).join(', '), dt.runtime ? dt.runtime + ' Min.' : '', dt.seasons ? dt.seasons + (dt.seasons === 1 ? ' Staffel' : ' Staffeln') : '', dt.episodes ? dt.episodes + ' Folgen' : '', dt.latest ? `${dt.completed ? '' : 'laufend · '}${fmtCh(dt.latest)} Kapitel` : ''].filter(Boolean).join(' · '))}</small></div>
               <button type="button" class="btn btn-ghost btn-sm" id="undoFetch">Entfernen</button></div>`;
             $('#undoFetch', m).onclick = () => { fetched = null; F.cover.value = ''; info.innerHTML = ''; };
           } catch { info.innerHTML = `<div class="tiny" style="margin-top:4px">Details konnten nicht geladen werden.</div>`; }
@@ -330,10 +339,16 @@
           if (type === 'game') { data.platform = form.elements.platform.value; data.genre = form.elements.genre.value; }
           const fin = form.elements.finishedAt.value;
           data.finishedAt = fin ? (isEdit && item.finishedAt?.slice(0, 10) === fin ? item.finishedAt : new Date(fin + 'T12:00:00').toISOString()) : null;
+          if (type === 'manga') {
+            data.chapters = form.elements.chapters.value !== '' ? +form.elements.chapters.value : null;
+            data.chaptersRead = form.elements.chaptersRead.value !== '' ? +form.elements.chaptersRead.value : 0;
+            if (data.chapters != null && data.chaptersRead > data.chapters) data.chapters = data.chaptersRead;
+            if (isEdit && (item.chapters || 0) > (data.chapters || 0) && !form.elements.chapters.dataset.touched) data.chapters = item.chapters;
+          }
           if (type === 'anime' && form.elements.episodes) { data.episodes = form.elements.episodes.value ? +form.elements.episodes.value : null; data.episodesSeen = form.elements.episodesSeen.value ? +form.elements.episodesSeen.value : null; }
           if (type === 'series' && form.elements.seasons) { data.seasons = form.elements.seasons.value ? +form.elements.seasons.value : null; data.seasonSeen = form.elements.seasonSeen.value ? +form.elements.seasonSeen.value : null; }
           if (fetched) {
-            ['genres', 'released', 'runtime', 'summary', 'external', 'anilistId'].forEach(k => { if (fetched[k] != null && fetched[k] !== '') data[k] = fetched[k]; });
+            ['genres', 'released', 'runtime', 'summary', 'external', 'anilistId', 'mangadexId', 'mdStatus', 'lastUpload', 'kind', 'authors'].forEach(k => { if (fetched[k] != null && fetched[k] !== '') data[k] = fetched[k]; });
           }
 
           if (isEdit) {
@@ -665,6 +680,7 @@
     const txt = {
       game: ['Deine Spielesammlung wartet', 'Füge dein erstes Spiel hinzu und hake Trophäen ab.'],
       series: ['Noch keine Serien', 'Halte fest, welche Serien du gesehen hast oder gerade schaust.'],
+      manga: ['Noch keine Manga', 'Füge Manga hinzu. Die aktuelle Kapitelzahl hält Nightshelf automatisch auf dem neuesten Stand.'],
       anime: ['Noch keine Anime', 'Füge Anime hinzu. Staffeln werden automatisch von AniList geladen.'],
       movie: ['Noch keine Filme', 'Sammle alle Filme, die du gesehen hast, mit Bewertung.'],
     }[type];
@@ -678,6 +694,7 @@
     if (item.type === 'series' && item.seasons) meta.push(`${item.seasonSeen || 0}/${item.seasons} ${item.seasons === 1 ? 'Staffel' : 'Staffeln'}`);
     if (['anime', 'series'].includes(item.type) && item.seasonList?.length > 1 && item.seasonList.some(x => x.episodes)) { const cur = currentSeason(item); meta.length = 0; meta.push(`${cur.label} · ${seasonDone(cur) ? '✓' : `${cur.seen || 0}/${cur.episodes || '?'}`}`); }
     else if (item.type === 'anime' && (item.episodes || item.episodesSeen)) meta.push(`${item.episodesSeen || 0}/${item.episodes || '?'} Folgen`);
+    if (item.type === 'manga' && (item.chapters || item.chaptersRead)) meta.push(`Kap. ${fmtCh(item.chaptersRead || 0)}/${item.chapters ? fmtCh(item.chapters) : '?'}`);
     if (item.year) meta.push(item.year);
     let extra = '';
     if (item.type === 'game' && item.trophies?.length) {
@@ -685,6 +702,8 @@
       const plat = item.trophies.find(t => t.tier === 'platinum' && t.done);
       extra = `<div class="cover-progress"><i style="width:${Math.round(p.done / p.total * 100)}%"></i></div>${plat ? `<div class="cover-plat" title="Platin">${Trophies.icon('platinum', 15)}</div>` : ''}`;
     }
+    const behind = item.type === 'manga' ? mangaBehind(item) : 0;
+    if (behind > 0 && ['active', 'paused'].includes(item.status)) extra += `<div class="cover-new" title="${behind} ungelesene Kapitel">+${behind > 99 ? '99' : fmtCh(behind)}</div>`;
     return `<a class="card ${A()}" href="#/item/${item.id}">
       <div class="cover">${coverHTML(item)}${item.type === 'game' && item.platform ? `<span class="cover-tag">${esc(item.platform)}</span>` : ''}${extra}</div>
       <div><div class="card-title">${esc(item.title)}</div>
@@ -692,13 +711,13 @@
     </a>`;
   }
 
-  const libState = { game: { q: '', status: 'all', platform: 'all', sort: 'added' }, series: { q: '', status: 'all', sort: 'added' }, movie: { q: '', status: 'all', sort: 'added' }, anime: { q: '', status: 'all', sort: 'added' } };
+  const libState = { game: { q: '', status: 'all', platform: 'all', sort: 'added' }, series: { q: '', status: 'all', sort: 'added' }, movie: { q: '', status: 'all', sort: 'added' }, anime: { q: '', status: 'all', sort: 'added' }, manga: { q: '', status: 'all', sort: 'added' } };
 
   function viewLibrary(type) {
     const s = libState[type];
     const items = Store.all(type);
     const head = `<div class="page-head"><div><h1 class="page-title">${TYPES[type].plural}</h1><p class="page-sub">${items.length} ${items.length === 1 ? 'Eintrag' : 'Einträge'}</p></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}<button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button></div></div>`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}${type === 'manga' && items.length ? `<button class="btn" data-mangacheck>${I.refresh} Neue Kapitel prüfen</button>` : ''}<button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button></div></div>`;
     if (!items.length) { view.innerHTML = head + emptyState(type); return; }
 
     const platforms = type === 'game' ? [...new Set(items.map(i => i.platform).filter(Boolean))] : [];
@@ -918,6 +937,154 @@
     });
   }
   document.addEventListener('click', e => { if (e.target.closest('[data-lcimport]')) { e.preventDefault(); animeImport(); } });
+
+  /* ---------- Manga ---------- */
+  const fmtCh = n => (Math.round(n * 10) / 10).toLocaleString('de-AT');
+  const mangaBehind = m => (m.chapters != null ? Math.max(0, m.chapters - (m.chaptersRead || 0)) : 0);
+  function relTime(iso) {
+    if (!iso) return '';
+    const d = (Date.now() - Date.parse(iso)) / 1000;
+    if (d < 90) return 'gerade eben';
+    if (d < 3600) return `vor ${Math.round(d / 60)} Min.`;
+    if (d < 86400) return `vor ${Math.round(d / 3600)} Std.`;
+    if (d < 86400 * 45) return `vor ${Math.round(d / 86400)} Tagen`;
+    return fmtDate(iso);
+  }
+
+  function saveManga(item, patch) {
+    const read = patch.chaptersRead ?? item.chaptersRead ?? 0;
+    const total = Math.max(patch.chapters ?? item.chapters ?? 0, read) || null;
+    const delta = read - (item.chaptersRead || 0);
+    const p = { ...patch, chaptersRead: read, chapters: total };
+    if (delta > 0) p.readLog = [...(item.readLog || []), { at: new Date().toISOString(), n: delta }].slice(-3000);
+    if (!['dropped', 'paused'].includes(item.status)) {
+      if (total && read >= total && item.mdStatus === 'completed') p.status = 'done';
+      else if (read > 0 && item.status !== 'done') p.status = 'active';
+      else if (read > 0 && item.status === 'done' && read < total) p.status = 'active';
+    }
+    return Store.update(item.id, p);
+  }
+
+  function mangaSection(item) {
+    const read = item.chaptersRead || 0, total = item.chapters;
+    const behind = mangaBehind(item);
+    const pct = total ? Math.min(100, Math.round(read / total * 100)) : 0;
+    const ongoing = item.mdStatus && item.mdStatus !== 'completed';
+    const stale = item.lastUpload && Date.now() - Date.parse(item.lastUpload) > 180 * 86400 * 1000 && ongoing;
+    return `<section class="section">
+      <div class="trophy-head">
+        <div><h2 class="section-title" style="margin:0">Kapitel</h2>
+          <div class="tiny">${total ? `${fmtCh(read)} von ${fmtCh(total)} gelesen · ${pct} %` : `${fmtCh(read)} gelesen`}${behind > 0 ? ` · <span style="color:var(--cyan)">${fmtCh(behind)} ungelesen</span>` : ''}</div></div>
+        ${item.mangadexId ? `<button class="btn btn-sm" id="mCheck">${I.refresh} Jetzt prüfen</button>` : ''}
+      </div>
+      <div class="season-panel manga-panel ${A()}">
+        <div class="manga-count">
+          <div class="ep-stepper" style="margin-top:0">
+            <button class="btn icon-btn" id="chMinus" aria-label="Ein Kapitel zurück">−</button>
+            <div class="ep-count"><input type="number" id="chInput" min="0" step="any" value="${read}" aria-label="Gelesen bis Kapitel"><span>/ ${total ? fmtCh(total) : '?'} Kapitel</span></div>
+            <button class="btn icon-btn btn-primary" id="chPlus" aria-label="Ein Kapitel weiter">+</button>
+          </div>
+          <div class="bar" style="max-width:420px"><i style="width:${pct}%"></i></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+            ${total && read < total ? `<button class="btn btn-sm btn-primary" id="chAll">${I.check} Bis Kapitel ${fmtCh(total)} gelesen</button>` : ''}
+            <button class="btn btn-sm" id="chTotal">${I.edit} Kapitelzahl ändern</button>
+          </div>
+        </div>
+        <div class="manga-info tiny">
+          ${item.mangadexId ? `<div><b>Neuestes Kapitel:</b> ${total ? fmtCh(total) : 'unbekannt'}${ongoing ? ' · Manga läuft noch' : item.mdStatus === 'completed' ? ' · Manga abgeschlossen' : ''}</div>
+          ${item.lastUpload ? `<div>Zuletzt ein neues Kapitel: ${relTime(item.lastUpload)}</div>` : ''}
+          <div>Automatisch geprüft: ${item.chapterCheckedAt ? relTime(item.chapterCheckedAt) : 'noch nie'}</div>
+          ${stale ? `<div class="stale">Seit über einem halben Jahr kam hier kein Kapitel mehr. Falls du weißt, dass es weitergeht, trag die Zahl selbst ein.</div>` : ''}`
+          : `<div>Dieser Manga ist nicht mit MangaDex verknüpft, deshalb wird die Kapitelzahl nicht automatisch aktualisiert. Über „Bearbeiten“ und die Titelsuche kannst du ihn verknüpfen.</div>`}
+        </div>
+      </div>
+    </section>`;
+  }
+
+  function bindManga(item) {
+    const fresh = () => Store.get(item.id);
+    const set = v => { const it = fresh(); saveManga(it, { chaptersRead: Math.max(0, Math.round(v * 10) / 10) }); render(); };
+    $('#chMinus').onclick = () => set((fresh().chaptersRead || 0) - 1);
+    $('#chPlus').onclick = () => set(Math.floor(fresh().chaptersRead || 0) + 1);
+    $('#chInput').onchange = e => set(+e.target.value || 0);
+    $('#chAll') && ($('#chAll').onclick = () => set(fresh().chapters));
+    $('#chTotal').onclick = () => {
+      const it = fresh();
+      openModal({
+        title: 'Kapitelzahl ändern',
+        body: `<form class="form" id="ctf" novalidate><div class="field"><label>Aktuelles Kapitel</label><input class="input" name="total" type="number" min="0" step="any" value="${it.chapters ?? ''}" placeholder="368"><div class="field-error" id="ctErr"></div></div>
+          <p class="tiny" style="margin:0">Die automatische Prüfung erhöht die Zahl weiter, sobald ein neueres Kapitel erscheint. Kleiner wird sie dadurch nie.</p></form>`,
+        foot: `<button class="btn btn-ghost" data-close>Abbrechen</button><button class="btn btn-primary" id="ctSave">Speichern</button>`,
+        onMount: (m, close) => {
+          $('#ctSave', m).onclick = () => {
+            const v = $('#ctf', m).elements.total.value;
+            if (v === '' || +v < 0) { $('#ctErr', m).textContent = 'Gib eine Kapitelzahl ein.'; return; }
+            Store.update(it.id, { chapters: +v, chaptersRead: Math.min(it.chaptersRead || 0, +v) });
+            close(); render();
+          };
+        },
+      });
+    };
+    $('#mCheck') && ($('#mCheck').onclick = async () => {
+      const b = $('#mCheck'); b.disabled = true; b.textContent = 'Prüfe…';
+      const r = await MangaWatch.check({ force: true, ids: [fresh().mangadexId] });
+      if (r.error) toast(`<div><b>Prüfen hat nicht geklappt</b><small>${r.error === 'key_required' ? 'Verbinde das Gerät unter Daten mit deinem Schlüssel' : 'Server nicht erreichbar'}</small></div>`);
+      else if (!r.updated.length) toast('<div><b>Keine neuen Kapitel</b></div>');
+      render();
+    });
+  }
+
+  const MangaWatch = (() => {
+    const KEY = 'nightshelf.mangaCheck';
+    const INTERVAL = 3 * 3600 * 1000;
+    let running = false;
+    async function check({ force = false, ids = null } = {}) {
+      if (running) return { updated: [] };
+      let last = 0; try { last = +localStorage.getItem(KEY) || 0; } catch {}
+      if (!force && Date.now() - last < INTERVAL) return { updated: [] };
+      const list = Store.all('manga').filter(m => m.mangadexId && (ids ? ids.includes(m.mangadexId) : m.mdStatus !== 'completed'));
+      if (!list.length) return { updated: [] };
+      running = true;
+      const updated = [];
+      try {
+        const all = [...new Set(list.map(m => m.mangadexId))];
+        for (let i = 0; i < all.length; i += 40) {
+          const res = await fetch(`${PSN.worker()}/manga/latest`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...Sync.header() }, body: JSON.stringify({ ids: all.slice(i, i + 40) }) });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) return { updated, error: data.error || 'error' };
+          const now = new Date().toISOString();
+          Object.entries(data.series || {}).forEach(([id, info]) => {
+            Store.all('manga').filter(m => m.mangadexId === id).forEach(m => {
+              const patch = { chapterCheckedAt: now };
+              if (info.status) patch.mdStatus = info.status;
+              if (info.latest && info.latest > (m.chapters || 0)) {
+                patch.chapters = info.latest; patch.lastUpload = now; patch.newChapterAt = now;
+                updated.push({ title: m.title, from: m.chapters || 0, to: info.latest });
+              }
+              Store.update(m.id, patch);
+            });
+          });
+        }
+        if (!ids) try { localStorage.setItem(KEY, String(Date.now())); } catch {}
+      } catch { return { updated, error: 'network' }; }
+      finally { running = false; }
+      if (updated.length === 1) toast(`<div class="tbadge" style="color:var(--cyan)">${I.book.replace('<svg', '<svg style="width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8"')}</div><div><b>${esc(updated[0].title)}</b><small>Kapitel ${fmtCh(updated[0].to)} ist da</small></div>`);
+      else if (updated.length > 1) toast(`<div class="tbadge" style="color:var(--cyan)">${I.book.replace('<svg', '<svg style="width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8"')}</div><div><b>${updated.length} Manga mit neuen Kapiteln</b><small>${esc(updated.slice(0, 3).map(u => u.title).join(', '))}${updated.length > 3 ? ' …' : ''}</small></div>`);
+      return { updated };
+    }
+    return { check };
+  })();
+  document.addEventListener('click', async e => {
+    if (!e.target.closest('[data-mangacheck]')) return;
+    e.preventDefault();
+    const b = e.target.closest('[data-mangacheck]'); b.disabled = true; b.textContent = 'Prüfe…';
+    const r = await MangaWatch.check({ force: true });
+    if (r.error) toast(`<div><b>Prüfen hat nicht geklappt</b><small>${r.error === 'key_required' ? 'Verbinde das Gerät unter Daten mit deinem Schlüssel' : 'Server nicht erreichbar'}</small></div>`);
+    else if (!r.updated.length) toast('<div><b>Keine neuen Kapitel</b><small>Alles auf dem neuesten Stand</small></div>');
+    render();
+  });
+  const autoMangaCheck = () => MangaWatch.check().then(r => { if (r.updated.length) render(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') autoMangaCheck(); });
 
   /* ---------- Staffeln (Anime und Serien) ---------- */
   const seasonTab = {};
@@ -1155,6 +1322,7 @@
       if (nF) meta.push(`${nF} ${nF === 1 ? 'Film' : 'Filme'}`);
     }
     if (item.type === 'anime' && item.episodes) meta.push(`${item.episodes} Folgen`);
+    if (item.type === 'manga') { if (item.kind) meta.push(esc(item.kind)); if (item.authors?.length) meta.push(esc(item.authors.join(', '))); if (item.mdStatus) meta.push({ ongoing: 'Laufend', completed: 'Abgeschlossen', hiatus: 'Pausiert', cancelled: 'Eingestellt' }[item.mdStatus] || esc(item.mdStatus)); }
     if (item.runtime) meta.push(`${item.runtime} Min.`);
     if (item.genres?.length && item.type !== 'game') meta.push(esc(item.genres.slice(0, 3).join(', ')));
     if (item.released) meta.push(`Erschienen ${fmtDate(item.released)}`);
@@ -1214,7 +1382,7 @@
           <div style="margin-top:12px">${starsInput(item.rating, 'heroRating')}</div>
           ${item.notes ? `<div class="hero-notes">${esc(item.notes)}</div>` : ''}
           ${item.summary ? `<div class="hero-summary" id="heroSummary">${esc(item.summary)}</div><button class="more-btn" id="moreBtn" type="button" hidden aria-expanded="false">Mehr lesen</button>` : ''}
-          ${item.external ? `<div class="tiny" style="margin-top:8px">Infos von ${{ tvmaze: 'TVmaze', tmdb: 'TMDB', wikidata: 'Wikipedia / Wikidata', rawg: 'RAWG', anilist: 'AniList', livechart: 'LiveChart' }[item.external.split(':')[0]] || 'externer Datenbank'}</div>` : ''}
+          ${item.external ? `<div class="tiny" style="margin-top:8px">Infos von ${{ tvmaze: 'TVmaze', tmdb: 'TMDB', wikidata: 'Wikipedia / Wikidata', rawg: 'RAWG', anilist: 'AniList', livechart: 'LiveChart', mangadex: 'MangaDex' }[item.external.split(':')[0]] || 'externer Datenbank'}</div>` : ''}
           ${ring}${seriesBlock}
           <div class="hero-actions">
             <select class="input" id="quickStatus" style="width:auto">${Object.entries(STATUS[item.type]).map(([k, v]) => `<option value="${k}" ${k === item.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
@@ -1223,7 +1391,7 @@
           </div>
         </div>
       </div>
-      ${trophySection}${['anime', 'series'].includes(item.type) ? seasonSection(item) : ''}
+      ${trophySection}${['anime', 'series'].includes(item.type) ? seasonSection(item) : ''}${item.type === 'manga' ? mangaSection(item) : ''}
     </div>`;
 
     bindStars(view);
@@ -1237,6 +1405,7 @@
       };
     }
     if (['anime', 'series'].includes(item.type)) bindSeasons(item);
+    if (item.type === 'manga') bindManga(item);
     $('[data-stars="heroRating"]').addEventListener('change', e => { Store.update(item.id, { rating: e.detail }); });
     $('#quickStatus').onchange = e => { Store.update(item.id, { status: e.target.value }); render(); };
     $('#editBtn').onclick = () => itemForm(item.type, item);
@@ -1305,19 +1474,19 @@
   }
 
   function viewHome() {
-    const games = Store.all('game'), series = Store.all('series'), movies = Store.all('movie'), animes = Store.all('anime');
+    const games = Store.all('game'), series = Store.all('series'), movies = Store.all('movie'), animes = Store.all('anime'), mangas = Store.all('manga');
     const s = allTrophyStats();
-    const total = games.length + series.length + movies.length + animes.length;
+    const total = games.length + series.length + movies.length + animes.length + mangas.length;
     const hour = new Date().getHours();
     const greet = hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Hallo' : 'Guten Abend';
-    const active = [...games, ...series, ...animes].filter(i => i.status === 'active').slice(0, 6);
+    const active = [...mangas.filter(m => m.status === 'active' && mangaBehind(m) > 0), ...games, ...series, ...animes, ...mangas.filter(m => !(mangaBehind(m) > 0))].filter(i => i.status === 'active').slice(0, 6);
     const recent = recentTrophies();
 
     if (!total) {
       view.innerHTML = `<div class="${A()}"><div class="page-head"><div><h1 class="page-title">${greet}</h1><p class="page-sub">Dein Regal ist noch leer. Womit fangen wir an?</p></div></div>
         <div class="stats">${ORDER_TYPES.map(t => `<button class="stat" data-add="${t}" style="text-align:left;cursor:pointer;color:inherit">
           <div class="stat-label">${typeIcon(t).replace('<svg', '<svg style="width:18px;height:18px"')} ${TYPES[t].plural}</div>
-          <div class="stat-value" style="font-size:20px;margin-top:10px">${TYPES[t].label} hinzufügen</div><div class="stat-hint">${t === 'game' ? 'Mit Trophäen zum Abhaken' : t === 'series' ? 'Mit Staffel-Fortschritt' : t === 'anime' ? 'Mit allen Staffeln' : 'Mit Bewertung'}</div></button>`).join('')}</div></div>`;
+          <div class="stat-value" style="font-size:20px;margin-top:10px">${TYPES[t].label} hinzufügen</div><div class="stat-hint">${t === 'game' ? 'Mit Trophäen zum Abhaken' : t === 'series' ? 'Mit Staffel-Fortschritt' : t === 'manga' ? 'Kapitel zählen sich selbst hoch' : t === 'anime' ? 'Mit allen Staffeln' : 'Mit Bewertung'}</div></button>`).join('')}</div></div>`;
       return;
     }
 
@@ -1330,6 +1499,7 @@
         <a class="stat" href="#/trophies"><div class="stat-label">${Trophies.icon('platinum', 16)} Platin</div><div class="stat-value" style="color:var(--platinum)">${platCount}</div><div class="stat-hint">${games.filter(g => g.status === 'done').length} Spiele durchgespielt</div></a>
         <a class="stat" href="#/games"><div class="stat-label">${I.game} Spiele</div><div class="stat-value">${games.length}</div><div class="stat-hint">${games.filter(g => g.status === 'active').length} am Spielen</div></a>
         <a class="stat" href="#/series"><div class="stat-label">${I.tv} Serien</div><div class="stat-value">${series.length}</div><div class="stat-hint">${series.filter(g => g.status === 'done').length} fertig geschaut</div></a>
+        <a class="stat" href="#/manga"><div class="stat-label">${I.book} Manga</div><div class="stat-value">${mangas.length}</div><div class="stat-hint">${(() => { const n = mangas.filter(m => m.status === 'active' && mangaBehind(m) > 0).length; return n ? `${n} mit neuen Kapiteln` : `${mangas.filter(m => m.status === 'active').length} am Lesen`; })()}</div></a>
         <a class="stat" href="#/anime"><div class="stat-label">${I.anime} Anime</div><div class="stat-value">${animes.length}</div><div class="stat-hint">${animes.filter(g => g.status === 'done').length} fertig geschaut</div></a>
         <a class="stat" href="#/movies"><div class="stat-label">${I.film} Filme</div><div class="stat-value">${movies.length}</div><div class="stat-hint">${movies.filter(g => g.status === 'done').length} gesehen</div></a>
       </div>
@@ -1338,7 +1508,8 @@
           let sub = TYPES[i.type].label;
           if (i.type === 'game' && i.trophies?.length) { const p = Trophies.progress(i.trophies); sub += ` · ${p.done}/${p.total} Trophäen`; }
           if (i.type === 'series' && i.seasons) sub += ` · Staffel ${i.seasonSeen || 0}/${i.seasons}`;
-          if (['anime', 'series'].includes(i.type) && i.seasonList?.some(x => x.episodes)) { const cur = currentSeason(i); sub = `${TYPES[i.type].label} · ${cur.label} · Folge ${cur.seen || 0}/${cur.episodes || '?'}`; }
+          if (i.type === 'manga') { const b = mangaBehind(i); sub = `Manga · Kapitel ${fmtCh(i.chaptersRead || 0)}/${i.chapters ? fmtCh(i.chapters) : '?'}${b > 0 ? ` · <span style="color:var(--cyan)">${fmtCh(b)} neu</span>` : ''}`; }
+          else if (['anime', 'series'].includes(i.type) && i.seasonList?.some(x => x.episodes)) { const cur = currentSeason(i); sub = `${TYPES[i.type].label} · ${cur.label} · Folge ${cur.seen || 0}/${cur.episodes || '?'}`; }
           else if (i.type === 'anime' && i.seasonList?.length > 1) { const cur = currentSeason(i); sub += ` · ${cur.label} · Folge ${cur.seen || 0}/${cur.episodes || '?'}`; }
           else if (i.type === 'anime' && i.episodes) sub += ` · Folge ${i.episodesSeen || 0}/${i.episodes}`;
           return listRow(i, sub);
@@ -1410,7 +1581,8 @@
     }
     const bucketOf = iso => { const d = new Date(iso); return all ? buckets.find(b => b.key === d.getFullYear()) : buckets[d.getMonth()]; };
     periodTrophies.forEach(x => { const b = bucketOf(x.t.doneAt); if (b) b.tiers[x.t.tier]++; });
-    let episodes = 0;
+    let episodes = 0, chapters = 0;
+    items.forEach(i => (i.readLog || []).forEach(w => { if (inPeriod(w.at)) chapters += w.n; }));
     items.forEach(i => (i.watchLog || []).forEach(w => { if (inPeriod(w.at)) { episodes += w.n; const b = bucketOf(w.at); if (b) b.episodes += w.n; } }));
 
     const finished = items.filter(i => inPeriod(i.finishedAt)).sort((a, b) => b.finishedAt.localeCompare(a.finishedAt));
@@ -1420,7 +1592,7 @@
     periodTrophies.forEach(x => tierCount[x.t.tier]++);
     const busiest = buckets.reduce((best, b) => { const n = Object.values(b.tiers).reduce((a, c) => a + c, 0); return n > best.n ? { n, b } : best; }, { n: 0, b: null });
     return {
-      all, years: [...years].sort().reverse(), buckets, trophies: periodTrophies, tierCount, episodes,
+      all, years: [...years].sort().reverse(), buckets, trophies: periodTrophies, tierCount, episodes, chapters,
       plats: plats.filter(x => inPeriod(x.t.doneAt)).reverse(), allPlats: plats.length, finished, rare, rated, busiest,
       undatedFinished: all ? items.filter(i => i.status === 'done' && !i.finishedAt).length : 0,
     };
@@ -1477,8 +1649,8 @@
       <div class="stats">
         <div class="stat feature"><div class="stat-label">${I.trophy} Trophäen ${period}</div><div class="stat-value">${st.trophies.length.toLocaleString('de-AT')}</div><div class="stat-hint">${['gold', 'silver', 'bronze'].map(t => `${st.tierCount[t]} ${Trophies.TIERS[t].label}`).join(' · ')}</div></div>
         <div class="stat"><div class="stat-label">${Trophies.icon('platinum', 16)} Platin</div><div class="stat-value" style="color:var(--platinum)">${st.tierCount.platinum}</div><div class="stat-hint">${st.allPlats} insgesamt</div></div>
-        <div class="stat"><div class="stat-label">${I.check} Abgeschlossen</div><div class="stat-value">${st.finished.length}</div><div class="stat-hint">${[['game', 'Spiele'], ['series', 'Serien'], ['anime', 'Anime'], ['movie', 'Filme']].filter(([t]) => byType(t)).map(([t, l]) => `${byType(t)} ${l}`).join(' · ') || 'noch nichts mit Datum'}</div></div>
-        <div class="stat"><div class="stat-label">${I.tv} Folgen gesehen</div><div class="stat-value">${st.episodes.toLocaleString('de-AT')}</div><div class="stat-hint">Serien und Anime</div></div>
+        <div class="stat"><div class="stat-label">${I.check} Abgeschlossen</div><div class="stat-value">${st.finished.length}</div><div class="stat-hint">${[['game', 'Spiele'], ['series', 'Serien'], ['anime', 'Anime'], ['manga', 'Manga'], ['movie', 'Filme']].filter(([t]) => byType(t)).map(([t, l]) => `${byType(t)} ${l}`).join(' · ') || 'noch nichts mit Datum'}</div></div>
+        <div class="stat"><div class="stat-label">${I.tv} Folgen gesehen</div><div class="stat-value">${st.episodes.toLocaleString('de-AT')}</div><div class="stat-hint">Serien und Anime${st.chapters ? ` · ${Math.round(st.chapters).toLocaleString('de-AT')} Manga-Kapitel gelesen` : ''}</div></div>
       </div>
 
       <section class="section"><h2 class="section-title">Trophäen ${st.all ? 'pro Jahr' : 'pro Monat'}${st.busiest.b ? `<span class="tiny" style="font-family:var(--font)">Stärkster ${st.all ? 'Jahrgang' : 'Monat'}: ${esc(st.busiest.b.long)} mit ${st.busiest.n}</span>` : ''}</h2>
@@ -1678,6 +1850,7 @@
     else if (route === 'series') viewLibrary('series');
     else if (route === 'movies') viewLibrary('movie');
     else if (route === 'anime') viewLibrary('anime');
+    else if (route === 'manga') viewLibrary('manga');
     else if (route === 'stats') viewStats();
     else if (route === 'trophies') viewTrophies();
     else if (route === 'settings') viewSettings();
@@ -1704,5 +1877,5 @@
 
   render();
   animate = false;
-  Sync.syncNow();
+  Sync.syncNow().finally(() => setTimeout(autoMangaCheck, 1500));
 })();
