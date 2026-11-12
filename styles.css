@@ -482,3 +482,7 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 .hint-box.quota { background: rgba(248, 113, 113, .08); border-color: rgba(248, 113, 113, .3); }
 .hint-box.quota svg { stroke: var(--danger); }
 .hint-box b { color: var(--text); }
+
+.quota-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+.quota-big { font-family: var(--display); font-size: 28px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.quota-bar.low > i { background: linear-gradient(90deg, var(--violet), var(--danger)); }

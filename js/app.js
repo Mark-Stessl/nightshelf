@@ -495,6 +495,34 @@
   }
   const aiQuotaText = () => `Die KI-Trophäen sind für heute aufgebraucht. Ab ${aiResetTime()} Uhr geht es wieder.`;
 
+  async function renderAiPanel() {
+    const el = $('#aiPanel'); if (!el) return;
+    el.innerHTML = `<h3>KI-Trophäen</h3><p style="margin:0">Lade dein Kontingent für heute…</p>`;
+    let u;
+    try {
+      const r = await fetch(`${PSN.worker()}/ai-usage`);
+      u = await r.json();
+      if (!r.ok) throw new Error(u.error);
+    } catch {
+      if ($('#aiPanel')) $('#aiPanel').innerHTML = `<h3>KI-Trophäen</h3><p style="margin:0">Das Kontingent konnte gerade nicht geladen werden.</p>`;
+      return;
+    }
+    if (!$('#aiPanel')) return;
+    if (u.full) { try { localStorage.setItem(AI_KEY, utcDay()); } catch {} }
+    const pct = Math.min(100, Math.round(u.used / u.limit * 100));
+    const avg = u.avg || 250;
+    const games = u.full ? 0 : Math.max(0, Math.floor(u.remaining / avg));
+    const reset = new Date(u.resetAt).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
+    $('#aiPanel').innerHTML = `<h3>KI-Trophäen</h3>
+      <p>Gratis-Kontingent bei Cloudflare für heute. Es wird jeden Tag um ${reset} Uhr wieder aufgefüllt.</p>
+      <div class="quota-row">
+        <div><div class="quota-big">${u.full ? 0 : u.remaining.toLocaleString('de-AT')}</div><div class="tiny">von ${u.limit.toLocaleString('de-AT')} Neurons übrig</div></div>
+        <div style="text-align:right"><div class="quota-big" style="color:${games ? 'var(--cyan)' : 'var(--danger)'}">≈ ${games}</div><div class="tiny">Spiele heute noch möglich</div></div>
+      </div>
+      <div class="bar quota-bar ${pct >= 90 ? 'low' : ''}" style="margin-top:12px"><i style="width:${u.full ? 100 : pct}%"></i></div>
+      <div class="tiny" style="margin-top:8px">${u.full ? 'Heute aufgebraucht.' : `Heute ${u.runs} ${u.runs === 1 ? 'Liste' : 'Listen'} erstellt, im Schnitt ${avg} Neurons pro Spiel.`} Die Zahlen sind aus den Token-Mengen berechnet und können leicht von Cloudflares Abrechnung abweichen.</div>`;
+  }
+
   async function smartTrophies(title, genre, platform, size = 'normal') {
     if (aiBlockedToday()) return { trophies: null, ai: false, reason: 'ai_quota' };
     try {
@@ -1044,6 +1072,7 @@
     const n = Store.all().length;
     view.innerHTML = `<div class="${A()}" style="max-width:720px">
       <div class="page-head"><div><h1 class="page-title">Daten</h1><p class="page-sub">${n} Einträge sind in diesem Browser gespeichert.</p></div></div>
+      <div class="panel" id="aiPanel"></div>
       <div class="panel" id="psnPanel"></div>
       <div class="panel"><h3>Automatische Infos</h3><p>Beim Hinzufügen werden Cover, Erscheinungsdatum und Genre automatisch gesucht. Serien und Spiele funktionieren ohne Schlüssel. Für Filme brauchst du einen kostenlosen TMDB-Schlüssel. Er bleibt nur in diesem Browser gespeichert.</p>
         <div class="form">
@@ -1079,6 +1108,7 @@
     $('#impMerge').onchange = doImport('merge');
     $('#impReplace').onchange = doImport('replace');
     renderPsnPanel();
+    renderAiPanel();
     const k = Lookup.keys();
     $('#kTmdb').value = k.tmdb || '';
     const saveKeys = () => Lookup.setKeys({ ...Lookup.keys(), tmdb: $('#kTmdb').value.trim() });

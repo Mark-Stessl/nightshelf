@@ -11,6 +11,7 @@
  *   GET  /trophies?id=&service=       -> Trophäen eines Spiels inkl. Verdient-Status (Bearer-Token)
  *   GET  /livechart?user=             -> öffentliche Anime-Liste eines LiveChart-Nutzers (ohne Anmeldung)
  *   POST /achievements { title, platform, genre, size } -> KI-Trophäenliste (Wikipedia + Workers AI)
+ *   GET  /ai-usage                    -> heute verbrauchte Neurons (Schätzung aus Token-Zahlen)
  */
 
 const ALLOWED_ORIGINS = [
@@ -25,6 +26,21 @@ const CLIENT_BASIC = 'Basic MDk1MTUxNTktNzIzNy00MzcwLTliNDAtMzgwNmU2N2MwODkxOnVj
 const REDIRECT_URI = 'com.scee.psxandroid.scecompcall://redirect';
 const SCOPE = 'psn:mobile.v2.core psn:clientapp';
 const TROPHY_API = 'https://m.np.playstation.com/api/trophy/v1';
+const AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+const AI_DAILY_LIMIT = 10000;
+// Cloudflare-Preisliste: Neurons pro Million Tokens für Llama 3.3 70B fp8-fast
+const NEURONS_PER_M_IN = 26668, NEURONS_PER_M_OUT = 204805;
+const usageKey = () => `ai:${new Date().toISOString().slice(0, 10)}`;
+async function readUsage(env) {
+  if (!env?.USAGE) return null;
+  return (await env.USAGE.get(usageKey(), 'json')) || { neurons: 0, runs: 0 };
+}
+async function addUsage(env, neurons, { full = false } = {}) {
+  if (!env?.USAGE) return;
+  const u = await readUsage(env);
+  const next = full ? { ...u, neurons: Math.max(u.neurons, AI_DAILY_LIMIT), full: true } : { ...u, neurons: u.neurons + neurons, runs: u.runs + 1 };
+  await env.USAGE.put(usageKey(), JSON.stringify(next), { expirationTtl: 3 * 86400 });
+}
 const LIVECHART_GQL = 'https://www.livechart.me/graphql';
 const LC_QUERY = `query($u: String!) {
   user(username: $u) {
@@ -79,12 +95,23 @@ export default {
         const size = { short: 7, normal: 13, long: 19 }[body.size] || 13;
         const info = await gameInfo(title);
         try {
-          const trophies = await aiTrophies(env, { title, platform: String(body.platform || '').slice(0, 30), genre: String(body.genre || '').slice(0, 40), size, info });
-          return json({ trophies, source: info ? info.page : null });
+          const { trophies, neurons } = await aiTrophies(env, { title, platform: String(body.platform || '').slice(0, 30), genre: String(body.genre || '').slice(0, 40), size, info });
+          await addUsage(env, neurons).catch(() => {});
+          return json({ trophies, source: info ? info.page : null, neurons });
         } catch (e) {
           const msg = String(e.message || e);
-          return json({ error: /neuron|quota|limit|4006|exceeded/i.test(msg) ? 'ai_quota' : 'ai_failed', detail: msg.slice(0, 200) }, 503);
+          const quota = /neuron|quota|limit|4006|exceeded/i.test(msg);
+          if (quota) await addUsage(env, 0, { full: true }).catch(() => {});
+          return json({ error: quota ? 'ai_quota' : 'ai_failed', detail: msg.slice(0, 200) }, 503);
         }
+      }
+
+      if (url.pathname === '/ai-usage') {
+        const u = await readUsage(env);
+        if (!u) return json({ error: 'usage_missing' }, 501);
+        const reset = new Date(); reset.setUTCHours(24, 0, 0, 0);
+        const used = Math.min(AI_DAILY_LIMIT, Math.round(u.neurons));
+        return json({ used, limit: AI_DAILY_LIMIT, remaining: AI_DAILY_LIMIT - used, runs: u.runs, avg: u.runs ? Math.round(u.neurons / u.runs) : null, full: !!u.full, resetAt: reset.toISOString() });
       }
 
       if (url.pathname === '/livechart') {
@@ -256,11 +283,15 @@ Regeln:
 - Keine großen Story-Spoiler über das Ende.
 Format: {"platinum":{"name":"...","desc":"..."},"trophies":[{"name":"...","desc":"...","tier":"bronze|silver|gold"}]}`;
   const user = `Spiel: ${title}${platform ? `\nPlattform: ${platform}` : ''}${genre ? `\nGenre: ${genre}` : ''}\n\nSpielinfos (Wikipedia, Englisch):\n${info ? info.text : 'Keine Infos gefunden.'}`;
-  const res = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+  const res = await env.AI.run(AI_MODEL, {
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     max_tokens: 1800, temperature: 0.7,
     response_format: { type: 'json_object' },
   });
+  const usage = res?.usage || {};
+  const inTok = usage.prompt_tokens ?? Math.ceil((system.length + user.length) / 3.5);
+  const outTok = usage.completion_tokens ?? Math.ceil(JSON.stringify(res?.response ?? '').length / 3.5);
+  const neurons = Math.ceil(inTok * NEURONS_PER_M_IN / 1e6 + outTok * NEURONS_PER_M_OUT / 1e6);
   let out = res?.response ?? res;
   if (typeof out === 'string') {
     const m = out.match(/\{[\s\S]*\}/);
@@ -274,5 +305,5 @@ Format: {"platinum":{"name":"...","desc":"..."},"trophies":[{"name":"...","desc"
     .map(t => ({ name: clean(t.name).slice(0, 60), desc: clean(t.desc || t.description), tier: tiers.includes(String(t.tier).toLowerCase()) ? String(t.tier).toLowerCase() : 'bronze' }));
   if (list.length < 4) throw new Error('ai_output_too_short');
   const plat = out.platinum && out.platinum.name ? { name: clean(out.platinum.name).slice(0, 60), desc: clean(out.platinum.desc || 'Erhalte alle anderen Trophäen'), tier: 'platinum' } : { name: `Meister von ${title}`, desc: 'Erhalte alle anderen Trophäen', tier: 'platinum' };
-  return [plat, ...list];
+  return { trophies: [plat, ...list], neurons };
 }
