@@ -723,4 +723,7 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   .panel .key-ok { font-size: 13px; }
   .panel .quota-big { font-size: 22px; }
   .sync-opt { padding: 12px; gap: 6px; }
+  .sync-opt b { font-size: 14.5px; }
+  .sync-opt .tiny, .sync-opt p { font-size: 12px; }
+  .panel .page-sub, .main > div > .page-head .page-sub { font-size: 13px; }
 }
