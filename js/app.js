@@ -127,16 +127,25 @@
 
   /* ---------- Modal ---------- */
   // Seite im Hintergrund sperren, solange ein Fenster offen ist
+  let lockedY = null;
   function lockScroll() {
     const html = document.documentElement;
     if (html.classList.contains('modal-open')) return;
     const gap = window.innerWidth - html.clientWidth;
     if (gap > 0) document.body.style.paddingRight = `${gap}px`;
+    if (window.matchMedia('(max-width: 820px)').matches) {
+      // Handy: Seite festnageln, sonst lässt iOS sie trotzdem mitwischen
+      lockedY = window.scrollY;
+      Object.assign(document.body.style, { position: 'fixed', top: `-${lockedY}px`, left: '0', right: '0', width: '100%' });
+    }
     html.classList.add('modal-open');
   }
   function unlockScroll() {
-    document.documentElement.classList.remove('modal-open');
-    document.body.style.paddingRight = '';
+    const html = document.documentElement;
+    if (!html.classList.contains('modal-open')) return;
+    html.classList.remove('modal-open');
+    Object.assign(document.body.style, { paddingRight: '', position: '', top: '', left: '', right: '', width: '' });
+    if (lockedY != null) { window.scrollTo(0, lockedY); lockedY = null; }
   }
   function openModal({ title, body, foot = '', wide = false, onMount }) {
     const root = $('#modalRoot');
@@ -239,12 +248,15 @@
           <div class="field"><label>Jahr</label><input class="input" name="year" type="number" min="1950" max="2100" value="${d.year || ''}" placeholder="2024"></div>
         </div>
         ${seriesFields}${animeFields}${mangaFields}
-        <div class="grid-2">
-          <div class="field"><label>Bewertung</label>${starsInput(d.rating)}</div>
-          <div class="field"><label>Cover-Bild (Link, optional)</label><input class="input" name="cover" value="${esc(d.cover || '')}" placeholder="https://…/cover.jpg"></div>
-        </div>
-        <div class="field" id="finField"><label>Fertig am <span class="tiny">(optional, für die Statistik)</span></label><input class="input" name="finishedAt" type="date" value="${(d.finishedAt || (!isEdit && d.status === 'done' ? new Date().toISOString() : '')).slice(0, 10)}" max="${new Date().toISOString().slice(0, 10)}"></div>
-        <div class="field"><label>Notizen</label><textarea class="input" name="notes" placeholder="Was hat dir gefallen?">${esc(d.notes || '')}</textarea></div>
+        <div class="field"><label>Bewertung</label>${starsInput(d.rating)}</div>
+        <details class="form-more" ${(isEdit && (d.notes || d.finishedAt)) || window.matchMedia('(min-width: 821px)').matches ? 'open' : ''}>
+          <summary>Weitere Angaben <span class="tiny">Fertig am, Notizen, Cover-Link</span></summary>
+          <div class="form-more-body">
+            <div class="field" id="finField"><label>Fertig am <span class="tiny">(optional, für die Statistik)</span></label><input class="input" name="finishedAt" type="date" value="${(d.finishedAt || (!isEdit && d.status === 'done' ? new Date().toISOString() : '')).slice(0, 10)}" max="${new Date().toISOString().slice(0, 10)}"></div>
+            <div class="field"><label>Notizen</label><textarea class="input" name="notes" placeholder="Was hat dir gefallen?">${esc(d.notes || '')}</textarea></div>
+            <div class="field"><label>Cover-Bild (Link, optional)</label><input class="input" name="cover" value="${esc(d.cover || '')}" placeholder="https://…/cover.jpg"></div>
+          </div>
+        </details>
         ${trophySection}
       </form>`,
       foot: `<button class="btn btn-ghost" data-close>Abbrechen</button><button class="btn btn-primary" id="saveBtn">${isEdit ? 'Speichern' : 'Hinzufügen'}</button>`,
