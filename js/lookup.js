@@ -269,10 +269,10 @@ const Lookup = (() => {
     // Anzeigename: dein frühester Eintrag dieser Reihe (nicht ein Prolog oder Vorgängerfilm)
     const list = [...groups.values()];
     const named = g => {
-      const pos = x => g.seasons.findIndex(sea => sea.anilistId === x.anilistId);
-      const first = g.entries.slice().sort((a, b) => pos(a) - pos(b))[0];
-      const sea = g.seasons[pos(first)] || g.seasons[0];
-      g.title = first.entry.title; g.cover = sea.cover || g.seasons[0].cover; g.year = sea.year || g.seasons[0].year; g.mainId = sea.anilistId;
+      const sea = g.seasons.find(x => ['TV', 'TV_SHORT'].includes(x.format)) || g.seasons.find(x => g.entries.some(e => e.anilistId === x.anilistId)) || g.seasons[0];
+      const own = g.entries.find(e => e.anilistId === sea.anilistId);
+      g.title = own ? own.entry.title : (sea.title || g.entries[0].entry.title);
+      g.cover = sea.cover || g.seasons[0].cover; g.year = sea.year || g.seasons[0].year; g.mainId = sea.anilistId;
       return g;
     };
     list.forEach(named);
