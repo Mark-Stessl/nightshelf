@@ -1203,6 +1203,19 @@
   const autoMangaCheck = () => MangaWatch.check().then(r => { if (r.updated.length) render(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') autoMangaCheck(); });
 
+  /* ---------- Hinzufügen: erst Art wählen ---------- */
+  function addPicker() {
+    const hint = { game: 'mit Trophäen', series: 'mit Staffeln', anime: 'mit Staffeln & Filmen', manga: 'mit Kapiteln', movie: 'mit Kinostart' };
+    openModal({
+      title: 'Was möchtest du hinzufügen?',
+      body: `<div class="add-pick">${ORDER_TYPES.map(t => `<button type="button" class="add-pick-btn" data-pick="${t}">
+        <span class="add-pick-icon">${typeIcon(t)}</span><span class="add-pick-text"><b>${TYPES[t].label}</b><small>${hint[t]}</small></span></button>`).join('')}</div>`,
+      onMount: (m, close) => {
+        $$('[data-pick]', m).forEach(b => b.onclick = () => { const t = b.dataset.pick; close(); setTimeout(() => itemForm(t), 60); });
+      },
+    });
+  }
+
   /* ---------- Neue Folgen (Anime und Serien) ---------- */
   // Erschienene Folgen einer Staffel: aus den Ausstrahlungsdaten, sonst die Gesamtzahl
   const released = x => x.aired != null ? (x.episodes ? Math.min(x.aired, x.episodes) : x.aired) : (x.episodes || 0);
@@ -1864,7 +1877,7 @@
     const platCount = s.counts.platinum;
     view.innerHTML = `<div class="${A()}">
       <div class="page-head"><div><h1 class="page-title">${greet}</h1><p class="page-sub">${total} Einträge in deinem Regal</p></div>
-        <div class="head-actions" style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="#/upcoming">${I.calendar} Demnächst</a><a class="btn" href="#/stats">${I.chart} Statistik</a>${ORDER_TYPES.map(t => `<button class="btn ${t === 'game' ? 'btn-primary' : ''}" data-add="${t}">${I.plus} ${TYPES[t].label}</button>`).join('')}</div></div>
+        <div class="head-actions" style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="#/upcoming">${I.calendar} Demnächst</a><a class="btn" href="#/stats">${I.chart} Statistik</a><button class="btn btn-primary" data-addpick>${I.plus} Hinzufügen</button></div></div>
       <div class="stats">
         <a class="stat feature" href="#/trophies"><div class="stat-label">${I.trophy} Trophäen-Level</div><div class="stat-value">${s.level.level}</div><div class="bar" style="margin-top:8px"><i style="width:${s.level.pct}%"></i></div><div class="stat-hint" style="margin-top:6px">${s.earned} von ${s.total} Trophäen</div></a>
         <a class="stat" href="#/trophies"><div class="stat-label">${Trophies.icon('platinum', 16)} Platin</div><div class="stat-value" style="color:var(--platinum)">${platCount}</div><div class="stat-hint">${games.filter(g => g.status === 'done').length} Spiele durchgespielt</div></a>
@@ -2256,7 +2269,8 @@
   });
   document.addEventListener('click', e => {
     const add = e.target.closest('[data-add]');
-    if (add) { e.preventDefault(); itemForm(add.dataset.add); }
+    if (add) { e.preventDefault(); itemForm(add.dataset.add); return; }
+    if (e.target.closest('[data-addpick]')) { e.preventDefault(); addPicker(); }
   });
 
   render();
