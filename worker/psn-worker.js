@@ -35,6 +35,7 @@ const REDIRECT_URI = 'com.scee.psxandroid.scecompcall://redirect';
 const SCOPE = 'psn:mobile.v2.core psn:clientapp';
 const TROPHY_API = 'https://m.np.playstation.com/api/trophy/v1';
 const MD_API = 'https://api.mangadex.org';
+let SELF_ORIGIN = '';
 const MD_HEADERS = { Accept: 'application/json', 'User-Agent': 'Nightshelf/1.0 (https://mark-stessl.github.io/nightshelf/)' };
 const MD_RATINGS = 'contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica';
 const mdGet = async path => {
@@ -45,8 +46,9 @@ const mdGet = async path => {
 function mdManga(m) {
   const a = m.attributes || {};
   const pick = obj => obj?.en || obj?.['ja-ro'] || Object.values(obj || {})[0] || '';
+  const altEn = (a.altTitles || []).map(t => t.en).filter(Boolean);
   const alt = (a.altTitles || []).map(pick).filter(Boolean);
-  const title = a.title?.en || alt.find(t => /^[\x20-\x7E]+$/.test(t)) || pick(a.title);
+  const title = a.title?.en || altEn[0] || a.title?.['ja-ro'] || pick(a.title);
   const coverRel = (m.relationships || []).find(r => r.type === 'cover_art');
   const file = coverRel?.attributes?.fileName;
   const authors = (m.relationships || []).filter(r => r.type === 'author' && r.attributes?.name).map(r => r.attributes.name);
@@ -54,8 +56,8 @@ function mdManga(m) {
   return {
     id: m.id, title, altTitle: alt.find(t => t !== title) || '', kind, year: a.year || null,
     status: a.status || '', completed: a.status === 'completed', lastChapter: a.lastChapter ? parseFloat(a.lastChapter) || null : null,
-    cover: file ? `https://uploads.mangadex.org/covers/${m.id}/${file}.512.jpg` : '',
-    thumb: file ? `https://uploads.mangadex.org/covers/${m.id}/${file}.256.jpg` : '',
+    cover: file ? `${SELF_ORIGIN}/manga/cover/${m.id}/${file}.512.jpg` : '',
+    thumb: file ? `${SELF_ORIGIN}/manga/cover/${m.id}/${file}.256.jpg` : '',
     genres: (a.tags || []).filter(t => t.attributes?.group === 'genre').map(t => t.attributes.name?.en).filter(Boolean).slice(0, 6),
     summary: String(a.description?.en || pick(a.description) || '').replace(/\[[^\]]*\]\([^)]*\)/g, '').replace(/[*_#>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 3000),
     authors: [...new Set(authors)].slice(0, 3),
@@ -97,6 +99,21 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
     const url = new URL(request.url);
+    SELF_ORIGIN = url.origin;
+
+    // Manga-Cover über den Server laden (MangaDex erlaubt keine direkten Bild-Links von anderen Seiten).
+    // Ohne Schlüssel erreichbar, weil <img> keine Header schicken kann; nur Cover-Pfade sind erlaubt.
+    const cm = url.pathname.match(/^\/manga\/cover\/([0-9a-f-]{36})\/([\w.-]+\.(?:jpg|png|jpeg|webp))$/i);
+    if (cm && request.method === 'GET') {
+      const cache = caches.default;
+      const hit = await cache.match(request);
+      if (hit) return hit;
+      const img = await fetch(`https://uploads.mangadex.org/covers/${cm[1]}/${cm[2]}`, { headers: MD_HEADERS });
+      if (!img.ok) return new Response('not found', { status: 404 });
+      const res = new Response(img.body, { headers: { 'Content-Type': img.headers.get('Content-Type') || 'image/jpeg', 'Cache-Control': 'public, max-age=604800', 'Access-Control-Allow-Origin': '*' } });
+      await cache.put(request, res.clone());
+      return res;
+    }
     try {
       if (url.pathname === '/') return json({ ok: true, service: 'nightshelf-psn', claimed: !!(await ownerHash(env)) });
 
