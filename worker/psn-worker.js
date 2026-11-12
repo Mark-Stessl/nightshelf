@@ -537,30 +537,23 @@ async function runChecks(env) {
   let calls = 0;
   const BUDGET = Math.max(8, 44 - Math.min(subs.length, 6) * 4);
 
-  // Anime: alle laufenden Staffeln in einer Abfrage
-  const seasons = [];
-  items.filter(i => i.type === 'anime').forEach(it => (it.seasonList || []).forEach(x => {
-    if (x.anilistId && x.format !== 'MOVIE' && !['FINISHED', 'CANCELLED'].includes(x.airing)) seasons.push({ it, x });
-  }));
-  const ids = [...new Set(seasons.map(s => s.x.anilistId))].slice(0, 100);
-  const info = {};
-  for (let i = 0; i < ids.length; i += 50) {
-    calls++;
-    try {
-      const r = await fetch('https://graphql.anilist.co', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ query: 'query($ids:[Int]){Page(perPage:50){media(id_in:$ids,type:ANIME){id status episodes nextAiringEpisode{episode}}}}', variables: { ids: ids.slice(i, i + 50) } }) });
-      const d = await r.json();
-      (d?.data?.Page?.media || []).forEach(m => { info[m.id] = m.nextAiringEpisode ? m.nextAiringEpisode.episode - 1 : m.status === 'FINISHED' ? m.episodes : m.status === 'NOT_YET_RELEASED' ? 0 : null; });
-    } catch {}
-  }
-  seasons.forEach(({ it, x }) => {
-    const aired = info[x.anilistId]; if (aired == null) return;
-    const key = String(x.anilistId);
-    const base = Math.max(state.anime[key] ?? -1, x.aired ?? -1);
-    const multi = (it.seasonList || []).filter(s => s.format !== 'MOVIE').length > 1;
-    if (base >= 0 && aired > base) push(it, `${aired - base > 1 ? `Folgen ${base + 1}–${aired} sind` : `Folge ${aired} ist`} da${multi && x.label ? ` · ${x.label}` : ''}`, `a${x.anilistId}`, recentlySeen(it.newEpisodeAt));
-    state.anime[key] = Math.max(base, aired);
+  // Anime: AniList lässt keine Server-Anfragen zu. Die App speichert aber die genauen Sendezeiten
+  // der nächsten Folgen (item.upcoming) und synchronisiert sie; ist eine Sendezeit erreicht, ist die Folge da.
+  const nowMs = Date.now(), nowIso = new Date(nowMs).toISOString();
+  let animeChecked = 0;
+  items.filter(i => i.type === 'anime' && Array.isArray(i.upcoming)).forEach(it => {
+    const eps = it.upcoming.filter(u => u.kind === 'ep' && !u.dateOnly && Date.parse(u.at) <= nowMs).sort((a, b) => a.at.localeCompare(b.at));
+    animeChecked++;
+    const last = state.anime[it.id];
+    if (last == null) { state.anime[it.id] = nowIso; return; }
+    const due = eps.filter(u => u.at > last);
+    if (!due.length) return;
+    const a = due[0], b = due[due.length - 1];
+    const label = b.season ? ` · ${b.season}` : '';
+    push(it, due.length > 1 ? `Folgen ${a.ep}–${b.ep} sind da${label}` : `Folge ${b.ep} ist da${b.last ? ' (Finale)' : ''}${label}`, `a${String(it.id).slice(0, 12)}`, recentlySeen(it.newEpisodeAt));
+    state.anime[it.id] = b.at;
   });
+  Object.keys(state.anime).forEach(k => { if (!items.some(i => i.id === k)) delete state.anime[k]; });
 
   // Serien und Manga: reihum, damit jede Runde unter dem Abfrage-Limit bleibt
   const tasks = [
@@ -601,5 +594,5 @@ async function runChecks(env) {
   if (news.length > 4) messages = [...news.slice(0, 3), { title: `${news.length - 3} weitere Neuigkeiten`, body: news.slice(3, 8).map(m => m.title).join(', ') + (news.length > 8 ? ' …' : ''), url: './#/upcoming', tag: 'summary' }];
   const result = messages.length ? await broadcast(env, subs, messages) : { sent: 0 };
   if (JSON.stringify(state) !== JSON.stringify(prev)) await env.DATA.put('push-state', JSON.stringify(state));
-  return { checked: { anime: ids.length, rotating: done, of: n }, news: news.length, ...result };
+  return { checked: { anime: animeChecked, rotating: done, of: n }, news: news.length, ...result };
 }
