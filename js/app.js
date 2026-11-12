@@ -1149,10 +1149,12 @@
   // Erschienene Folgen einer Staffel: aus den Ausstrahlungsdaten, sonst die Gesamtzahl
   const released = x => x.aired != null ? (x.episodes ? Math.min(x.aired, x.episodes) : x.aired) : (x.episodes || 0);
   const airingNow = x => x.airing === 'RELEASING';
+  // Zählt als „neu“: Staffel mit neu dazugekommenen Folgen, oder laufende Staffel, die du schon angefangen hast
+  const countsAsNew = x => x.format !== 'MOVIE' && !x.complete && (!!x.newAt || (airingNow(x) && (x.seen || 0) > 0));
   // Ungesehene Folgen in Staffeln, die gerade laufen oder in denen neue Folgen dazugekommen sind
   function episodesBehind(item) {
     if (!['anime', 'series'].includes(item.type) || !item.seasonList?.length) return 0;
-    return item.seasonList.filter(x => x.format !== 'MOVIE' && !x.complete && (x.newAt || airingNow(x)))
+    return item.seasonList.filter(countsAsNew)
       .reduce((a, x) => a + Math.max(0, released(x) - (x.seen || 0)), 0);
   }
   const newCount = it => it.type === 'manga' ? mangaBehind(it) : episodesBehind(it);
@@ -1338,7 +1340,7 @@
     let sub;
     if (it.type === 'manga') sub = `Manga · ${fmtCh(n)} ${n === 1 ? 'neues Kapitel' : 'neue Kapitel'} · bis Kapitel ${fmtCh(it.chapters)}`;
     else {
-      const x = it.seasonList.find(s => s.format !== 'MOVIE' && !s.complete && (s.newAt || airingNow(s)) && released(s) > (s.seen || 0));
+      const x = it.seasonList.find(s => countsAsNew(s) && released(s) > (s.seen || 0));
       sub = `${TYPES[it.type].label} · ${n} ${n === 1 ? 'neue Folge' : 'neue Folgen'}${x && it.seasonList.length > 1 ? ` · ${esc(x.label)}` : ''}`;
     }
     return `<a class="list-row" href="#/item/${it.id}"><div class="thumb">${coverHTML(it, { noTitle: true })}</div>
@@ -1488,7 +1490,7 @@
     if (sea.airing === 'NOT_YET_RELEASED') bits.push(sea.nextAt ? `${sea.format === 'MOVIE' ? 'Erscheint' : 'Startet'} ${fmtWhen(sea.nextAt)}` : sea.start ? `${sea.format === 'MOVIE' ? 'Erscheint' : 'Startet'} ${fmtWhen(sea.start + 'T00:00:00', true)}` : 'Noch nicht erschienen, Termin unbekannt');
     else if (sea.nextAt) bits.push(`Folge ${sea.nextEp} kommt ${fmtWhen(sea.nextAt)}`);
     if (sea.format !== 'MOVIE' && sea.aired != null && sea.episodes && sea.aired < sea.episodes && sea.aired > 0) bits.push(`${sea.aired} von ${sea.episodes} Folgen erschienen`);
-    const unseen = sea.format !== 'MOVIE' && !sea.complete && (sea.newAt || airingNow(sea)) ? released(sea) - (sea.seen || 0) : 0;
+    const unseen = countsAsNew(sea) ? released(sea) - (sea.seen || 0) : 0;
     if (unseen > 0) bits.push(`<b>${unseen} ${unseen === 1 ? 'neue Folge' : 'neue Folgen'} für dich</b>`);
     return bits.length ? `<div class="air-info">${I.calendar}<span>${bits.join(' · ')}</span></div>` : '';
   }
