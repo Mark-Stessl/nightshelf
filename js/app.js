@@ -1150,6 +1150,9 @@
   const released = x => x.aired != null ? (x.episodes ? Math.min(x.aired, x.episodes) : x.aired) : (x.episodes || 0);
   const airingNow = x => x.airing === 'RELEASING';
   // Zählt als „neu“: Staffel mit neu dazugekommenen Folgen, oder laufende Staffel, die du schon angefangen hast
+  // Staffel läuft noch und hat weniger erschienene Folgen als geplant (oder Gesamtzahl unbekannt)
+  const partialAir = x => x.format !== 'MOVIE' && x.aired != null && x.airing !== 'FINISHED' && (!x.episodes || x.aired < x.episodes);
+  const epTotal = x => x.episodes || (x.aired != null && x.aired > 0 ? x.aired : null);
   const countsAsNew = x => x.format !== 'MOVIE' && !x.complete && (!!x.newAt || (airingNow(x) && (x.seen || 0) > 0));
   // Ungesehene Folgen in Staffeln, die gerade laufen oder in denen neue Folgen dazugekommen sind
   function episodesBehind(item) {
@@ -1458,7 +1461,7 @@
       ${noEpisodes ? `<div class="hint-box" style="margin-bottom:14px">${I.info}<div>Lade die Staffeln von ${seasonSource(item)}, dann bekommst du Folgenzahlen und Cover pro Staffel. Deine fertigen Staffeln bleiben abgehakt.</div></div>` : ''}
       ${(() => {
         const tab = x => `<button class="season-tab ${x.id === activeId ? 'on' : ''} ${seasonDone(x) ? 'done' : ''}" role="tab" aria-selected="${x.id === activeId}" data-season="${x.id}">
-          <span>${esc(x.label)}</span><small>${seasonDone(x) ? '✓' : x.format === 'MOVIE' ? 'offen' : `${x.seen || 0}/${x.episodes || '?'}`}</small></button>`;
+          <span>${esc(x.label)}</span><small>${seasonDone(x) ? '✓' : x.format === 'MOVIE' ? 'offen' : `${x.seen || 0}/${epTotal(x) || '?'}`}</small></button>`;
         const shows = list.filter(x => x.format !== 'MOVIE'), films = list.filter(x => x.format === 'MOVIE');
         return `${shows.length ? `<div class="season-tabs" role="tablist" aria-label="Staffeln">${shows.map(tab).join('')}</div>` : ''}
           ${films.length ? `<div class="season-row-label">Filme</div><div class="season-tabs" role="tablist" aria-label="Filme">${films.map(tab).join('')}</div>` : ''}`;
@@ -1467,16 +1470,16 @@
         <div class="season-cover">${coverSrc ? `<img src="${esc(coverSrc)}" alt="" onerror="this.remove()">` : ''}</div>
         <div class="season-body">
           <div class="season-title">${esc(sea.title || item.title)}</div>
-          <div class="card-meta" style="margin-top:4px">${[esc(sea.label), sea.year, sea.format === 'MOVIE' && (sea.episodes || 1) === 1 ? '' : sea.episodes ? `${sea.episodes} Folgen` : 'Folgenzahl unbekannt'].filter(Boolean).join('<span class="dot"></span>')}</div>
+          <div class="card-meta" style="margin-top:4px">${[esc(sea.label), sea.year, sea.format === 'MOVIE' && (sea.episodes || 1) === 1 ? '' : sea.episodes ? `${sea.episodes} Folgen` : sea.aired ? `${sea.aired} Folgen erschienen` : 'Folgenzahl unbekannt'].filter(Boolean).join('<span class="dot"></span>')}</div>
           ${airInfo(sea)}
           ${sea.format === 'MOVIE' && (sea.episodes || 1) === 1 ? '' : `<div class="ep-stepper">
             <button class="btn icon-btn" id="epMinus" aria-label="Eine Folge weniger">−</button>
-            <div class="ep-count"><input type="number" id="epInput" min="0" ${sea.episodes ? `max="${sea.episodes}"` : ''} value="${sea.seen || 0}" aria-label="Gesehene Folgen"><span>/ ${sea.episodes || '?'} Folgen</span></div>
+            <div class="ep-count"><input type="number" id="epInput" min="0" ${sea.episodes ? `max="${sea.episodes}"` : ''} value="${sea.seen || 0}" aria-label="Gesehene Folgen"><span>/ ${epTotal(sea) || '?'} Folgen</span></div>
             <button class="btn icon-btn btn-primary" id="epPlus" aria-label="Eine Folge mehr">+</button>
           </div>`}
           ${sea.format === 'MOVIE' && (sea.episodes || 1) === 1 ? `<div class="movie-state ${seasonDone(sea) ? 'on' : ''}">${seasonDone(sea) ? `${I.check} Gesehen` : 'Noch nicht gesehen'}</div>` : `<div class="bar" style="max-width:420px"><i style="width:${pct}%"></i></div>`}
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
-            ${seasonDone(sea) ? `<button class="btn btn-sm" id="sReset">${sea.format === 'MOVIE' ? 'Als ungesehen markieren' : 'Zurücksetzen'}</button>` : (sea.aired != null && sea.episodes && sea.aired < sea.episodes && (sea.seen || 0) >= sea.aired ? `<div class="movie-state on" style="margin:0">${I.check} Auf dem neuesten Stand</div>` : `<button class="btn btn-sm btn-primary" id="sDone">${I.check} ${sea.format === 'MOVIE' ? 'Gesehen' : sea.aired != null && sea.episodes && sea.aired < sea.episodes ? `Bis Folge ${sea.aired} gesehen` : 'Ganz gesehen'}</button>`)}
+            ${seasonDone(sea) ? `<button class="btn btn-sm" id="sReset">${sea.format === 'MOVIE' ? 'Als ungesehen markieren' : 'Zurücksetzen'}</button>` : (partialAir(sea) && (sea.seen || 0) >= sea.aired ? `<div class="movie-state on" style="margin:0">${I.check} Auf dem neuesten Stand</div>` : `<button class="btn btn-sm btn-primary" id="sDone">${I.check} ${sea.format === 'MOVIE' ? 'Gesehen' : partialAir(sea) && sea.aired > 0 ? `Bis Folge ${sea.aired} gesehen` : 'Ganz gesehen'}</button>`)}
             <button class="btn btn-sm" id="sEdit">${I.edit} Bearbeiten</button>
             ${list.length > 1 ? `<button class="btn btn-sm btn-ghost btn-danger" id="sDel">${I.trash} Entfernen</button>` : ''}
           </div>
@@ -1517,7 +1520,7 @@
     $('#sDone') && ($('#sDone').onclick = () => {
       const it = fresh(); const cur = seasonsOf(it).find(x => x.id === seasonTab[it.id]);
       withList((list, i) => {
-        const x = list[i], partial = x.aired != null && x.episodes && x.aired < x.episodes;
+        const x = list[i], partial = partialAir(x);
         if (partial) { x.seen = x.aired; x.complete = false; } else { if (x.episodes) x.seen = x.episodes; x.complete = true; }
       });
       toast(`<div><b>${esc(cur.label)} fertig</b><small>${esc(it.title)}</small></div>`);
