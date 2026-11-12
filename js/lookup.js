@@ -76,8 +76,12 @@ const Lookup = (() => {
 
   /* ---------- Spiele: Wikipedia + Wikidata (ohne Schlüssel) ---------- */
   const PLATFORM_MAP = [
-    [/^playstation 5$/i, 'PS5'], [/^playstation 4$/i, 'PS4'], [/nintendo switch 2/i, 'Switch 2'], [/^nintendo switch$/i, 'Switch'],
-    [/^(microsoft windows|linux|macos|steam)$/i, 'PC'], [/steam deck/i, 'Steam Deck'], [/xbox (series|one)/i, 'Xbox'], [/^(ios|android)$/i, 'Mobile'],
+    [/^playstation 5$/i, 'PS5'], [/^playstation 4$/i, 'PS4'], [/^playstation 3$/i, 'PS3'], [/^playstation 2$/i, 'PS2'], [/^playstation( \(console\))?$/i, 'PS1'],
+    [/playstation vita/i, 'PS Vita'], [/playstation portable/i, 'PSP'],
+    [/nintendo switch 2/i, 'Switch 2'], [/^nintendo switch$/i, 'Switch'], [/^wii u$/i, 'Wii U'], [/^wii$/i, 'Wii'], [/gamecube/i, 'GameCube'],
+    [/nintendo 3ds/i, '3DS'], [/^nintendo ds$/i, 'DS'], [/nintendo 64/i, 'N64'],
+    [/xbox series/i, 'Xbox Series'], [/^xbox one$/i, 'Xbox One'], [/^xbox 360$/i, 'Xbox 360'], [/^xbox( \(console\))?$/i, 'Xbox'],
+    [/^steam$/i, 'Steam'], [/^(microsoft windows|linux|macos)$/i, 'PC'], [/steam deck/i, 'Steam Deck'], [/^(ios|android)$/i, 'Mobile'],
   ];
   const GENRE_RULES = [
     [/role-playing/i, 'rpg'], [/platform game|platformer/i, 'platformer'], [/shooter/i, 'shooter'], [/racing|kart/i, 'racing'],

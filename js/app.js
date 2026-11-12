@@ -23,9 +23,20 @@
     movie:  { done: 'Gesehen', planned: 'Merkliste', dropped: 'Abgebrochen' },
   };
   const ORDER_TYPES = ['game', 'series', 'anime', 'manga', 'movie'];
-  const PLATFORMS = ['PS5', 'PS4', 'PS3', 'PS Vita', 'Switch 2', 'Switch', 'PC', 'Steam Deck', 'Xbox', 'Mobile', 'Andere'];
+  // Plattformen nach Hersteller gruppiert (für Auswahl und Filter)
+  const PLATFORM_GROUPS = [
+    ['PlayStation', ['PS5', 'PS4', 'PS3', 'PS2', 'PS1', 'PS Vita', 'PSP']],
+    ['Nintendo', ['Switch 2', 'Switch', 'Wii U', 'Wii', 'GameCube', '3DS', 'DS', 'N64']],
+    ['Xbox', ['Xbox Series', 'Xbox One', 'Xbox 360', 'Xbox']],
+    ['PC & Steam', ['Steam', 'PC', 'Steam Deck']],
+    ['Sonstige', ['Mobile', 'Andere']],
+  ];
+  const PLATFORMS = PLATFORM_GROUPS.flatMap(([, list]) => list);
+  const familyOf = p => (PLATFORM_GROUPS.find(([, list]) => list.includes(p)) || ['Sonstige'])[0];
+  const platformOptions = sel => PLATFORM_GROUPS.map(([g, list]) => `<optgroup label="${g}">${list.map(p => `<option ${p === sel ? 'selected' : ''}>${p}</option>`).join('')}</optgroup>`).join('')
+    + (sel && !PLATFORMS.includes(sel) ? `<option selected>${esc(sel)}</option>` : '');
   const psDefault = p => isPS(p) ? (PSN.connected() ? 'psn' : 'paste') : 'auto';
-  const isPS = p => /^PS/.test(p || '');
+  const isPS = p => /^(PS5|PS4|PS3|PS Vita)$/.test(p || ''); // Plattformen mit offiziellen PlayStation-Trophäen
 
   const I = {
     plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
@@ -240,7 +251,7 @@
 
     const gameFields = type === 'game' ? `
       <div class="grid-2">
-        <div class="field"><label>Plattform</label><select class="input" name="platform">${PLATFORMS.map(p => `<option ${p === d.platform ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
+        <div class="field"><label>Plattform</label><select class="input" name="platform">${platformOptions(d.platform)}</select></div>
         <div class="field"><label>Genre</label><select class="input" name="genre">${Object.entries(Trophies.GENRES).map(([k, v]) => `<option value="${k}" ${k === d.genre ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       </div>` : '';
     const seriesFields = type === 'series' && d.seasonList?.some(x => x.episodes) ? `<p class="tiny" style="margin:0">Staffeln und Folgen bearbeitest du direkt auf der Seite der Serie.</p>` : type === 'series' ? `
@@ -361,7 +372,7 @@
             if (type === 'game') {
               if (dt.genre && F.genre) F.genre.value = dt.genre;
               if (dt.platforms?.length && !dt.platforms.includes(F.platform.value)) {
-                const pref = ['PS5', 'Switch 2', 'Switch', 'PS4', 'PC', 'Xbox', 'Mobile'].find(p => dt.platforms.includes(p));
+                const pref = ['PS5', 'Switch 2', 'Switch', 'PS4', 'Steam', 'PC', 'Xbox Series', 'Xbox One', 'Wii U', 'PS3', 'Xbox 360', 'Wii', '3DS', 'Mobile'].find(p => dt.platforms.includes(p));
                 if (pref) { F.platform.value = pref; F.platform.onchange && F.platform.onchange(); }
               }
             }
@@ -849,7 +860,13 @@
           <button class="chip ${s.status === 'all' ? 'on' : ''}" data-s="all">Alle</button>
           ${Object.entries(STATUS[type]).map(([k, v]) => `<button class="chip ${s.status === k ? 'on' : ''}" data-s="${k}">${v}</button>`).join('')}
         </div>
-        ${platforms.length > 1 ? `<select class="input" id="plat" style="width:auto"><option value="all">Alle Plattformen</option>${platforms.map(p => `<option ${p === s.platform ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>` : ''}
+        ${platforms.length > 1 ? (() => {
+          const fams = PLATFORM_GROUPS.map(([g]) => g).filter(g => platforms.some(p => familyOf(p) === g));
+          const sorted = [...platforms].sort((a, b) => (PLATFORMS.indexOf(a) + 1 || 999) - (PLATFORMS.indexOf(b) + 1 || 999));
+          return `<select class="input" id="plat" style="width:auto"><option value="all">Alle Plattformen</option>
+            ${fams.length > 1 ? `<optgroup label="Hersteller">${fams.map(g => `<option value="fam:${g}" ${s.platform === 'fam:' + g ? 'selected' : ''}>${g === 'PC & Steam' ? 'PC & Steam' : `Alle ${g}`}</option>`).join('')}</optgroup>` : ''}
+            <optgroup label="Konsole">${sorted.map(p => `<option value="${esc(p)}" ${p === s.platform ? 'selected' : ''}>${esc(p)}</option>`).join('')}</optgroup></select>`;
+        })() : ''}
         <select class="input" id="sort" style="width:auto">
           <option value="added" ${s.sort === 'added' ? 'selected' : ''}>Zuletzt hinzugefügt</option>
           <option value="title" ${s.sort === 'title' ? 'selected' : ''}>Titel A–Z</option>
@@ -861,7 +878,7 @@
 
     const drawGrid = () => {
       let list = items.filter(i => (s.status === 'all' || i.status === s.status)
-        && (s.platform === 'all' || type !== 'game' || i.platform === s.platform)
+        && (s.platform === 'all' || type !== 'game' || (s.platform.startsWith('fam:') ? familyOf(i.platform) === s.platform.slice(4) : i.platform === s.platform))
         && (!s.q || i.title.toLowerCase().includes(s.q.toLowerCase())));
       const prog = i => { const p = Trophies.progress(i.trophies); return p.total ? p.done / p.total : -1; };
       list.sort({
