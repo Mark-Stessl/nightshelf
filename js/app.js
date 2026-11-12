@@ -126,8 +126,21 @@
   }
 
   /* ---------- Modal ---------- */
+  // Seite im Hintergrund sperren, solange ein Fenster offen ist
+  function lockScroll() {
+    const html = document.documentElement;
+    if (html.classList.contains('modal-open')) return;
+    const gap = window.innerWidth - html.clientWidth;
+    if (gap > 0) document.body.style.paddingRight = `${gap}px`;
+    html.classList.add('modal-open');
+  }
+  function unlockScroll() {
+    document.documentElement.classList.remove('modal-open');
+    document.body.style.paddingRight = '';
+  }
   function openModal({ title, body, foot = '', wide = false, onMount }) {
     const root = $('#modalRoot');
+    lockScroll();
     root.innerHTML = `<div class="modal-backdrop"></div>
       <div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
         <div class="modal-head"><h2>${esc(title)}</h2><button class="btn btn-ghost icon-btn" data-close aria-label="Schließen">${I.x}</button></div>
@@ -135,7 +148,11 @@
         ${foot ? `<div class="modal-foot">${foot}</div>` : ''}
       </div>`;
     requestAnimationFrame(() => root.classList.add('open'));
-    const close = () => { root.classList.remove('open'); setTimeout(() => { if (!root.classList.contains('open')) root.innerHTML = ''; }, 280); document.removeEventListener('keydown', onKey); };
+    const close = () => {
+      root.classList.remove('open');
+      setTimeout(() => { if (!root.classList.contains('open')) { root.innerHTML = ''; unlockScroll(); } }, 280);
+      document.removeEventListener('keydown', onKey);
+    };
     const onKey = e => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', onKey);
     $('.modal-backdrop', root).onclick = close;
@@ -776,7 +793,7 @@
     const s = libState[type];
     const items = Store.all(type);
     const head = `<div class="page-head"><div><h1 class="page-title">${TYPES[type].plural}</h1><p class="page-sub">${items.length} ${items.length === 1 ? 'Eintrag' : 'Einträge'}</p></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}${type === 'manga' && items.length ? `<button class="btn" data-mangacheck>${I.refresh} Neue Kapitel prüfen</button>` : ''}${['anime', 'series'].includes(type) && items.length ? `<button class="btn" data-aircheck>${I.refresh} Neue Folgen prüfen</button>` : ''}<button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button></div></div>`;
+      <div class="head-actions" style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}${type === 'manga' && items.length ? `<button class="btn" data-mangacheck>${I.refresh} Neue Kapitel prüfen</button>` : ''}${['anime', 'series'].includes(type) && items.length ? `<button class="btn" data-aircheck>${I.refresh} Neue Folgen prüfen</button>` : ''}<button class="btn btn-primary fab" data-add="${type}" aria-label="${TYPES[type].label} hinzufügen">${I.plus}<span>${TYPES[type].label} hinzufügen</span></button></div></div>`;
     if (!items.length) { view.innerHTML = head + emptyState(type); return; }
 
     const platforms = type === 'game' ? [...new Set(items.map(i => i.platform).filter(Boolean))] : [];
@@ -1686,11 +1703,13 @@
       <div class="hero">
         <div class="hero-bg">${item.cover ? `<img src="${esc(item.cover)}" alt="" onerror="this.remove()">` : coverHTML(item, { noTitle: true })}</div>
         <div class="cover">${coverHTML(item)}</div>
-        <div>
-          ${statusPill(item)}
-          <h1 class="hero-title">${esc(item.title)}</h1>
-          <div class="hero-meta">${meta.join('<span class="dot"></span>')}</div>
-          <div style="margin-top:12px">${starsInput(item.rating, 'heroRating')}</div>
+        <div class="hero-info">
+          <div class="hero-head">
+            ${statusPill(item)}
+            <h1 class="hero-title">${esc(item.title)}</h1>
+            <div class="hero-meta">${meta.join('<span class="dot"></span>')}</div>
+            <div class="hero-stars" style="margin-top:12px">${starsInput(item.rating, 'heroRating')}</div>
+          </div>
           ${item.notes ? `<div class="hero-notes">${esc(item.notes)}</div>` : ''}
           ${item.summary ? `<div class="hero-summary" id="heroSummary">${esc(item.summary)}</div><button class="more-btn" id="moreBtn" type="button" hidden aria-expanded="false">Mehr lesen</button>` : ''}
           ${item.external ? `<div class="tiny" style="margin-top:8px">Infos von ${{ tvmaze: 'TVmaze', tmdb: 'TMDB', wikidata: 'Wikipedia / Wikidata', rawg: 'RAWG', anilist: 'AniList', livechart: 'LiveChart', mangadex: 'MangaDex' }[item.external.split(':')[0]] || 'externer Datenbank'}</div>` : ''}
@@ -1804,7 +1823,7 @@
     const platCount = s.counts.platinum;
     view.innerHTML = `<div class="${A()}">
       <div class="page-head"><div><h1 class="page-title">${greet}</h1><p class="page-sub">${total} Einträge in deinem Regal</p></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="#/stats">${I.chart} Statistik</a>${ORDER_TYPES.map(t => `<button class="btn ${t === 'game' ? 'btn-primary' : ''}" data-add="${t}">${I.plus} ${TYPES[t].label}</button>`).join('')}</div></div>
+        <div class="head-actions" style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="#/upcoming">${I.calendar} Demnächst</a><a class="btn" href="#/stats">${I.chart} Statistik</a>${ORDER_TYPES.map(t => `<button class="btn ${t === 'game' ? 'btn-primary' : ''}" data-add="${t}">${I.plus} ${TYPES[t].label}</button>`).join('')}</div></div>
       <div class="stats">
         <a class="stat feature" href="#/trophies"><div class="stat-label">${I.trophy} Trophäen-Level</div><div class="stat-value">${s.level.level}</div><div class="bar" style="margin-top:8px"><i style="width:${s.level.pct}%"></i></div><div class="stat-hint" style="margin-top:6px">${s.earned} von ${s.total} Trophäen</div></a>
         <a class="stat" href="#/trophies"><div class="stat-label">${Trophies.icon('platinum', 16)} Platin</div><div class="stat-value" style="color:var(--platinum)">${platCount}</div><div class="stat-hint">${games.filter(g => g.status === 'done').length} Spiele durchgespielt</div></a>
