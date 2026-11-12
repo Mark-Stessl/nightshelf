@@ -9,6 +9,7 @@
  *   POST /refresh   { refreshToken }  -> neues Token-Paar
  *   GET  /titles                      -> alle Spiele mit Trophäen-Fortschritt (Bearer-Token)
  *   GET  /trophies?id=&service=       -> Trophäen eines Spiels inkl. Verdient-Status (Bearer-Token)
+ *   GET  /livechart?user=             -> öffentliche Anime-Liste eines LiveChart-Nutzers (ohne Anmeldung)
  */
 
 const ALLOWED_ORIGINS = [
@@ -23,6 +24,18 @@ const CLIENT_BASIC = 'Basic MDk1MTUxNTktNzIzNy00MzcwLTliNDAtMzgwNmU2N2MwODkxOnVj
 const REDIRECT_URI = 'com.scee.psxandroid.scecompcall://redirect';
 const SCOPE = 'psn:mobile.v2.core psn:clientapp';
 const TROPHY_API = 'https://m.np.playstation.com/api/trophy/v1';
+const LIVECHART_GQL = 'https://www.livechart.me/graphql';
+const LC_QUERY = `query($u: String!) {
+  user(username: $u) {
+    username
+    library {
+      nodes {
+        animeId status rating episodesWatched updatedAt
+        anime { databaseId romajiTitle englishTitle poster { url } startDate { value } anilistUrl malUrl releaseStatus }
+      }
+    }
+  }
+}`;
 
 export default {
   async fetch(request) {
@@ -55,6 +68,23 @@ export default {
         const { refreshToken } = await request.json().catch(() => ({}));
         if (!refreshToken) return json({ error: 'refresh_missing' }, 400);
         return json(await tokenRequest({ refresh_token: refreshToken, grant_type: 'refresh_token', token_format: 'jwt', scope: SCOPE }));
+      }
+
+      if (url.pathname === '/livechart') {
+        const user = (url.searchParams.get('user') || '').trim();
+        if (!/^[A-Za-z0-9_.-]{2,40}$/.test(user)) return json({ error: 'user_invalid' }, 400);
+        const res = await fetch(LIVECHART_GQL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': 'me.livechart.android/6.4.8' },
+          body: JSON.stringify({ query: LC_QUERY, variables: { u: user } }),
+        });
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch { return json({ error: 'livechart_error', status: res.status, detail: text.slice(0, 200) }, 502); }
+        if (data.errors && !data.data?.user) return json({ error: 'livechart_query', detail: JSON.stringify(data.errors).slice(0, 400) }, 502);
+        const u = data.data?.user;
+        if (!u) return json({ error: 'user_not_found' }, 404);
+        return json({ username: u.username, entries: u.library?.nodes || [] });
       }
 
       const auth = request.headers.get('Authorization') || '';
