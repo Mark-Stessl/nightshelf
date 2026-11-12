@@ -17,6 +17,10 @@ Persönliches Regal für Spiele, Serien und Filme – mit Trophäen-System im Pl
 - **Anime-Reihen:** Beim Hinzufügen werden alle Staffeln und Filme einer Reihe von AniList geladen; pro Staffel Tabs mit eigenem Folgen-Zähler.
 - **Trophäen-Level** aus gesammelten Punkten (Bronze 15, Silber 30, Gold 90, Platin 300)
 - **Backup** als JSON-Datei herunterladen und wieder einlesen (Seite „Daten“)
+- **Neue Folgen automatisch:** Laufende Anime (AniList) und Serien (TVmaze) werden alle 3 Stunden beim Öffnen geprüft. Erschienene Folgen, neue und angekündigte Staffeln werden eingetragen, ungesehene Folgen als „+N“ markiert.
+- **Demnächst:** Kalender mit kommenden Folgen (mit Uhrzeit), Staffelstarts, Filmstarts und Spiele-Releases aus dem eigenen Regal, dazu „Neu für dich“.
+- **Als App installierbar (PWA):** auf Android, iPhone/iPad (Zum Home-Bildschirm), Windows, macOS und Linux (Chrome/Edge: Installieren-Symbol in der Adressleiste). Läuft offline, zeigt ungesehene Neuigkeiten als Zahl am App-Symbol.
+- **Push-Benachrichtigungen:** Der Worker prüft per Cron alle 30 Minuten neue Anime-Folgen, Serienfolgen und Manga-Kapitel und schickt Web-Push-Nachrichten an die eingeschalteten Geräte (VAPID-Schlüssel erzeugt der Worker selbst und speichert ihn in KV).
 
 ## Daten
 

@@ -42,6 +42,9 @@
     trophy: '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"/></svg>',
     game: '<svg viewBox="0 0 24 24"><path d="M6 8h12a4 4 0 0 1 4 4v1a4 4 0 0 1-7 2.6L14 15h-4l-1 .6A4 4 0 0 1 2 13v-1a4 4 0 0 1 4-4zM7 11v3M5.5 12.5h3M16 12h.01M18 14h.01"/></svg>',
     tv: '<svg viewBox="0 0 24 24"><path d="M3 7h18v12H3zM8 3l4 4 4-4"/></svg>',
+    calendar: '<svg viewBox="0 0 24 24"><path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"/></svg>',
+    bell: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/></svg>',
+    install: '<svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>',
     book: '<svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h6"/></svg>',
     anime: '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.9l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/></svg>',
     film: '<svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 9h16M4 15h16M8 5v4M12 5v4M16 5v4M8 15v4M12 15v4M16 15v4"/></svg>',
@@ -442,6 +445,7 @@
           }
           const created = Store.add(data);
           close();
+          if (['anime', 'series'].includes(type)) setTimeout(() => EpisodeWatch.check({ force: true, ids: [created.id] }).then(() => render()), 400);
           location.hash = `#/item/${created.id}`;
           toast(`<div class="tbadge" style="color:var(--lilac)">${typeIcon(type).replace('<svg', '<svg style="width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8"')}</div><div><b>${esc(title)}</b><small>wurde hinzugefügt</small></div>`);
         };
@@ -592,6 +596,61 @@
   Sync.onChange(st => { const l = $('#syncLine'); if (l) l.innerHTML = syncLine(st); });
   window.addEventListener('nightshelf:synced', () => { if (!$('#modalRoot').classList.contains('open')) render(); });
 
+
+  /* ---------- App installieren & Benachrichtigungen ---------- */
+  async function renderAppPanel() {
+    const el = $('#appPanel'); if (!el) return;
+    const st = Pwa.installState();
+    const install = {
+      installed: `<div class="key-ok">${I.check} Nightshelf läuft hier als App</div>`,
+      prompt: `<button class="btn btn-primary" id="appInstall">${I.install} Nightshelf installieren</button><div class="tiny" style="margin-top:8px">${Pwa.isMobile ? 'Die App landet auf deinem Startbildschirm.' : 'Die App bekommt ein eigenes Fenster, einen Eintrag im Startmenü bzw. Dock und ein Symbol in der Taskleiste.'}</div>`,
+      ios: `<ol class="app-steps"><li>Tippe in Safari unten auf <b>Teilen</b> (Quadrat mit Pfeil).</li><li>Wähle <b>Zum Home-Bildschirm</b>.</li><li>Öffne Nightshelf ab jetzt über das neue Symbol.</li></ol>`,
+      'mac-safari': `<ol class="app-steps"><li>Klicke in Safari in der Menüleiste auf <b>Ablage</b>.</li><li>Wähle <b>Zum Dock hinzufügen</b>.</li></ol><div class="tiny">In Chrome oder Edge geht es mit einem Klick auf das Installieren-Symbol in der Adressleiste.</div>`,
+      firefox: `<div class="tiny">Firefox kann Web-Apps am Desktop nicht installieren. Öffne Nightshelf in <b>Chrome</b> oder <b>Edge</b> und klick in der Adressleiste auf das Installieren-Symbol.</div>`,
+      'android-firefox': `<ol class="app-steps"><li>Tippe oben rechts auf das Menü (⋮).</li><li>Wähle <b>Installieren</b> bzw. <b>Zum Startbildschirm hinzufügen</b>.</li></ol>`,
+      manual: `<ol class="app-steps"><li>Klicke in der Adressleiste rechts auf das <b>Installieren</b>-Symbol, oder öffne das Browser-Menü.</li><li>Wähle <b>App installieren</b> bzw. <b>Nightshelf installieren</b>.</li></ol>`,
+    }[st];
+    let push;
+    const sub = await Pwa.subscription().catch(() => null);
+    if (!Pwa.pushSupported()) push = Pwa.isIOS && !Pwa.standalone()
+      ? `<div class="tiny">Auf iPhone und iPad gehen Benachrichtigungen nur, wenn Nightshelf zum Home-Bildschirm hinzugefügt ist (Anleitung oben). Öffne danach die App und schalte sie hier ein.</div>`
+      : `<div class="tiny">Dieser Browser kann keine Benachrichtigungen empfangen.</div>`;
+    else if (!Sync.enabled()) push = `<div class="tiny">Dafür muss dieses Gerät mit deinem Sync verbunden sein (oben), weil dein Server deine Liste kennen muss, um nach Neuem zu suchen.</div>`;
+    else if (sub && Notification.permission === 'granted') push = `<div class="key-ok">${I.bell} An auf diesem Gerät</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn" id="pushTest">Test senden</button><button class="btn btn-ghost btn-danger" id="pushOff">Ausschalten</button></div>`;
+    else if (Notification.permission === 'denied') push = `<div class="tiny" style="color:var(--danger)">Benachrichtigungen sind für diese Seite blockiert. Erlaube sie in den Browser-Einstellungen (Schloss-Symbol in der Adressleiste) und lade die Seite neu.</div>`;
+    else push = `<button class="btn btn-primary" id="pushOn">${I.bell} Benachrichtigungen einschalten</button>`;
+    el.innerHTML = `<h3>App & Benachrichtigungen</h3>
+      <p>Installiere Nightshelf als App auf dem Handy und am PC oder Mac. Sie startet wie ein eigenes Programm und funktioniert auch offline mit deinen gespeicherten Daten.</p>
+      <div class="field"><label>Als App installieren</label>${install}</div>
+      <div class="field" style="margin-top:16px"><label>Benachrichtigungen</label>
+        <div class="tiny" style="margin-bottom:10px">Dein Server schaut alle 30 Minuten nach neuen Folgen, Staffeln und Manga-Kapiteln und schickt dir eine Nachricht, auch wenn Nightshelf geschlossen ist. Benachrichtigt wird bei allem, was du schaust oder liest, gesehen hast oder pausierst, nicht bei Merkliste und Abgebrochen.</div>
+        ${push}<div class="field-error" id="pushErr" style="margin-top:8px"></div></div>`;
+    const err = m => { $('#pushErr').textContent = m; };
+    $('#appInstall') && ($('#appInstall').onclick = async () => { await Pwa.install(); renderAppPanel(); });
+    $('#pushOn') && ($('#pushOn').onclick = async () => {
+      const b = $('#pushOn'); b.disabled = true; b.textContent = 'Schalte ein…'; err('');
+      try { await Pwa.enablePush(); toast(`<div><b>Benachrichtigungen an</b><small>Du hörst von uns, sobald etwas Neues erscheint</small></div>`); renderAppPanel(); }
+      catch (e) {
+        b.disabled = false; b.innerHTML = `${I.bell} Benachrichtigungen einschalten`;
+        err({ denied: 'Du hast Benachrichtigungen nicht erlaubt. Erlaube sie in den Browser-Einstellungen und versuch es nochmal.', sync_required: 'Verbinde dieses Gerät zuerst mit deinem Sync.', key_required: 'Dein Schlüssel passt nicht mehr. Verbinde das Gerät neu.', ios_install: 'Füge Nightshelf zuerst zum Home-Bildschirm hinzu.' }[e.code] || 'Einschalten hat nicht geklappt. Prüf deine Verbindung und versuch es nochmal.');
+      }
+    });
+    $('#pushOff') && ($('#pushOff').onclick = async () => { await Pwa.disablePush(); toast('<div><b>Benachrichtigungen aus</b><small>auf diesem Gerät</small></div>'); renderAppPanel(); });
+    $('#pushTest') && ($('#pushTest').onclick = async () => {
+      const b = $('#pushTest'); b.disabled = true; b.textContent = 'Sende…'; err('');
+      try { const r = await Pwa.testPush(); if (!r.sent) err('Der Server kennt dieses Gerät nicht mehr. Schalte die Benachrichtigungen aus und wieder ein.'); }
+      catch { err('Test hat nicht geklappt. Versuch es gleich nochmal.'); }
+      b.disabled = false; b.textContent = 'Test senden';
+    });
+  }
+  Pwa.onChange(() => { renderAppPanel(); renderInstallSlot(); });
+  function renderInstallSlot() {
+    const el = $('#installSlot'); if (!el) return;
+    el.innerHTML = Pwa.installState() === 'prompt' ? `<button class="btn btn-sm install-btn" id="sideInstall">${I.install} App installieren</button>` : '';
+    $('#sideInstall') && ($('#sideInstall').onclick = () => Pwa.install());
+  }
+
   async function renderAiPanel() {
     const el = $('#aiPanel'); if (!el) return;
     el.innerHTML = `<h3>KI-Trophäen</h3><p style="margin:0">Lade dein Kontingent für heute…</p>`;
@@ -702,8 +761,8 @@
       const plat = item.trophies.find(t => t.tier === 'platinum' && t.done);
       extra = `<div class="cover-progress"><i style="width:${Math.round(p.done / p.total * 100)}%"></i></div>${plat ? `<div class="cover-plat" title="Platin">${Trophies.icon('platinum', 15)}</div>` : ''}`;
     }
-    const behind = item.type === 'manga' ? mangaBehind(item) : 0;
-    if (behind > 0 && ['active', 'paused'].includes(item.status)) extra += `<div class="cover-new" title="${behind} ungelesene Kapitel">+${behind > 99 ? '99' : fmtCh(behind)}</div>`;
+    const behind = newCount(item);
+    if (behind > 0 && ['active', 'paused', 'done'].includes(item.status)) extra += `<div class="cover-new" title="${behind} ${item.type === 'manga' ? 'ungelesene Kapitel' : 'neue Folgen'}">+${behind > 99 ? '99' : fmtCh(behind)}</div>`;
     return `<a class="card ${A()}" href="#/item/${item.id}">
       <div class="cover">${coverHTML(item)}${item.type === 'game' && item.platform ? `<span class="cover-tag">${esc(item.platform)}</span>` : ''}${extra}</div>
       <div><div class="card-title">${esc(item.title)}</div>
@@ -717,7 +776,7 @@
     const s = libState[type];
     const items = Store.all(type);
     const head = `<div class="page-head"><div><h1 class="page-title">${TYPES[type].plural}</h1><p class="page-sub">${items.length} ${items.length === 1 ? 'Eintrag' : 'Einträge'}</p></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}${type === 'manga' && items.length ? `<button class="btn" data-mangacheck>${I.refresh} Neue Kapitel prüfen</button>` : ''}<button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button></div></div>`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}${type === 'manga' && items.length ? `<button class="btn" data-mangacheck>${I.refresh} Neue Kapitel prüfen</button>` : ''}${['anime', 'series'].includes(type) && items.length ? `<button class="btn" data-aircheck>${I.refresh} Neue Folgen prüfen</button>` : ''}<button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button></div></div>`;
     if (!items.length) { view.innerHTML = head + emptyState(type); return; }
 
     const platforms = type === 'game' ? [...new Set(items.map(i => i.platform).filter(Boolean))] : [];
@@ -1086,6 +1145,236 @@
   const autoMangaCheck = () => MangaWatch.check().then(r => { if (r.updated.length) render(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') autoMangaCheck(); });
 
+  /* ---------- Neue Folgen (Anime und Serien) ---------- */
+  // Erschienene Folgen einer Staffel: aus den Ausstrahlungsdaten, sonst die Gesamtzahl
+  const released = x => x.aired != null ? (x.episodes ? Math.min(x.aired, x.episodes) : x.aired) : (x.episodes || 0);
+  const airingNow = x => x.airing === 'RELEASING';
+  // Ungesehene Folgen in Staffeln, die gerade laufen oder in denen neue Folgen dazugekommen sind
+  function episodesBehind(item) {
+    if (!['anime', 'series'].includes(item.type) || !item.seasonList?.length) return 0;
+    return item.seasonList.filter(x => x.format !== 'MOVIE' && !x.complete && (x.newAt || airingNow(x)))
+      .reduce((a, x) => a + Math.max(0, released(x) - (x.seen || 0)), 0);
+  }
+  const newCount = it => it.type === 'manga' ? mangaBehind(it) : episodesBehind(it);
+  const showsNew = it => ['active', 'paused', 'done'].includes(it.status) && newCount(it) > 0;
+  const recentDate = (d, days) => !d || Date.parse(d) > Date.now() - days * 86400000;
+  const lastShow = it => [...seasonsOf(it)].reverse().find(x => x.format !== 'MOVIE');
+  function fmtWhen(isoStr, dateOnly = false) {
+    const d = new Date(isoStr);
+    const day = new Date(d); day.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const diff = Math.round((day - today) / 86400000);
+    const dayTxt = diff === 0 ? 'heute' : diff === 1 ? 'morgen' : diff > 1 && diff < 7 ? `am ${d.toLocaleDateString('de-AT', { weekday: 'long' })}` : `am ${d.toLocaleDateString('de-AT', { day: 'numeric', month: 'short' })}`;
+    return dateOnly ? dayTxt : `${dayTxt} um ${d.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  const EpisodeWatch = (() => {
+    const KEY = 'nightshelf.airCheck', SEQ_KEY = 'nightshelf.sequelCheck';
+    const INTERVAL = 3 * 3600 * 1000, SEQ_INTERVAL = 20 * 3600 * 1000;
+    let running = false;
+    const lsGet = k => { try { return +localStorage.getItem(k) || 0; } catch { return 0; } };
+    const lsSet = k => { try { localStorage.setItem(k, String(Date.now())); } catch {} };
+    const tracked = it => it.status !== 'dropped';
+    const strip = list => JSON.stringify(list.map(({ id, ...x }) => x));
+
+    function store(it, list, extra) {
+      const before = strip(seasonsOf(it)) + JSON.stringify({ u: it.upcoming || [], s: it.showStatus || '' });
+      const after = strip(list) + JSON.stringify({ u: extra.upcoming || [], s: extra.showStatus || it.showStatus || '' });
+      if (before === after) return false;
+      Store.update(it.id, extra);
+      saveSeasons(Store.get(it.id), list, { autoStatus: false });
+      return true;
+    }
+
+    async function checkAnime(only, news) {
+      const items = Store.all('anime').filter(it => tracked(it) && it.seasonList?.some(x => x.anilistId) && (!only || only.includes(it.id)));
+      if (!items.length) return;
+      const want = new Set();
+      items.forEach(it => it.seasonList.forEach(x => { if (x.anilistId && (only || !['FINISHED', 'CANCELLED'].includes(x.airing))) want.add(x.anilistId); }));
+      let seq = new Map();
+      if (only || Date.now() - lsGet(SEQ_KEY) > SEQ_INTERVAL) {
+        const lastIds = [...new Set(items.map(it => lastShow(it)?.anilistId).filter(Boolean))];
+        seq = await Airing.animeSequels(lastIds).catch(() => new Map());
+        seq.forEach(list => list.forEach(s => want.add(s.anilistId)));
+        if (!only) lsSet(SEQ_KEY);
+      }
+      const info = want.size ? await Airing.anime([...want]) : new Map();
+      const now = new Date().toISOString();
+      for (const it0 of items) {
+        const it = Store.get(it0.id); if (!it) continue;
+        const list = seasonsOf(it).map(x => ({ ...x }));
+        const removed = it.removedSeasons || [];
+        (seq.get(lastShow(it)?.anilistId) || []).forEach(s => {
+          if (list.some(x => x.anilistId === s.anilistId) || removed.includes(s.anilistId)) return;
+          if (s.airing === 'FINISHED' && !recentDate(s.start, 300)) return; // ältere Teile, die bewusst fehlen, nicht nachtragen
+          const movie = s.format === 'MOVIE';
+          list.push({ ...s, id: Store.uid(), label: '', seen: 0, complete: false, newAt: now, aired: s.airing === 'NOT_YET_RELEASED' ? 0 : null });
+          news.push({ item: it, kind: 'season', text: s.airing === 'NOT_YET_RELEASED' ? `${movie ? 'Neuer Film' : 'Neue Staffel'} angekündigt${s.start ? ` · ab ${fmtDate(s.start)}` : ''}` : `${movie ? 'Neuer Film' : 'Neue Staffel'} ist da` });
+        });
+        const shows = list.filter(x => x.format !== 'MOVIE').length;
+        const upcoming = [];
+        list.forEach(x => {
+          const a = info.get(x.anilistId); if (!a) return;
+          x.airing = a.status;
+          if (a.episodes) x.episodes = a.episodes;
+          if (a.aired != null) {
+            if (x.aired != null && a.aired > x.aired && x.format !== 'MOVIE') {
+              x.newAt = now;
+              const n = a.aired - x.aired;
+              news.push({ item: it, kind: 'ep', text: `${n > 1 ? `Folgen ${x.aired + 1}–${a.aired} sind` : `Folge ${a.aired} ist`} da${shows > 1 ? ` · ${x.label}` : ''}` });
+            }
+            x.aired = a.aired;
+          }
+          x.nextEp = a.next?.ep || null; x.nextAt = a.next?.at || null; x.start = a.start || x.start || null;
+          a.schedule.forEach(s => upcoming.push({ at: s.at, kind: 'ep', ep: s.ep, season: shows > 1 ? x.label : '', last: !!(x.episodes && s.ep === x.episodes) }));
+          if (a.status === 'NOT_YET_RELEASED' && !a.schedule.length && a.start) upcoming.push({ at: a.start + 'T00:00:00', dateOnly: true, kind: x.format === 'MOVIE' ? 'movie' : 'start', season: x.label });
+        });
+        upcoming.sort((a, b) => a.at.localeCompare(b.at));
+        store(it, list, { upcoming: upcoming.slice(0, 12), airCheckedAt: now });
+      }
+    }
+
+    async function checkSeries(only, news) {
+      const items = Store.all('series').filter(it => tracked(it) && /^tvmaze:\d+$/.test(it.external || '') && (only ? only.includes(it.id) : it.showStatus !== 'Ended'));
+      for (const it0 of items) {
+        let s;
+        try { s = await Airing.series(+it0.external.split(':')[1]); } catch { continue; }
+        await Airing.sleep(300);
+        const it = Store.get(it0.id); if (!it) continue;
+        const now = new Date().toISOString();
+        const hasIds = it.seasonList?.some(x => x.tvmazeId);
+        const list = hasIds ? seasonsOf(it).map(x => ({ ...x })) : seasonsOf(it);
+        if (hasIds) {
+          s.seasons.forEach(ts => {
+            const running = s.upcoming.some(u => u.season === ts.number) && ts.aired > 0;
+            const airing = ts.aired === 0 ? 'NOT_YET_RELEASED' : running || (ts.episodes && ts.aired < ts.episodes) ? 'RELEASING' : 'FINISHED';
+            let x = list.find(o => o.tvmazeId === ts.tvmazeId);
+            if (!x) {
+              if ((it.removedSeasons || []).includes(ts.tvmazeId) || !recentDate(ts.premiere, 300)) return;
+              list.push({ id: Store.uid(), tvmazeId: ts.tvmazeId, label: '', title: ts.name || '', episodes: ts.episodes, year: ts.premiere ? +ts.premiere.slice(0, 4) : null, cover: ts.cover || it.cover || '', format: 'TV', seen: 0, complete: false, newAt: now, aired: ts.aired, airing });
+              news.push({ item: it, kind: 'season', text: ts.aired ? `Staffel ${ts.number} ist da` : `Staffel ${ts.number} angekündigt${ts.premiere ? ` · ab ${fmtDate(ts.premiere)}` : ''}` });
+              return;
+            }
+            if (ts.episodes && ts.episodes > (x.episodes || 0)) x.episodes = ts.episodes;
+            if (x.aired != null && ts.aired > x.aired) {
+              x.newAt = now;
+              const n = ts.aired - x.aired;
+              news.push({ item: it, kind: 'ep', text: n > 1 ? `${n} neue Folgen · Staffel ${ts.number}` : `Neue Folge · Staffel ${ts.number}, Folge ${ts.aired}` });
+            }
+            x.aired = ts.aired; x.airing = airing;
+            const next = s.upcoming.find(u => u.season === ts.number);
+            x.nextEp = next?.ep || null; x.nextAt = next?.at || null; x.start = ts.premiere || x.start || null;
+          });
+        }
+        const upcoming = s.upcoming.map(u => ({ at: u.at, kind: 'ep', ep: u.ep, season: `Staffel ${u.season}`, name: u.name, dateOnly: u.dateOnly }));
+        s.seasons.filter(ts => ts.aired === 0 && ts.premiere && !s.upcoming.some(u => u.season === ts.number) && Date.parse(ts.premiere) > Date.now() - 86400000)
+          .forEach(ts => upcoming.push({ at: ts.premiere + 'T00:00:00', dateOnly: true, kind: 'start', season: `Staffel ${ts.number}` }));
+        upcoming.sort((a, b) => a.at.localeCompare(b.at));
+        const extra = { upcoming: upcoming.slice(0, 12), showStatus: s.status, airCheckedAt: now };
+        if (hasIds) store(it, list, extra);
+        else if (JSON.stringify(it.upcoming || []) !== JSON.stringify(extra.upcoming) || it.showStatus !== s.status) Store.update(it.id, extra);
+      }
+    }
+
+    async function check({ force = false, ids = null } = {}) {
+      if (running) return { news: [] };
+      if (!force && Date.now() - lsGet(KEY) < INTERVAL) return { news: [] };
+      running = true;
+      const news = []; let error = null;
+      try {
+        await checkAnime(ids, news).catch(() => { error = 'network'; });
+        await checkSeries(ids, news).catch(() => { error = 'network'; });
+        if (!ids && !error) lsSet(KEY);
+        const stamp = new Date().toISOString();
+        [...new Set(news.map(n => n.item.id))].forEach(id => Store.update(id, { newEpisodeAt: stamp }));
+      } finally { running = false; }
+      if (news.length === 1) toast(`<div class="tbadge" style="color:var(--cyan)">${I.tv.replace('<svg', '<svg style="width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8"')}</div><div><b>${esc(news[0].item.title)}</b><small>${esc(news[0].text)}</small></div>`);
+      else if (news.length > 1) { const t = [...new Set(news.map(n => n.item.title))]; toast(`<div class="tbadge" style="color:var(--cyan)">${I.tv.replace('<svg', '<svg style="width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8"')}</div><div><b>${news.length} Neuigkeiten</b><small>${esc(t.slice(0, 3).join(', '))}${t.length > 3 ? ' …' : ''}</small></div>`); }
+      return { news, error };
+    }
+    return { check };
+  })();
+  const autoAirCheck = () => EpisodeWatch.check().then(r => { if (r.news.length) render(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') autoAirCheck(); });
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-aircheck]'); if (!b) return;
+    e.preventDefault();
+    const label = b.innerHTML; b.disabled = true; b.textContent = 'Prüfe…';
+    const [a, m] = await Promise.all([EpisodeWatch.check({ force: true }), Store.all('manga').length ? MangaWatch.check({ force: true }) : Promise.resolve({ updated: [] })]);
+    if (!a.news.length && !m.updated.length) toast(`<div><b>${a.error ? 'Nicht alles erreichbar' : 'Nichts Neues'}</b><small>${a.error ? 'Später nochmal versuchen' : 'Alles auf dem neuesten Stand'}</small></div>`);
+    b.disabled = false; b.innerHTML = label;
+    render();
+  });
+
+  /* ---------- Demnächst ---------- */
+  function upcomingEntries() {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const now = Date.now(), out = [];
+    Store.all().forEach(it => {
+      if (it.status === 'dropped') return;
+      (it.upcoming || []).forEach(u => { const t = Date.parse(u.at); if (u.dateOnly ? t >= today : t > now) out.push({ it, ...u, t }); });
+      if (['movie', 'game'].includes(it.type) && /^\d{4}-\d{2}-\d{2}/.test(it.released || '')) {
+        const t = Date.parse(it.released.slice(0, 10) + 'T00:00:00');
+        if (t >= today) out.push({ it, at: it.released, t, dateOnly: true, kind: it.type });
+      }
+    });
+    return out.sort((a, b) => a.t - b.t);
+  }
+  function upcomingText(u) {
+    if (u.kind === 'ep') return [u.season, `Folge ${u.ep}${u.last ? ' (Finale)' : ''}`, u.name].filter(Boolean).map(esc).join(' · ');
+    if (u.kind === 'start') return `${esc(u.season)} startet`;
+    if (u.kind === 'movie') return u.it.type === 'movie' ? 'Kinostart' : `${esc(u.season)} erscheint`;
+    if (u.kind === 'game') return `Erscheint${u.it.platform ? ` für ${esc(u.it.platform)}` : ''}`;
+    return '';
+  }
+  function upcomingRow(u) {
+    const time = u.dateOnly ? '' : new Date(u.t).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
+    return `<a class="list-row" href="#/item/${u.it.id}"><div class="thumb">${coverHTML(u.it, { noTitle: true })}</div>
+      <div class="grow"><div class="title">${esc(u.it.title)}</div><div class="sub">${TYPES[u.it.type].label} · ${upcomingText(u)}</div></div>
+      ${time ? `<div class="up-time">${time}</div>` : ''}</a>`;
+  }
+  function newRow(it) {
+    const n = newCount(it);
+    let sub;
+    if (it.type === 'manga') sub = `Manga · ${fmtCh(n)} ${n === 1 ? 'neues Kapitel' : 'neue Kapitel'} · bis Kapitel ${fmtCh(it.chapters)}`;
+    else {
+      const x = it.seasonList.find(s => s.format !== 'MOVIE' && !s.complete && (s.newAt || airingNow(s)) && released(s) > (s.seen || 0));
+      sub = `${TYPES[it.type].label} · ${n} ${n === 1 ? 'neue Folge' : 'neue Folgen'}${x && it.seasonList.length > 1 ? ` · ${esc(x.label)}` : ''}`;
+    }
+    return `<a class="list-row" href="#/item/${it.id}"><div class="thumb">${coverHTML(it, { noTitle: true })}</div>
+      <div class="grow"><div class="title">${esc(it.title)}</div><div class="sub">${sub}</div></div><div class="up-new">+${n > 99 ? '99' : fmtCh(n)}</div></a>`;
+  }
+  const newItems = () => Store.all().filter(showsNew).sort((a, b) => (b.newEpisodeAt || b.newChapterAt || b.updatedAt || '').localeCompare(a.newEpisodeAt || a.newChapterAt || a.updatedAt || ''));
+
+  function viewUpcoming() {
+    const entries = upcomingEntries();
+    const fresh = newItems();
+    const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const dayLabel = t => {
+      const d = new Date(t); d.setHours(0, 0, 0, 0);
+      const diff = Math.round((d - today) / 86400000);
+      if (diff === 0) return 'Heute';
+      if (diff === 1) return 'Morgen';
+      return new Date(t).toLocaleDateString('de-AT', diff < 7 ? { weekday: 'long', day: 'numeric', month: 'long' } : { weekday: 'short', day: 'numeric', month: 'long', year: new Date(t).getFullYear() !== today.getFullYear() ? 'numeric' : undefined });
+    };
+    const soon = entries.filter(u => u.t < today.getTime() + 60 * 86400000);
+    const later = entries.filter(u => u.t >= today.getTime() + 60 * 86400000).slice(0, 40);
+    const groups = [];
+    soon.forEach(u => { const k = dayKey(u.t); const g = groups[groups.length - 1]; if (g && g.k === k) g.list.push(u); else groups.push({ k, label: dayLabel(u.t), list: [u] }); });
+    const months = [];
+    later.forEach(u => { const k = new Date(u.t).toLocaleDateString('de-AT', { month: 'long', year: 'numeric' }); const g = months[months.length - 1]; if (g && g.k === k) g.list.push(u); else months.push({ k, list: [u] }); });
+    const hasSeasons = Store.all().some(it => ['anime', 'series'].includes(it.type) && it.seasonList?.some(x => x.anilistId || x.tvmazeId));
+    view.innerHTML = `<div class="${A()}" style="max-width:900px">
+      <div class="page-head"><div><h1 class="page-title">Demnächst</h1><p class="page-sub">Neue Folgen, Staffeln, Filme und Spiele aus deinem Regal</p></div>
+        <button class="btn" data-aircheck>${I.refresh} Jetzt prüfen</button></div>
+      ${fresh.length ? `<section class="section" style="margin-top:0"><h2 class="section-title">Neu für dich</h2><div class="list-card">${fresh.map(newRow).join('')}</div></section>` : ''}
+      ${groups.length ? groups.map(g => `<section class="section up-day"><h2 class="section-title">${esc(g.label)}<span class="tiny" style="font-weight:400">${g.list.length} ${g.list.length === 1 ? 'Termin' : 'Termine'}</span></h2><div class="list-card">${g.list.map(upcomingRow).join('')}</div></section>`).join('') : ''}
+      ${months.length ? `<section class="section"><h2 class="section-title">Später</h2>${months.map(g => `<div class="season-row-label">${esc(g.k)}</div><div class="list-card" style="margin-bottom:14px">${g.list.map(u => upcomingRow({ ...u, dateOnly: true, season: u.season }).replace('<div class="grow">', `<div class="up-date">${new Date(u.t).getDate()}.</div><div class="grow">`)).join('')}</div>`).join('')}</section>` : ''}
+      ${!entries.length ? `<div class="empty"><div class="empty-icon">${I.calendar}</div><h3>Gerade nichts angekündigt</h3><p>${hasSeasons ? 'Sobald zu deinen Serien, Anime, Filmen oder Spielen ein Termin bekannt ist, steht er hier.' : 'Lade bei deinen Serien und Anime die Staffeln (Button „Von TVmaze laden“ bzw. „Von AniList laden“), dann erscheinen hier die nächsten Folgen.'}</p></div>` : ''}
+    </div>`;
+  }
+
   /* ---------- Staffeln (Anime und Serien) ---------- */
   const seasonTab = {};
   const isImplicit = x => String(x.id).startsWith('implicit');
@@ -1177,6 +1466,7 @@
         <div class="season-body">
           <div class="season-title">${esc(sea.title || item.title)}</div>
           <div class="card-meta" style="margin-top:4px">${[esc(sea.label), sea.year, sea.format === 'MOVIE' && (sea.episodes || 1) === 1 ? '' : sea.episodes ? `${sea.episodes} Folgen` : 'Folgenzahl unbekannt'].filter(Boolean).join('<span class="dot"></span>')}</div>
+          ${airInfo(sea)}
           ${sea.format === 'MOVIE' && (sea.episodes || 1) === 1 ? '' : `<div class="ep-stepper">
             <button class="btn icon-btn" id="epMinus" aria-label="Eine Folge weniger">−</button>
             <div class="ep-count"><input type="number" id="epInput" min="0" ${sea.episodes ? `max="${sea.episodes}"` : ''} value="${sea.seen || 0}" aria-label="Gesehene Folgen"><span>/ ${sea.episodes || '?'} Folgen</span></div>
@@ -1184,13 +1474,23 @@
           </div>`}
           ${sea.format === 'MOVIE' && (sea.episodes || 1) === 1 ? `<div class="movie-state ${seasonDone(sea) ? 'on' : ''}">${seasonDone(sea) ? `${I.check} Gesehen` : 'Noch nicht gesehen'}</div>` : `<div class="bar" style="max-width:420px"><i style="width:${pct}%"></i></div>`}
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
-            ${seasonDone(sea) ? `<button class="btn btn-sm" id="sReset">${sea.format === 'MOVIE' ? 'Als ungesehen markieren' : 'Zurücksetzen'}</button>` : `<button class="btn btn-sm btn-primary" id="sDone">${I.check} ${sea.format === 'MOVIE' ? 'Gesehen' : 'Ganz gesehen'}</button>`}
+            ${seasonDone(sea) ? `<button class="btn btn-sm" id="sReset">${sea.format === 'MOVIE' ? 'Als ungesehen markieren' : 'Zurücksetzen'}</button>` : (sea.aired != null && sea.episodes && sea.aired < sea.episodes && (sea.seen || 0) >= sea.aired ? `<div class="movie-state on" style="margin:0">${I.check} Auf dem neuesten Stand</div>` : `<button class="btn btn-sm btn-primary" id="sDone">${I.check} ${sea.format === 'MOVIE' ? 'Gesehen' : sea.aired != null && sea.episodes && sea.aired < sea.episodes ? `Bis Folge ${sea.aired} gesehen` : 'Ganz gesehen'}</button>`)}
             <button class="btn btn-sm" id="sEdit">${I.edit} Bearbeiten</button>
             ${list.length > 1 ? `<button class="btn btn-sm btn-ghost btn-danger" id="sDel">${I.trash} Entfernen</button>` : ''}
           </div>
         </div>
       </div>
     </section>`;
+  }
+
+  function airInfo(sea) {
+    const bits = [];
+    if (sea.airing === 'NOT_YET_RELEASED') bits.push(sea.nextAt ? `${sea.format === 'MOVIE' ? 'Erscheint' : 'Startet'} ${fmtWhen(sea.nextAt)}` : sea.start ? `${sea.format === 'MOVIE' ? 'Erscheint' : 'Startet'} ${fmtWhen(sea.start + 'T00:00:00', true)}` : 'Noch nicht erschienen, Termin unbekannt');
+    else if (sea.nextAt) bits.push(`Folge ${sea.nextEp} kommt ${fmtWhen(sea.nextAt)}`);
+    if (sea.format !== 'MOVIE' && sea.aired != null && sea.episodes && sea.aired < sea.episodes && sea.aired > 0) bits.push(`${sea.aired} von ${sea.episodes} Folgen erschienen`);
+    const unseen = sea.format !== 'MOVIE' && !sea.complete && (sea.newAt || airingNow(sea)) ? released(sea) - (sea.seen || 0) : 0;
+    if (unseen > 0) bits.push(`<b>${unseen} ${unseen === 1 ? 'neue Folge' : 'neue Folgen'} für dich</b>`);
+    return bits.length ? `<div class="air-info">${I.calendar}<span>${bits.join(' · ')}</span></div>` : '';
   }
 
   function materialize(it) { return seasonsOf(it).map(x => ({ ...x, id: isImplicit(x) ? Store.uid() : x.id })); }
@@ -1214,7 +1514,10 @@
     if ($('#epInput')) $('#epInput').onchange = e => setSeen(Math.round(+e.target.value || 0));
     $('#sDone') && ($('#sDone').onclick = () => {
       const it = fresh(); const cur = seasonsOf(it).find(x => x.id === seasonTab[it.id]);
-      withList((list, i) => { if (list[i].episodes) list[i].seen = list[i].episodes; list[i].complete = true; });
+      withList((list, i) => {
+        const x = list[i], partial = x.aired != null && x.episodes && x.aired < x.episodes;
+        if (partial) { x.seen = x.aired; x.complete = false; } else { if (x.episodes) x.seen = x.episodes; x.complete = true; }
+      });
       toast(`<div><b>${esc(cur.label)} fertig</b><small>${esc(it.title)}</small></div>`);
     });
     $('#sReset') && ($('#sReset').onclick = () => withList((list, i) => { list[i].seen = 0; list[i].complete = false; }));
@@ -1224,7 +1527,9 @@
       const it = fresh(); const cur = seasonsOf(it).find(x => x.id === seasonTab[it.id]);
       confirmDialog(`„${esc(cur.label)}“ wird aus ${esc(it.title)} entfernt.`, 'Entfernen', () => {
         const list = materialize(it).filter((x, i) => seasonsOf(it)[i].id !== cur.id);
-        delete seasonTab[it.id]; saveSeasons(it, list); render();
+        const ext = cur.anilistId || cur.tvmazeId;
+        if (ext) Store.update(it.id, { removedSeasons: [...new Set([...(it.removedSeasons || []), ext])].slice(-200) });
+        delete seasonTab[it.id]; saveSeasons(Store.get(it.id), list); render();
       });
     });
     $('#sLoad').onclick = async () => {
@@ -1257,6 +1562,7 @@
         if (Object.keys(patch).length) Store.update(it.id, patch);
         saveSeasons(Store.get(it.id), list, { autoStatus: false });
         toast(`<div><b>${list.length} ${it.type === 'anime' ? (list.length === 1 ? 'Teil' : 'Teile') : (list.length === 1 ? 'Staffel' : 'Staffeln')} geladen</b><small>${esc(it.title)}</small></div>`);
+        EpisodeWatch.check({ force: true, ids: [it.id] }).then(() => render());
       } catch { toast(`<div><b>${seasonSource(it)} nicht erreichbar</b><small>Später nochmal versuchen</small></div>`); }
       render();
     };
@@ -1479,7 +1785,7 @@
     const total = games.length + series.length + movies.length + animes.length + mangas.length;
     const hour = new Date().getHours();
     const greet = hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Hallo' : 'Guten Abend';
-    const active = [...mangas.filter(m => m.status === 'active' && mangaBehind(m) > 0), ...games, ...series, ...animes, ...mangas.filter(m => !(mangaBehind(m) > 0))].filter(i => i.status === 'active').slice(0, 6);
+    const active = [...mangas, ...series, ...animes].filter(i => i.status === 'active' && newCount(i) > 0).concat([...games, ...series, ...animes, ...mangas].filter(i => i.status === 'active' && !(newCount(i) > 0))).slice(0, 6);
     const recent = recentTrophies();
 
     if (!total) {
@@ -1509,7 +1815,7 @@
           if (i.type === 'game' && i.trophies?.length) { const p = Trophies.progress(i.trophies); sub += ` · ${p.done}/${p.total} Trophäen`; }
           if (i.type === 'series' && i.seasons) sub += ` · Staffel ${i.seasonSeen || 0}/${i.seasons}`;
           if (i.type === 'manga') { const b = mangaBehind(i); sub = `Manga · Kapitel ${fmtCh(i.chaptersRead || 0)}/${i.chapters ? fmtCh(i.chapters) : '?'}${b > 0 ? ` · <span style="color:var(--cyan)">${fmtCh(b)} neu</span>` : ''}`; }
-          else if (['anime', 'series'].includes(i.type) && i.seasonList?.some(x => x.episodes)) { const cur = currentSeason(i); sub = `${TYPES[i.type].label} · ${cur.label} · Folge ${cur.seen || 0}/${cur.episodes || '?'}`; }
+          else if (['anime', 'series'].includes(i.type) && i.seasonList?.some(x => x.episodes)) { const cur = currentSeason(i); const n = episodesBehind(i); sub = `${TYPES[i.type].label} · ${cur.label} · Folge ${cur.seen || 0}/${cur.episodes || '?'}${n > 0 ? ` · <span style="color:var(--cyan)">${n} neu</span>` : ''}`; }
           else if (i.type === 'anime' && i.seasonList?.length > 1) { const cur = currentSeason(i); sub += ` · ${cur.label} · Folge ${cur.seen || 0}/${cur.episodes || '?'}`; }
           else if (i.type === 'anime' && i.episodes) sub += ` · Folge ${i.episodesSeen || 0}/${i.episodes}`;
           return listRow(i, sub);
@@ -1518,6 +1824,14 @@
           <a class="list-row" href="#/item/${g.id}"><div class="tbadge">${Trophies.icon(t.tier, 22)}</div><div class="grow"><div class="title">${esc(t.name)}</div><div class="sub">${esc(g.title)} · ${fmtDate(t.doneAt)}</div></div></a>`).join('')
           : '<div class="list-empty">Hake Trophäen in einem Spiel ab, dann erscheinen sie hier.</div>'}</div></div>
       </div>
+      ${(() => {
+        const fresh = newItems().slice(0, 5), up = upcomingEntries().slice(0, 5);
+        if (!fresh.length && !up.length) return '';
+        return `<div class="two-col section">
+          <div><h2 class="section-title">Neu für dich <a href="#/upcoming">Alle</a></h2><div class="list-card">${fresh.length ? fresh.map(newRow).join('') : '<div class="list-empty">Du bist überall auf dem neuesten Stand.</div>'}</div></div>
+          <div><h2 class="section-title">Demnächst <a href="#/upcoming">Kalender</a></h2><div class="list-card">${up.length ? up.map(u => upcomingRow(u).replace('<div class="sub">', `<div class="sub"><span style="color:var(--lilac)">${esc(fmtWhen(u.at, true).replace(/^am /, ''))}</span> · `)).join('') : '<div class="list-empty">Gerade nichts angekündigt.</div>'}</div></div>
+        </div>`;
+      })()}
       ${ORDER_TYPES.map(t => {
         const list = Store.all(t).slice(0, 12);
         return list.length ? `<section class="section"><h2 class="section-title">${TYPES[t].plural} <a href="#/${TYPES[t].route}">Alle ansehen</a></h2><div class="home-row">${list.map(cardHTML).join('')}</div></section>` : '';
@@ -1709,6 +2023,7 @@
     view.innerHTML = `<div class="${A()}" style="max-width:720px">
       <div class="page-head"><div><h1 class="page-title">Daten</h1><p class="page-sub">${n} Einträge sind in diesem Browser gespeichert.</p></div></div>
       <div class="panel" id="syncPanel"></div>
+      <div class="panel" id="appPanel"></div>
       <div class="panel" id="aiPanel"></div>
       <div class="panel" id="psnPanel"></div>
       <div class="panel"><h3>Automatische Infos</h3><p>Beim Hinzufügen werden Cover, Erscheinungsdatum und Genre automatisch gesucht. Serien und Spiele funktionieren ohne Schlüssel. Für Filme brauchst du einen kostenlosen TMDB-Schlüssel. Er bleibt nur in diesem Browser gespeichert.</p>
@@ -1747,6 +2062,7 @@
     renderPsnPanel();
     renderAiPanel();
     renderSyncPanel();
+    renderAppPanel();
     const k = Lookup.keys();
     $('#kTmdb').value = k.tmdb || '';
     const saveKeys = () => Lookup.setKeys({ ...Lookup.keys(), tmdb: $('#kTmdb').value.trim() });
@@ -1852,12 +2168,15 @@
     else if (route === 'anime') viewLibrary('anime');
     else if (route === 'manga') viewLibrary('manga');
     else if (route === 'stats') viewStats();
+    else if (route === 'upcoming') viewUpcoming();
     else if (route === 'trophies') viewTrophies();
     else if (route === 'settings') viewSettings();
     else if (route === 'item') viewDetail(param);
     else viewHome();
 
     renderSidebarLevel();
+    Pwa.badge(Store.all().filter(showsNew).length);
+    renderInstallSlot();
   }
 
   let lastRoute = '';
@@ -1877,5 +2196,6 @@
 
   render();
   animate = false;
-  Sync.syncNow().finally(() => setTimeout(autoMangaCheck, 1500));
+  Sync.syncNow().finally(() => { setTimeout(autoMangaCheck, 1500); setTimeout(autoAirCheck, 3000); });
+  Pwa.init({ toast, render });
 })();

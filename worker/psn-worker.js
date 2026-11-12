@@ -20,6 +20,10 @@
  *   GET  /manga/search?q=             -> Manga-Suche über MangaDex
  *   GET  /manga/series?id=            -> Details + höchstes Kapitel (alle Sprachen)
  *   POST /manga/latest { ids }        -> höchstes Kapitel für bis zu 40 Manga
+ *   GET  /push/key                    -> öffentlicher VAPID-Schlüssel für Push
+ *   POST /push/subscribe { subscription, device } / POST /push/unsubscribe { endpoint }
+ *   POST /push/test                   -> Testnachricht an ein oder alle Geräte
+ *   POST /push/run                    -> Prüfung sofort ausführen (läuft sonst per Cron alle 30 Minuten)
  */
 
 const ALLOWED_ORIGINS = [
@@ -84,6 +88,9 @@ async function addUsage(env, neurons, { full = false } = {}) {
   await env.USAGE.put(usageKey(), JSON.stringify(next), { expirationTtl: 3 * 86400 });
 }
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runChecks(env).catch(() => {}));
+  },
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
     const cors = {
@@ -132,6 +139,8 @@ export default {
         const given = request.headers.get('X-Nightshelf-Key') || '';
         if (!given || (await sha256(given)) !== owner) return json({ error: 'key_required' }, 403);
       }
+
+      if (url.pathname.startsWith('/push/')) return handlePush(url, request, env, json);
 
       if (url.pathname === '/manga/search') {
         const q = (url.searchParams.get('q') || '').trim().slice(0, 100);
@@ -417,4 +426,180 @@ async function ownerHash(env) {
 async function sha256(text) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/* ---------- Push-Benachrichtigungen (Web Push, RFC 8291 + VAPID) ---------- */
+const enc = new TextEncoder();
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), c => c.charCodeAt(0));
+const concat = (...parts) => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let i = 0; parts.forEach(p => { out.set(p, i); i += p.length; }); return out; };
+
+// Schlüsselpaar für VAPID: wird beim ersten Mal erzeugt und bleibt im eigenen Speicher, nie im Code
+async function getVapid(env) {
+  const stored = await env.DATA.get('vapid', 'json');
+  if (stored) return stored;
+  const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+  const v = { publicKey: b64u(await crypto.subtle.exportKey('raw', kp.publicKey)), privateJwk: await crypto.subtle.exportKey('jwk', kp.privateKey) };
+  await env.DATA.put('vapid', JSON.stringify(v));
+  return v;
+}
+async function vapidAuth(endpoint, v) {
+  const head = b64u(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
+  const body = b64u(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'https://mark-stessl.github.io/nightshelf/' })));
+  const key = await crypto.subtle.importKey('jwk', v.privateJwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(`${head}.${body}`));
+  return `vapid t=${head}.${body}.${b64u(sig)}, k=${v.publicKey}`;
+}
+async function hkdf(salt, ikm, info, bits) {
+  const key = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, key, bits));
+}
+async function encryptPush(sub, plaintext) {
+  const uaPub = unb64u(sub.keys.p256dh), auth = unb64u(sub.keys.auth);
+  const local = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const asPub = new Uint8Array(await crypto.subtle.exportKey('raw', local.publicKey));
+  const uaKey = await crypto.subtle.importKey('raw', uaPub, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, local.privateKey, 256));
+  const ikm = await hkdf(auth, shared, concat(enc.encode('WebPush: info\0'), uaPub, asPub), 256);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(salt, ikm, enc.encode('Content-Encoding: aes128gcm\0'), 128);
+  const nonce = await hkdf(salt, ikm, enc.encode('Content-Encoding: nonce\0'), 96);
+  const aes = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aes, concat(plaintext, new Uint8Array([2]))));
+  const head = new Uint8Array(21 + asPub.length);
+  head.set(salt, 0); new DataView(head.buffer).setUint32(16, 4096); head[20] = asPub.length; head.set(asPub, 21);
+  return concat(head, ct);
+}
+async function sendPush(env, sub, data, vapid) {
+  const v = vapid || await getVapid(env);
+  const body = await encryptPush(sub, enc.encode(JSON.stringify(data)));
+  const res = await fetch(sub.endpoint, {
+    method: 'POST',
+    headers: { Authorization: await vapidAuth(sub.endpoint, v), 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '86400', Urgency: 'normal', ...(data.tag ? { Topic: String(data.tag).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32) } : {}) },
+    body,
+  });
+  return res.status;
+}
+const validSub = s => s && typeof s.endpoint === 'string' && /^https:\/\//.test(s.endpoint) && s.endpoint.length < 1000 && s.keys && /^[A-Za-z0-9_-]{80,100}$/.test(s.keys.p256dh || '') && /^[A-Za-z0-9_-]{16,30}$/.test(s.keys.auth || '');
+
+async function broadcast(env, subs, messages) {
+  const vapid = await getVapid(env);
+  const dead = new Set(); let sent = 0;
+  for (const m of messages) for (const s of subs) {
+    if (dead.has(s.endpoint)) continue;
+    try { const st = await sendPush(env, s, m, vapid); if (st === 404 || st === 410) dead.add(s.endpoint); else if (st < 300) sent++; } catch {}
+  }
+  if (dead.size) await env.DATA.put('push-subs', JSON.stringify(subs.filter(s => !dead.has(s.endpoint))));
+  return { sent, removed: dead.size };
+}
+
+async function handlePush(url, request, env, json) {
+  if (!env?.DATA) return json({ error: 'storage_missing' }, 501);
+  const subs = (await env.DATA.get('push-subs', 'json')) || [];
+  if (url.pathname === '/push/key') return json({ publicKey: (await getVapid(env)).publicKey });
+  if (url.pathname === '/push/devices') return json({ devices: subs.map(s => ({ device: s.device, createdAt: s.createdAt })) });
+  if (request.method !== 'POST') return json({ error: 'method' }, 405);
+  const body = await request.json().catch(() => ({}));
+  if (url.pathname === '/push/subscribe') {
+    if (!validSub(body.subscription)) return json({ error: 'subscription_invalid' }, 400);
+    const entry = { endpoint: body.subscription.endpoint, keys: body.subscription.keys, device: String(body.device || 'Gerät').slice(0, 60), createdAt: new Date().toISOString() };
+    const next = [entry, ...subs.filter(s => s.endpoint !== entry.endpoint)].slice(0, 6);
+    await env.DATA.put('push-subs', JSON.stringify(next));
+    return json({ ok: true, devices: next.length });
+  }
+  if (url.pathname === '/push/unsubscribe') {
+    await env.DATA.put('push-subs', JSON.stringify(subs.filter(s => s.endpoint !== body.endpoint)));
+    return json({ ok: true });
+  }
+  if (url.pathname === '/push/test') {
+    const targets = body.endpoint ? subs.filter(s => s.endpoint === body.endpoint) : subs;
+    if (!targets.length) return json({ sent: 0 });
+    return json(await broadcast(env, targets, [{ title: 'Nightshelf', body: 'Benachrichtigungen funktionieren. Du hörst von mir, sobald etwas Neues erscheint.', url: './#/upcoming', tag: 'test' }]));
+  }
+  if (url.pathname === '/push/run') return json(await runChecks(env));
+  return json({ error: 'not_found' }, 404);
+}
+
+/* Regelmäßige Prüfung (Cron): neue Anime-Folgen, Serienfolgen und Manga-Kapitel */
+const NOTIFY_STATUS = ['active', 'paused', 'done'];
+const recentlySeen = iso => iso && Date.now() - Date.parse(iso) < 2 * 3600 * 1000; // App hat es schon selbst gemeldet
+async function runChecks(env) {
+  if (!env?.DATA) return { skipped: 'storage_missing' };
+  const subs = (await env.DATA.get('push-subs', 'json')) || [];
+  if (!subs.length) return { skipped: 'no_devices' };
+  const lib = await env.DATA.get('library', 'json');
+  if (!lib?.items?.length) return { skipped: 'no_data' };
+  const prev = (await env.DATA.get('push-state', 'json')) || {};
+  const state = { anime: {}, series: {}, manga: {}, cursor: 0, ...JSON.parse(JSON.stringify(prev)) };
+  const items = lib.items.filter(i => NOTIFY_STATUS.includes(i.status));
+  const news = [];
+  const push = (it, body, tag, fresh) => { if (!fresh) news.push({ title: it.title, body, url: `./#/item/${it.id}`, tag, icon: /^https:/.test(it.cover || '') ? it.cover : undefined }); };
+  let calls = 0;
+  const BUDGET = Math.max(8, 44 - Math.min(subs.length, 6) * 4);
+
+  // Anime: alle laufenden Staffeln in einer Abfrage
+  const seasons = [];
+  items.filter(i => i.type === 'anime').forEach(it => (it.seasonList || []).forEach(x => {
+    if (x.anilistId && x.format !== 'MOVIE' && !['FINISHED', 'CANCELLED'].includes(x.airing)) seasons.push({ it, x });
+  }));
+  const ids = [...new Set(seasons.map(s => s.x.anilistId))].slice(0, 100);
+  const info = {};
+  for (let i = 0; i < ids.length; i += 50) {
+    calls++;
+    try {
+      const r = await fetch('https://graphql.anilist.co', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ query: 'query($ids:[Int]){Page(perPage:50){media(id_in:$ids,type:ANIME){id status episodes nextAiringEpisode{episode}}}}', variables: { ids: ids.slice(i, i + 50) } }) });
+      const d = await r.json();
+      (d?.data?.Page?.media || []).forEach(m => { info[m.id] = m.nextAiringEpisode ? m.nextAiringEpisode.episode - 1 : m.status === 'FINISHED' ? m.episodes : m.status === 'NOT_YET_RELEASED' ? 0 : null; });
+    } catch {}
+  }
+  seasons.forEach(({ it, x }) => {
+    const aired = info[x.anilistId]; if (aired == null) return;
+    const key = String(x.anilistId);
+    const base = Math.max(state.anime[key] ?? -1, x.aired ?? -1);
+    const multi = (it.seasonList || []).filter(s => s.format !== 'MOVIE').length > 1;
+    if (base >= 0 && aired > base) push(it, `${aired - base > 1 ? `Folgen ${base + 1}–${aired} sind` : `Folge ${aired} ist`} da${multi && x.label ? ` · ${x.label}` : ''}`, `a${x.anilistId}`, recentlySeen(it.newEpisodeAt));
+    state.anime[key] = Math.max(base, aired);
+  });
+
+  // Serien und Manga: reihum, damit jede Runde unter dem Abfrage-Limit bleibt
+  const tasks = [
+    ...items.filter(i => i.type === 'series' && /^tvmaze:\d+$/.test(i.external || '') && i.showStatus !== 'Ended').map(it => ({ kind: 'series', it })),
+    ...items.filter(i => i.type === 'manga' && i.mangadexId && i.mdStatus !== 'completed').map(it => ({ kind: 'manga', it })),
+  ];
+  const n = tasks.length, start = n ? state.cursor % n : 0;
+  let done = 0;
+  for (let k = 0; k < n && calls < BUDGET; k++) {
+    const { kind, it } = tasks[(start + k) % n];
+    calls++; done++;
+    try {
+      if (kind === 'series') {
+        const id = it.external.split(':')[1];
+        const r = await fetch(`https://api.tvmaze.com/shows/${id}/episodes`);
+        if (!r.ok) continue;
+        const now = Date.now();
+        const eps = (await r.json()).filter(e => e.type !== 'insignificant_special' && (e.airstamp ? Date.parse(e.airstamp) : e.airdate ? Date.parse(e.airdate + 'T20:00:00Z') : Infinity) <= now);
+        const base = state.series[id];
+        if (base != null && eps.length > base) {
+          const last = eps[eps.length - 1];
+          const cnt = eps.length - base;
+          push(it, cnt > 1 ? `${cnt} neue Folgen · bis Staffel ${last.season}, Folge ${last.number}` : `Neue Folge · Staffel ${last.season}, Folge ${last.number}${last.name ? ` · ${last.name}` : ''}`, `s${id}`, recentlySeen(it.newEpisodeAt));
+        }
+        state.series[id] = Math.max(base ?? 0, eps.length);
+      } else {
+        const latest = await mdLatest(it.mangadexId);
+        if (!latest) continue;
+        const base = Math.max(state.manga[it.mangadexId] ?? 0, it.chapters ?? 0);
+        if (base > 0 && latest > base) push(it, `Kapitel ${latest} ist da`, `m${it.mangadexId.slice(0, 8)}`, recentlySeen(it.newChapterAt));
+        state.manga[it.mangadexId] = Math.max(base, latest);
+      }
+    } catch {}
+  }
+  state.cursor = n ? (start + done) % n : 0;
+
+  let messages = news;
+  if (news.length > 4) messages = [...news.slice(0, 3), { title: `${news.length - 3} weitere Neuigkeiten`, body: news.slice(3, 8).map(m => m.title).join(', ') + (news.length > 8 ? ' …' : ''), url: './#/upcoming', tag: 'summary' }];
+  const result = messages.length ? await broadcast(env, subs, messages) : { sent: 0 };
+  if (JSON.stringify(state) !== JSON.stringify(prev)) await env.DATA.put('push-state', JSON.stringify(state));
+  return { checked: { anime: ids.length, rotating: done, of: n }, news: news.length, ...result };
 }
