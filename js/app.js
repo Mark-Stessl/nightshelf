@@ -147,8 +147,10 @@
     Object.assign(document.body.style, { paddingRight: '', position: '', top: '', left: '', right: '', width: '' });
     if (lockedY != null) { window.scrollTo(0, lockedY); lockedY = null; }
   }
+  let modalSeq = 0;
   function openModal({ title, body, foot = '', wide = false, onMount }) {
     const root = $('#modalRoot');
+    const seq = ++modalSeq;
     lockScroll();
     root.innerHTML = `<div class="modal-backdrop"></div>
       <div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
@@ -156,7 +158,9 @@
         <div class="modal-body">${body}</div>
         ${foot ? `<div class="modal-foot">${foot}</div>` : ''}
       </div>`;
-    requestAnimationFrame(() => root.classList.add('open'));
+    if (root.classList.contains('open')) root.classList.remove('open');
+    void root.offsetWidth; // Startzustand festhalten, damit die Einblend-Animation läuft
+    root.classList.add('open');
     // Handy: Fenster immer am sichtbaren Bereich ausrichten (iOS schiebt die Ansicht sonst bei Tastatur/Fokus hoch)
     const vv = window.visualViewport;
     const touch = window.matchMedia('(max-width: 820px)').matches;
@@ -187,7 +191,7 @@
       root.classList.remove('open');
       if (vv && touch) { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); }
       if (touch) { root.removeEventListener('focusin', onFocusIn); root.removeEventListener('focusout', onFocusOut); }
-      setTimeout(() => { if (!root.classList.contains('open')) { root.innerHTML = ''; root.style.top = root.style.height = root.style.bottom = ''; root.classList.remove('kb-open'); unlockScroll(); } }, 280);
+      setTimeout(() => { if (seq === modalSeq && !root.classList.contains('open')) { root.innerHTML = ''; root.style.top = root.style.height = root.style.bottom = ''; root.classList.remove('kb-open'); unlockScroll(); } }, 280);
       document.removeEventListener('keydown', onKey);
     };
     const onKey = e => { if (e.key === 'Escape') close(); };
