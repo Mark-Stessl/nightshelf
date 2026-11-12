@@ -146,7 +146,7 @@ const Lookup = (() => {
     return {
       title: m.title?.english || m.title?.romaji, year: m.startDate?.year || null,
       cover: m.coverImage?.extraLarge || m.coverImage?.large || '', episodes: m.episodes || null,
-      genres: m.genres || [], released: alDate(m.startDate), summary: strip(m.description).replace(/\s+/g, ' ').slice(0, 900),
+      genres: m.genres || [], released: alDate(m.startDate), summary: strip(m.description).replace(/\s+/g, ' ').slice(0, 3000),
       external: `anilist:${m.id}`, anilistId: m.id, format: m.format,
     };
   }

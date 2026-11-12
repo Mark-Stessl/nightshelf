@@ -543,3 +543,7 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 .movie-state { display: inline-flex; align-items: center; gap: 6px; margin: 16px 0 4px; padding: 6px 12px; border-radius: 999px; font-size: 13px; color: var(--text-2); border: 1px solid var(--line-2); }
 .movie-state svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.4; }
 .movie-state.on { color: var(--cyan); border-color: rgba(34, 211, 238, .4); background: rgba(34, 211, 238, .08); }
+
+.hero-summary.open { -webkit-line-clamp: unset; display: block; overflow: visible; }
+.more-btn { margin-top: 6px; padding: 0; border: none; background: none; color: var(--lilac); font-size: 13px; font-weight: 600; cursor: pointer; }
+.more-btn:hover { color: var(--text); text-decoration: underline; }

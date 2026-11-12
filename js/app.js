@@ -1213,7 +1213,7 @@
           <div class="hero-meta">${meta.join('<span class="dot"></span>')}</div>
           <div style="margin-top:12px">${starsInput(item.rating, 'heroRating')}</div>
           ${item.notes ? `<div class="hero-notes">${esc(item.notes)}</div>` : ''}
-          ${item.summary ? `<div class="hero-summary">${esc(item.summary)}</div>` : ''}
+          ${item.summary ? `<div class="hero-summary" id="heroSummary">${esc(item.summary)}</div><button class="more-btn" id="moreBtn" type="button" hidden aria-expanded="false">Mehr lesen</button>` : ''}
           ${item.external ? `<div class="tiny" style="margin-top:8px">Infos von ${{ tvmaze: 'TVmaze', tmdb: 'TMDB', wikidata: 'Wikipedia / Wikidata', rawg: 'RAWG', anilist: 'AniList', livechart: 'LiveChart' }[item.external.split(':')[0]] || 'externer Datenbank'}</div>` : ''}
           ${ring}${seriesBlock}
           <div class="hero-actions">
@@ -1227,6 +1227,15 @@
     </div>`;
 
     bindStars(view);
+    const sumEl = $('#heroSummary'), moreBtn = $('#moreBtn');
+    if (sumEl && moreBtn) {
+      requestAnimationFrame(() => { if (sumEl.scrollHeight > sumEl.clientHeight + 2) moreBtn.hidden = false; });
+      moreBtn.onclick = () => {
+        const open = sumEl.classList.toggle('open');
+        moreBtn.textContent = open ? 'Weniger anzeigen' : 'Mehr lesen';
+        moreBtn.setAttribute('aria-expanded', String(open));
+      };
+    }
     if (['anime', 'series'].includes(item.type)) bindSeasons(item);
     $('[data-stars="heroRating"]').addEventListener('change', e => { Store.update(item.id, { rating: e.detail }); });
     $('#quickStatus').onchange = e => { Store.update(item.id, { status: e.target.value }); render(); };
