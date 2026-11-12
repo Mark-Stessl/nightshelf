@@ -17,6 +17,20 @@ const Pwa = (() => {
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; emit(); });
   window.addEventListener('appinstalled', () => { deferred = null; ctx.toast('<div><b>Nightshelf ist installiert</b><small>Du findest die App jetzt bei deinen Programmen</small></div>'); emit(); });
 
+  /* Neue Version? Beim Zurückkehren in die App prüfen und ggf. neu laden (iOS hält Apps lange im Speicher) */
+  const myVersion = (document.querySelector('script[src*="js/app.js"]')?.getAttribute('src').match(/v=(\d+)/) || [])[1];
+  let lastUpdateCheck = 0;
+  async function checkUpdate() {
+    if (!myVersion || Date.now() - lastUpdateCheck < 5 * 60 * 1000) return;
+    lastUpdateCheck = Date.now();
+    try {
+      const html = await fetch(`./?check=${Date.now()}`, { cache: 'no-store' }).then(r => r.ok ? r.text() : '');
+      const v = (html.match(/js\/app\.js\?v=(\d+)/) || [])[1];
+      if (v && v !== myVersion && !document.documentElement.classList.contains('modal-open')) location.reload();
+    } catch {}
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
+
   async function init(c) {
     ctx = { ...ctx, ...c };
     if (!('serviceWorker' in navigator)) return;
