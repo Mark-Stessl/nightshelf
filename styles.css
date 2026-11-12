@@ -442,3 +442,11 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 .level-card .tier-counts { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 4px; font-size: 12px; }
 .level-card .tier-counts span { gap: 2px; white-space: nowrap; }
 .level-card { overflow: hidden; }
+
+/* Untere Leiste am Handy: sieben Punkte passen nebeneinander */
+@media (max-width: 820px) {
+  .nav { gap: 0; }
+  .nav a { flex: 1 1 0; min-width: 0; padding: 6px 2px; font-size: 10px; }
+  .nav a span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav a svg { width: 19px; height: 19px; }
+}

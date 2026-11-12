@@ -11,13 +11,16 @@
   const TYPES = {
     game:   { label: 'Spiel',  plural: 'Spiele', route: 'games' },
     series: { label: 'Serie',  plural: 'Serien', route: 'series' },
+    anime:  { label: 'Anime',  plural: 'Anime',  route: 'anime' },
     movie:  { label: 'Film',   plural: 'Filme',  route: 'movies' },
   };
   const STATUS = {
     game:   { active: 'Am Spielen', done: 'Durchgespielt', planned: 'Backlog', dropped: 'Abgebrochen' },
     series: { active: 'Am Schauen', done: 'Fertig geschaut', planned: 'Merkliste', dropped: 'Abgebrochen' },
+    anime:  { active: 'Am Schauen', done: 'Fertig geschaut', paused: 'Pausiert', planned: 'Merkliste', dropped: 'Abgebrochen' },
     movie:  { done: 'Gesehen', planned: 'Merkliste', dropped: 'Abgebrochen' },
   };
+  const ORDER_TYPES = ['game', 'series', 'anime', 'movie'];
   const PLATFORMS = ['PS5', 'PS4', 'PS3', 'PS Vita', 'Switch 2', 'Switch', 'PC', 'Steam Deck', 'Xbox', 'Mobile', 'Andere'];
   const psDefault = p => isPS(p) ? (PSN.connected() ? 'psn' : 'paste') : 'auto';
   const isPS = p => /^PS/.test(p || '');
@@ -37,12 +40,13 @@
     trophy: '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"/></svg>',
     game: '<svg viewBox="0 0 24 24"><path d="M6 8h12a4 4 0 0 1 4 4v1a4 4 0 0 1-7 2.6L14 15h-4l-1 .6A4 4 0 0 1 2 13v-1a4 4 0 0 1 4-4zM7 11v3M5.5 12.5h3M16 12h.01M18 14h.01"/></svg>',
     tv: '<svg viewBox="0 0 24 24"><path d="M3 7h18v12H3zM8 3l4 4 4-4"/></svg>',
+    anime: '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.9l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/></svg>',
     film: '<svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 9h16M4 15h16M8 5v4M12 5v4M16 5v4M8 15v4M12 15v4M16 15v4"/></svg>',
     download: '<svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
     upload: '<svg viewBox="0 0 24 24"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg>',
     refresh: '<svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.9-3.9M4 5v4h4M4 13a8 8 0 0 0 14.9 3.9M20 19v-4h-4"/></svg>',
   };
-  const typeIcon = t => ({ game: I.game, series: I.tv, movie: I.film }[t]);
+  const typeIcon = t => ({ game: I.game, series: I.tv, anime: I.anime, movie: I.film }[t]);
 
   /* ---------- Hilfen ---------- */
   function hash(str) { let h = 0; for (const c of str || '') h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); }
@@ -68,7 +72,7 @@
   function statusPill(item) {
     const label = (STATUS[item.type] || {})[item.status];
     if (!label) return '';
-    const cls = { done: 'st-done', active: 'st-active', planned: 'st-planned', dropped: 'st-dropped' }[item.status];
+    const cls = { done: 'st-done', active: 'st-active', planned: 'st-planned', paused: 'st-planned', dropped: 'st-dropped' }[item.status];
     return `<span class="status-pill ${cls}">${label}</span>`;
   }
   function fmtDate(iso) { return iso ? new Date(iso).toLocaleDateString('de-AT', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; }
@@ -178,6 +182,11 @@
         <div class="field"><label>Staffeln gesamt</label><input class="input" name="seasons" type="number" min="0" value="${d.seasons || ''}" placeholder="5"></div>
         <div class="field"><label>Gesehen bis Staffel</label><input class="input" name="seasonSeen" type="number" min="0" value="${d.seasonSeen || ''}" placeholder="3"></div>
       </div>` : '';
+    const animeFields = type === 'anime' ? `
+      <div class="grid-2">
+        <div class="field"><label>Folgen gesamt</label><input class="input" name="episodes" type="number" min="0" value="${d.episodes || ''}" placeholder="24"></div>
+        <div class="field"><label>Gesehene Folgen</label><input class="input" name="episodesSeen" type="number" min="0" value="${d.episodesSeen || ''}" placeholder="12"></div>
+      </div>` : '';
     const trophySection = (type === 'game' && !isEdit) ? `
       <div class="field">
         <label>Trophäen</label>
@@ -200,7 +209,7 @@
           <div class="field"><label>Status</label><select class="input" name="status">${Object.entries(st).map(([k, v]) => `<option value="${k}" ${k === d.status ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
           <div class="field"><label>Jahr</label><input class="input" name="year" type="number" min="1950" max="2100" value="${d.year || ''}" placeholder="2024"></div>
         </div>
-        ${seriesFields}
+        ${seriesFields}${animeFields}
         <div class="grid-2">
           <div class="field"><label>Bewertung</label>${starsInput(d.rating)}</div>
           <div class="field"><label>Cover-Bild (Link, optional)</label><input class="input" name="cover" value="${esc(d.cover || '')}" placeholder="https://…/cover.jpg"></div>
@@ -272,6 +281,7 @@
             if (dt.year) F.year.value = dt.year;
             if (dt.cover) F.cover.value = dt.cover;
             if (type === 'series' && dt.seasons) F.seasons.value = dt.seasons;
+            if (type === 'anime' && dt.episodes) F.episodes.value = dt.episodes;
             if (type === 'game') {
               if (dt.genre && F.genre) F.genre.value = dt.genre;
               if (dt.platforms?.length && !dt.platforms.includes(F.platform.value)) {
@@ -279,7 +289,7 @@
                 if (pref) { F.platform.value = pref; F.platform.onchange && F.platform.onchange(); }
               }
             }
-            info.innerHTML = `<div class="fetched">${dt.cover ? `<img src="${esc(dt.cover)}" alt="">` : ''}<div><b>Infos übernommen</b><small>${esc([dt.released ? fmtDate(dt.released) : dt.year, (dt.genres || []).slice(0, 3).join(', '), dt.runtime ? dt.runtime + ' Min.' : '', dt.seasons ? dt.seasons + (dt.seasons === 1 ? ' Staffel' : ' Staffeln') : ''].filter(Boolean).join(' · '))}</small></div>
+            info.innerHTML = `<div class="fetched">${dt.cover ? `<img src="${esc(dt.cover)}" alt="">` : ''}<div><b>Infos übernommen</b><small>${esc([dt.released ? fmtDate(dt.released) : dt.year, (dt.genres || []).slice(0, 3).join(', '), dt.runtime ? dt.runtime + ' Min.' : '', dt.seasons ? dt.seasons + (dt.seasons === 1 ? ' Staffel' : ' Staffeln') : '', dt.episodes ? dt.episodes + ' Folgen' : ''].filter(Boolean).join(' · '))}</small></div>
               <button type="button" class="btn btn-ghost btn-sm" id="undoFetch">Entfernen</button></div>`;
             $('#undoFetch', m).onclick = () => { fetched = null; F.cover.value = ''; info.innerHTML = ''; };
           } catch { info.innerHTML = `<div class="tiny" style="margin-top:4px">Details konnten nicht geladen werden.</div>`; }
@@ -316,6 +326,7 @@
             notes: form.elements.notes.value.trim(),
           };
           if (type === 'game') { data.platform = form.elements.platform.value; data.genre = form.elements.genre.value; }
+          if (type === 'anime') { data.episodes = form.elements.episodes.value ? +form.elements.episodes.value : null; data.episodesSeen = form.elements.episodesSeen.value ? +form.elements.episodesSeen.value : null; }
           if (type === 'series') { data.seasons = form.elements.seasons.value ? +form.elements.seasons.value : null; data.seasonSeen = form.elements.seasonSeen.value ? +form.elements.seasonSeen.value : null; }
           if (fetched) {
             ['genres', 'released', 'runtime', 'summary', 'external'].forEach(k => { if (fetched[k] != null && fetched[k] !== '') data[k] = fetched[k]; });
@@ -470,6 +481,7 @@
     const txt = {
       game: ['Deine Spielesammlung wartet', 'Füge dein erstes Spiel hinzu und hake Trophäen ab.'],
       series: ['Noch keine Serien', 'Halte fest, welche Serien du gesehen hast oder gerade schaust.'],
+      anime: ['Noch keine Anime', 'Füge Anime hinzu oder hol dir deine Liste von LiveChart.'],
       movie: ['Noch keine Filme', 'Sammle alle Filme, die du gesehen hast, mit Bewertung.'],
     }[type];
     return `<div class="empty ${A()}"><div class="empty-icon">${typeIcon(type)}</div><h3>${txt[0]}</h3><p>${txt[1]}</p>
@@ -480,6 +492,7 @@
     const meta = [];
     if (item.type === 'game' && item.platform) meta.push(esc(item.platform));
     if (item.type === 'series' && item.seasons) meta.push(`${item.seasonSeen || 0}/${item.seasons} ${item.seasons === 1 ? 'Staffel' : 'Staffeln'}`);
+    if (item.type === 'anime' && (item.episodes || item.episodesSeen)) meta.push(`${item.episodesSeen || 0}/${item.episodes || '?'} Folgen`);
     if (item.year) meta.push(item.year);
     let extra = '';
     if (item.type === 'game' && item.trophies?.length) {
@@ -494,13 +507,13 @@
     </a>`;
   }
 
-  const libState = { game: { q: '', status: 'all', platform: 'all', sort: 'added' }, series: { q: '', status: 'all', sort: 'added' }, movie: { q: '', status: 'all', sort: 'added' } };
+  const libState = { game: { q: '', status: 'all', platform: 'all', sort: 'added' }, series: { q: '', status: 'all', sort: 'added' }, movie: { q: '', status: 'all', sort: 'added' }, anime: { q: '', status: 'all', sort: 'added' } };
 
   function viewLibrary(type) {
     const s = libState[type];
     const items = Store.all(type);
     const head = `<div class="page-head"><div><h1 class="page-title">${TYPES[type].plural}</h1><p class="page-sub">${items.length} ${items.length === 1 ? 'Eintrag' : 'Einträge'}</p></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}<button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button></div></div>`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}${type === 'anime' ? `<button class="btn" data-lcsync>${I.refresh} LiveChart sync</button>` : ''}<button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button></div></div>`;
     if (!items.length) { view.innerHTML = head + emptyState(type); return; }
 
     const platforms = type === 'game' ? [...new Set(items.map(i => i.platform).filter(Boolean))] : [];
@@ -572,6 +585,7 @@
     if (item.genre && item.type === 'game') meta.push(Trophies.GENRES[item.genre]);
     if (item.year) meta.push(item.year);
     if (item.type === 'series' && item.seasons) meta.push(`${item.seasons} ${item.seasons === 1 ? 'Staffel' : 'Staffeln'}`);
+    if (item.type === 'anime' && item.episodes) meta.push(`${item.episodes} Folgen`);
     if (item.runtime) meta.push(`${item.runtime} Min.`);
     if (item.genres?.length && item.type !== 'game') meta.push(esc(item.genres.slice(0, 3).join(', ')));
     if (item.released) meta.push(`Erschienen ${fmtDate(item.released)}`);
@@ -612,6 +626,9 @@
     }
 
     let seriesBlock = '';
+    if (item.type === 'anime' && item.episodes) {
+      seriesBlock = `<div style="margin-top:18px;max-width:360px"><div class="tiny" style="margin-bottom:6px">Fortschritt: Folge ${item.episodesSeen || 0} von ${item.episodes}</div><div class="bar"><i style="width:${Math.min(100, Math.round((item.episodesSeen || 0) / item.episodes * 100))}%"></i></div></div>`;
+    }
     if (item.type === 'series' && item.seasons) {
       seriesBlock = `<div style="margin-top:18px;max-width:360px"><div class="tiny" style="margin-bottom:6px">Fortschritt: Staffel ${item.seasonSeen || 0} von ${item.seasons}</div><div class="bar"><i style="width:${Math.min(100, Math.round((item.seasonSeen || 0) / item.seasons * 100))}%"></i></div></div>`;
     }
@@ -628,7 +645,7 @@
           <div style="margin-top:12px">${starsInput(item.rating, 'heroRating')}</div>
           ${item.notes ? `<div class="hero-notes">${esc(item.notes)}</div>` : ''}
           ${item.summary ? `<div class="hero-summary">${esc(item.summary)}</div>` : ''}
-          ${item.external ? `<div class="tiny" style="margin-top:8px">Infos von ${{ tvmaze: 'TVmaze', tmdb: 'TMDB', wikidata: 'Wikipedia / Wikidata', rawg: 'RAWG' }[item.external.split(':')[0]] || 'externer Datenbank'}</div>` : ''}
+          ${item.external ? `<div class="tiny" style="margin-top:8px">Infos von ${{ tvmaze: 'TVmaze', tmdb: 'TMDB', wikidata: 'Wikipedia / Wikidata', rawg: 'RAWG', anilist: 'AniList', livechart: 'LiveChart' }[item.external.split(':')[0]] || 'externer Datenbank'}</div>` : ''}
           ${ring}${seriesBlock}
           <div class="hero-actions">
             <select class="input" id="quickStatus" style="width:auto">${Object.entries(STATUS[item.type]).map(([k, v]) => `<option value="${k}" ${k === item.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
@@ -709,31 +726,32 @@
   }
 
   function viewHome() {
-    const games = Store.all('game'), series = Store.all('series'), movies = Store.all('movie');
+    const games = Store.all('game'), series = Store.all('series'), movies = Store.all('movie'), animes = Store.all('anime');
     const s = allTrophyStats();
-    const total = games.length + series.length + movies.length;
+    const total = games.length + series.length + movies.length + animes.length;
     const hour = new Date().getHours();
     const greet = hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Hallo' : 'Guten Abend';
-    const active = [...games, ...series].filter(i => i.status === 'active').slice(0, 6);
+    const active = [...games, ...series, ...animes].filter(i => i.status === 'active').slice(0, 6);
     const recent = recentTrophies();
 
     if (!total) {
       view.innerHTML = `<div class="${A()}"><div class="page-head"><div><h1 class="page-title">${greet}</h1><p class="page-sub">Dein Regal ist noch leer. Womit fangen wir an?</p></div></div>
-        <div class="stats">${['game', 'series', 'movie'].map(t => `<button class="stat" data-add="${t}" style="text-align:left;cursor:pointer;color:inherit">
+        <div class="stats">${ORDER_TYPES.map(t => `<button class="stat" data-add="${t}" style="text-align:left;cursor:pointer;color:inherit">
           <div class="stat-label">${typeIcon(t).replace('<svg', '<svg style="width:18px;height:18px"')} ${TYPES[t].plural}</div>
-          <div class="stat-value" style="font-size:20px;margin-top:10px">${TYPES[t].label} hinzufügen</div><div class="stat-hint">${t === 'game' ? 'Mit Trophäen zum Abhaken' : t === 'series' ? 'Mit Staffel-Fortschritt' : 'Mit Bewertung'}</div></button>`).join('')}</div></div>`;
+          <div class="stat-value" style="font-size:20px;margin-top:10px">${TYPES[t].label} hinzufügen</div><div class="stat-hint">${t === 'game' ? 'Mit Trophäen zum Abhaken' : t === 'series' ? 'Mit Staffel-Fortschritt' : t === 'anime' ? 'Oder von LiveChart laden' : 'Mit Bewertung'}</div></button>`).join('')}</div></div>`;
       return;
     }
 
     const platCount = s.counts.platinum;
     view.innerHTML = `<div class="${A()}">
       <div class="page-head"><div><h1 class="page-title">${greet}</h1><p class="page-sub">${total} Einträge in deinem Regal</p></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">${['game', 'series', 'movie'].map(t => `<button class="btn ${t === 'game' ? 'btn-primary' : ''}" data-add="${t}">${I.plus} ${TYPES[t].label}</button>`).join('')}</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${ORDER_TYPES.map(t => `<button class="btn ${t === 'game' ? 'btn-primary' : ''}" data-add="${t}">${I.plus} ${TYPES[t].label}</button>`).join('')}</div></div>
       <div class="stats">
         <a class="stat feature" href="#/trophies"><div class="stat-label">${I.trophy} Trophäen-Level</div><div class="stat-value">${s.level.level}</div><div class="bar" style="margin-top:8px"><i style="width:${s.level.pct}%"></i></div><div class="stat-hint" style="margin-top:6px">${s.earned} von ${s.total} Trophäen</div></a>
         <a class="stat" href="#/trophies"><div class="stat-label">${Trophies.icon('platinum', 16)} Platin</div><div class="stat-value" style="color:var(--platinum)">${platCount}</div><div class="stat-hint">${games.filter(g => g.status === 'done').length} Spiele durchgespielt</div></a>
         <a class="stat" href="#/games"><div class="stat-label">${I.game} Spiele</div><div class="stat-value">${games.length}</div><div class="stat-hint">${games.filter(g => g.status === 'active').length} am Spielen</div></a>
         <a class="stat" href="#/series"><div class="stat-label">${I.tv} Serien</div><div class="stat-value">${series.length}</div><div class="stat-hint">${series.filter(g => g.status === 'done').length} fertig geschaut</div></a>
+        <a class="stat" href="#/anime"><div class="stat-label">${I.anime} Anime</div><div class="stat-value">${animes.length}</div><div class="stat-hint">${animes.filter(g => g.status === 'done').length} fertig geschaut</div></a>
         <a class="stat" href="#/movies"><div class="stat-label">${I.film} Filme</div><div class="stat-value">${movies.length}</div><div class="stat-hint">${movies.filter(g => g.status === 'done').length} gesehen</div></a>
       </div>
       <div class="two-col section">
@@ -741,13 +759,14 @@
           let sub = TYPES[i.type].label;
           if (i.type === 'game' && i.trophies?.length) { const p = Trophies.progress(i.trophies); sub += ` · ${p.done}/${p.total} Trophäen`; }
           if (i.type === 'series' && i.seasons) sub += ` · Staffel ${i.seasonSeen || 0}/${i.seasons}`;
+          if (i.type === 'anime' && i.episodes) sub += ` · Folge ${i.episodesSeen || 0}/${i.episodes}`;
           return listRow(i, sub);
         }).join('') : '<div class="list-empty">Nichts in Arbeit. Setz bei einem Spiel oder einer Serie den Status auf „Am Spielen“ oder „Am Schauen“.</div>'}</div></div>
         <div><h2 class="section-title">Zuletzt verdient <a href="#/trophies">Alle</a></h2><div class="list-card">${recent.length ? recent.map(({ t, g }) => `
           <a class="list-row" href="#/item/${g.id}"><div class="tbadge">${Trophies.icon(t.tier, 22)}</div><div class="grow"><div class="title">${esc(t.name)}</div><div class="sub">${esc(g.title)} · ${fmtDate(t.doneAt)}</div></div></a>`).join('')
           : '<div class="list-empty">Hake Trophäen in einem Spiel ab, dann erscheinen sie hier.</div>'}</div></div>
       </div>
-      ${['game', 'series', 'movie'].map(t => {
+      ${ORDER_TYPES.map(t => {
         const list = Store.all(t).slice(0, 12);
         return list.length ? `<section class="section"><h2 class="section-title">${TYPES[t].plural} <a href="#/${TYPES[t].route}">Alle ansehen</a></h2><div class="home-row">${list.map(cardHTML).join('')}</div></section>` : '';
       }).join('')}
@@ -785,6 +804,7 @@
     view.innerHTML = `<div class="${A()}" style="max-width:720px">
       <div class="page-head"><div><h1 class="page-title">Daten</h1><p class="page-sub">${n} Einträge sind in diesem Browser gespeichert.</p></div></div>
       <div class="panel" id="psnPanel"></div>
+      <div class="panel" id="lcPanel"></div>
       <div class="panel"><h3>Automatische Infos</h3><p>Beim Hinzufügen werden Cover, Erscheinungsdatum und Genre automatisch gesucht. Serien und Spiele funktionieren ohne Schlüssel. Für Filme brauchst du einen kostenlosen TMDB-Schlüssel. Er bleibt nur in diesem Browser gespeichert.</p>
         <div class="form">
           <div class="field"><label>Serien · TVmaze</label><div class="key-ok">Aktiv, kein Schlüssel nötig</div></div>
@@ -819,6 +839,7 @@
     $('#impMerge').onchange = doImport('merge');
     $('#impReplace').onchange = doImport('replace');
     renderPsnPanel();
+    renderLcPanel();
     const k = Lookup.keys();
     $('#kTmdb').value = k.tmdb || '';
     const saveKeys = () => Lookup.setKeys({ ...Lookup.keys(), tmdb: $('#kTmdb').value.trim() });
@@ -908,6 +929,53 @@
   }
   document.addEventListener('click', e => { if (e.target.closest('[data-psnsync]')) { e.preventDefault(); runPsnSync(); } });
 
+  /* ---------- LiveChart ---------- */
+  function renderLcPanel() {
+    const el = $('#lcPanel'); if (!el) return;
+    const st = LiveChart.state();
+    el.innerHTML = `<h3>LiveChart</h3>
+      <p>Hol dir deine Anime-Liste von <a href="https://www.livechart.me" target="_blank" rel="noopener">LiveChart.me</a> mit Status, gesehenen Folgen und Bewertung. Dafür reicht dein Benutzername, ein Passwort ist nicht nötig. Deine Liste muss dafür auf LiveChart öffentlich sein.</p>
+      <div class="field"><label>LiveChart-Benutzername</label><div class="key-row"><input class="input" id="lcUser" value="${esc(st.username || '')}" placeholder="dein_name" autocomplete="off" spellcheck="false"><button class="btn btn-primary" id="lcGo">${I.refresh} Synchronisieren</button></div>
+        <div class="field-error" id="lcErr"></div>${st.lastSync ? `<div class="tiny">Zuletzt synchronisiert: ${new Date(st.lastSync).toLocaleString('de-AT', { dateStyle: 'medium', timeStyle: 'short' })}</div>` : ''}</div>`;
+    $('#lcUser').oninput = () => { $('#lcErr').textContent = ''; };
+    $('#lcGo').onclick = () => {
+      const u = $('#lcUser').value.trim();
+      if (!u) { $('#lcErr').textContent = 'Gib deinen LiveChart-Benutzernamen ein.'; return; }
+      LiveChart.save({ username: u });
+      runLcSync();
+    };
+  }
+
+  let lcSyncing = false;
+  function runLcSync() {
+    if (lcSyncing) return;
+    if (!LiveChart.state().username) { location.hash = '#/settings'; setTimeout(() => toast('<div><b>Trag zuerst deinen LiveChart-Namen ein</b></div>'), 300); return; }
+    lcSyncing = true;
+    openModal({
+      title: 'LiveChart synchronisieren',
+      body: `<div id="lcBody"><p class="muted" style="margin:0 0 12px">Lade deine Anime-Liste…</p><div class="bar"><i id="lcBar" style="width:5%"></i></div><p class="tiny" id="lcStep" style="margin-top:10px">&nbsp;</p></div>`,
+      foot: `<button class="btn" data-close>Schließen</button>`,
+      onMount: () => {
+        LiveChart.sync({
+          onProgress: (pct, step) => { const b = $('#lcBar'), t = $('#lcStep'); if (b) b.style.width = pct + '%'; if (t) t.textContent = step; },
+        }).then(r => {
+          lcSyncing = false;
+          const msg = `${r.added} neue Anime, ${r.updated} aktualisiert${r.total ? ` (${r.total} auf deiner Liste)` : ''}.`;
+          const body = $('#lcBody');
+          if (body) body.innerHTML = `<div class="hint-box">${I.check}<div><b style="color:var(--text)">Fertig</b><br>${msg}</div></div>`; else toast(`<div><b>LiveChart synchronisiert</b><small>${msg}</small></div>`);
+          render();
+        }).catch(e => {
+          lcSyncing = false;
+          const msg = e.code === 'user_not_found' ? 'Diesen Benutzer gibt es nicht, oder seine Liste ist privat. Prüfe den Namen und die Sichtbarkeit auf LiveChart.' : e.code === 'empty' ? 'Die Liste ist leer oder privat.' : 'LiveChart war nicht erreichbar. Versuch es später nochmal.';
+          const body = $('#lcBody');
+          if (body) body.innerHTML = `<p class="field-error" style="margin:0">${msg}</p>`; else toast(`<div><b>Sync fehlgeschlagen</b><small>${msg}</small></div>`);
+          render();
+        });
+      },
+    });
+  }
+  document.addEventListener('click', e => { if (e.target.closest('[data-lcsync]')) { e.preventDefault(); runLcSync(); } });
+
   /* ---------- Router ---------- */
   function render() {
     const hash = location.hash.replace(/^#\/?/, '');
@@ -920,6 +988,7 @@
     else if (route === 'games') viewLibrary('game');
     else if (route === 'series') viewLibrary('series');
     else if (route === 'movies') viewLibrary('movie');
+    else if (route === 'anime') viewLibrary('anime');
     else if (route === 'trophies') viewTrophies();
     else if (route === 'settings') viewSettings();
     else if (route === 'item') viewDetail(param);

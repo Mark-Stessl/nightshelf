@@ -111,8 +111,45 @@ const Lookup = (() => {
     return out;
   }
 
-  const SEARCH = { series: searchSeries, movie: searchMovies, game: searchGames };
-  const DETAIL = { series: detailSeries, movie: detailMovie, game: detailGame };
+  /* ---------- Anime: AniList (ohne Schlüssel) ---------- */
+  const ANILIST = 'https://graphql.anilist.co';
+  const AL_FIELDS = 'id title { romaji english } coverImage { extraLarge large } startDate { year month day } episodes genres format description(asHtml: false)';
+  async function anilist(query, variables) {
+    const r = await fetch(ANILIST, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ query, variables }) });
+    if (!r.ok) throw new Error('http');
+    return (await r.json()).data;
+  }
+  const alDate = d => d?.year ? `${d.year}-${String(d.month || 1).padStart(2, '0')}-${String(d.day || 1).padStart(2, '0')}` : null;
+  const FORMAT = { TV: 'TV', TV_SHORT: 'TV kurz', MOVIE: 'Film', SPECIAL: 'Special', OVA: 'OVA', ONA: 'ONA', MUSIC: 'Musik' };
+  function alToDetail(m) {
+    return {
+      title: m.title?.english || m.title?.romaji, year: m.startDate?.year || null,
+      cover: m.coverImage?.extraLarge || m.coverImage?.large || '', episodes: m.episodes || null,
+      genres: m.genres || [], released: alDate(m.startDate), summary: strip(m.description).replace(/\s+/g, ' ').slice(0, 900),
+      external: `anilist:${m.id}`, anilistId: m.id,
+    };
+  }
+  async function searchAnime(q) {
+    const d = await anilist(`query($q: String) { Page(perPage: 6) { media(search: $q, type: ANIME, sort: SEARCH_MATCH) { ${AL_FIELDS} } } }`, { q });
+    return (d?.Page?.media || []).map(m => ({
+      source: 'anilist', id: m.id, title: m.title?.english || m.title?.romaji, year: m.startDate?.year || null,
+      cover: m.coverImage?.extraLarge || '', thumb: m.coverImage?.large || '', raw: m,
+      sub: [m.startDate?.year, FORMAT[m.format] || m.format, m.episodes ? `${m.episodes} Folgen` : '', m.title?.english && m.title?.romaji !== m.title.english ? m.title.romaji : ''].filter(Boolean).join(' · '),
+    }));
+  }
+  async function detailAnime(hit) { return alToDetail(hit.raw); }
+  async function animeByIds(ids) {
+    const out = new Map();
+    for (let i = 0; i < ids.length; i += 50) {
+      const d = await anilist(`query($ids: [Int]) { Page(perPage: 50) { media(id_in: $ids, type: ANIME) { ${AL_FIELDS} } } }`, { ids: ids.slice(i, i + 50) });
+      (d?.Page?.media || []).forEach(m => out.set(m.id, alToDetail(m)));
+      if (i + 50 < ids.length) await new Promise(r => setTimeout(r, 700));
+    }
+    return out;
+  }
+
+  const SEARCH = { series: searchSeries, movie: searchMovies, game: searchGames, anime: searchAnime };
+  const DETAIL = { series: detailSeries, movie: detailMovie, game: detailGame, anime: detailAnime };
   const NEEDS = { movie: 'tmdb' };
 
   return {
@@ -121,5 +158,6 @@ const Lookup = (() => {
     search: (type, q) => SEARCH[type](q),
     detail: (type, hit) => DETAIL[type](hit),
     async test(type) { await SEARCH[type]('star'); return true; },
+    animeByIds,
   };
 })();
