@@ -966,7 +966,7 @@
           render();
         }).catch(e => {
           lcSyncing = false;
-          const msg = e.code === 'user_not_found' ? 'Diesen Benutzer gibt es nicht, oder seine Liste ist privat. Prüfe den Namen und die Sichtbarkeit auf LiveChart.' : e.code === 'empty' ? 'Die Liste ist leer oder privat.' : 'LiveChart war nicht erreichbar. Versuch es später nochmal.';
+          const msg = e.code === 'user_not_found' ? 'Diesen Benutzer gibt es nicht, oder seine Liste ist privat. Prüfe den Namen und die Sichtbarkeit auf LiveChart.' : e.code === 'empty' ? 'Die Liste ist leer oder privat.' : e.code === 'livechart_blocked' ? 'LiveChart blockiert gerade automatische Abfragen von Servern. Der Sync funktioniert deshalb im Moment nicht.' : 'LiveChart war nicht erreichbar. Versuch es später nochmal.';
           const body = $('#lcBody');
           if (body) body.innerHTML = `<p class="field-error" style="margin:0">${msg}</p>`; else toast(`<div><b>Sync fehlgeschlagen</b><small>${msg}</small></div>`);
           render();
