@@ -83,6 +83,16 @@ export default {
         try { data = JSON.parse(text); } catch { return json({ error: 'livechart_error', status: res.status, detail: text.slice(0, 200) }, 502); }
         if (data.errors && !data.data?.user) return json({ error: 'livechart_query', detail: JSON.stringify(data.errors).slice(0, 400) }, 502);
         const u = data.data?.user;
+        if (url.searchParams.get('debug') === '1') {
+          const rest = await fetch(`https://www.livechart.me/api/v1/users/${encodeURIComponent(user)}`, { headers: { Accept: 'application/json', 'User-Agent': 'me.livechart.android/6.4.8' } });
+          const restText = await rest.text();
+          const variants = {};
+          for (const v of [user.toLowerCase(), user]) {
+            const r2 = await fetch(LIVECHART_GQL, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': 'me.livechart.android/6.4.8' }, body: JSON.stringify({ query: 'query($u: String!) { user(username: $u) { username id } }', variables: { u: v } }) });
+            variants[v] = (await r2.text()).slice(0, 300);
+          }
+          return json({ gql: JSON.stringify(data).slice(0, 500), restStatus: rest.status, rest: restText.slice(0, 800), variants });
+        }
         if (!u) return json({ error: 'user_not_found' }, 404);
         return json({ username: u.username, entries: u.library?.nodes || [] });
       }
