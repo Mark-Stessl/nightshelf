@@ -923,7 +923,7 @@
   const seasonTab = {};
   const isImplicit = x => String(x.id).startsWith('implicit');
   function seasonsOf(item) {
-    if (item.seasonList?.length) return item.seasonList;
+    if (item.seasonList?.length) return relabel(item.seasonList);
     if (item.type === 'series') {
       const n = Math.max(1, item.seasons || 1);
       return Array.from({ length: n }, (_, i) => ({ id: `implicit-${i + 1}`, title: item.title, label: `Staffel ${i + 1}`, episodes: null, seen: 0, complete: i < (item.seasonSeen || 0), year: null, cover: '' }));
@@ -950,7 +950,16 @@
     const list = seasonsOf(item);
     return list.find(x => (x.seen || 0) > 0 && !seasonDone(x)) || list.find(x => !seasonDone(x)) || list[list.length - 1];
   }
+  // Automatische Namen ("Staffel 3", "Film 12") nach Löschen/Hinzufügen lückenlos neu nummerieren
+  const AUTO_LABEL = /^(Staffel \d+|Film( \d+)?)$/;
+  function relabel(list) {
+    const shows = list.filter(x => x.format !== 'MOVIE'), movies = list.filter(x => x.format === 'MOVIE');
+    shows.forEach((x, i) => { if (!x.label || AUTO_LABEL.test(x.label)) x.label = `Staffel ${i + 1}`; });
+    movies.forEach((x, i) => { if (!x.label || AUTO_LABEL.test(x.label)) x.label = movies.length > 1 ? `Film ${i + 1}` : 'Film'; });
+    return list;
+  }
   function saveSeasons(item, list, { autoStatus = true } = {}) {
+    relabel(list);
     list.forEach(x => { if (x.episodes && (x.seen || 0) < x.episodes && x.complete) x.complete = false; });
     const tot = seasonTotals(list);
     const patch = { seasonList: list, ...tot };
