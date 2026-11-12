@@ -971,7 +971,7 @@
     const activeId = list.some(x => x.id === seasonTab[item.id]) ? seasonTab[item.id] : currentSeason(item).id;
     seasonTab[item.id] = activeId;
     const sea = list.find(x => x.id === activeId);
-    const tot = seasonTotals(list);
+    const tot = seasonTotals(list.filter(x => x.format !== 'MOVIE').length ? list.filter(x => x.format !== 'MOVIE') : list);
     const pct = seasonDone(sea) ? 100 : sea.episodes ? Math.min(100, Math.round((sea.seen || 0) / sea.episodes * 100)) : 0;
     const totPct = tot.episodes ? Math.min(100, Math.round(tot.episodesSeen / tot.episodes * 100)) : 0;
     const coverSrc = sea.cover || item.cover;
@@ -1000,7 +1000,7 @@
         <div class="season-cover">${coverSrc ? `<img src="${esc(coverSrc)}" alt="" onerror="this.remove()">` : ''}</div>
         <div class="season-body">
           <div class="season-title">${esc(sea.title || item.title)}</div>
-          <div class="card-meta" style="margin-top:4px">${[esc(sea.label), sea.year, sea.episodes ? `${sea.episodes} Folgen` : 'Folgenzahl unbekannt'].filter(Boolean).join('<span class="dot"></span>')}</div>
+          <div class="card-meta" style="margin-top:4px">${[esc(sea.label), sea.year, sea.format === 'MOVIE' && (sea.episodes || 1) === 1 ? '' : sea.episodes ? `${sea.episodes} Folgen` : 'Folgenzahl unbekannt'].filter(Boolean).join('<span class="dot"></span>')}</div>
           ${sea.format === 'MOVIE' && (sea.episodes || 1) === 1 ? '' : `<div class="ep-stepper">
             <button class="btn icon-btn" id="epMinus" aria-label="Eine Folge weniger">−</button>
             <div class="ep-count"><input type="number" id="epInput" min="0" ${sea.episodes ? `max="${sea.episodes}"` : ''} value="${sea.seen || 0}" aria-label="Gesehene Folgen"><span>/ ${sea.episodes || '?'} Folgen</span></div>
@@ -1140,7 +1140,11 @@
     if (item.genre && item.type === 'game') meta.push(Trophies.GENRES[item.genre]);
     if (item.year) meta.push(item.year);
     if (item.type === 'series' && item.seasons) meta.push(`${item.seasons} ${item.seasons === 1 ? 'Staffel' : 'Staffeln'}`);
-    if (item.type === 'anime' && item.seasonList?.length > 1) meta.push(`${item.seasonList.length} Teile`);
+    if (item.type === 'anime' && item.seasonList?.length > 1) {
+      const nS = item.seasonList.filter(x => x.format !== 'MOVIE').length, nF = item.seasonList.length - nS;
+      if (nS) meta.push(`${nS} ${nS === 1 ? 'Staffel' : 'Staffeln'}`);
+      if (nF) meta.push(`${nF} ${nF === 1 ? 'Film' : 'Filme'}`);
+    }
     if (item.type === 'anime' && item.episodes) meta.push(`${item.episodes} Folgen`);
     if (item.runtime) meta.push(`${item.runtime} Min.`);
     if (item.genres?.length && item.type !== 'game') meta.push(esc(item.genres.slice(0, 3).join(', ')));
