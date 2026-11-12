@@ -160,12 +160,21 @@
     // Handy: Fenster immer am sichtbaren Bereich ausrichten (iOS schiebt die Ansicht sonst bei Tastatur/Fokus hoch)
     const vv = window.visualViewport;
     const touch = window.matchMedia('(max-width: 820px)').matches;
-    const fit = () => { if (!vv) return; root.style.top = `${vv.offsetTop}px`; root.style.height = `${vv.height}px`; root.style.bottom = 'auto'; };
+    const fit = () => {
+      if (!vv) return;
+      root.style.top = `${vv.offsetTop}px`; root.style.height = `${vv.height}px`; root.style.bottom = 'auto';
+      // Tastatur offen: Buttons ausblenden, damit das Formular den Platz bekommt
+      const kb = window.innerHeight - vv.height > 120;
+      if (kb !== root.classList.contains('kb-open')) {
+        root.classList.toggle('kb-open', kb);
+        if (kb) { const f = document.activeElement; f && root.contains(f) && setTimeout(() => f.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60); }
+      }
+    };
     if (vv && touch) { vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); fit(); }
     const close = () => {
       root.classList.remove('open');
       if (vv && touch) { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); }
-      setTimeout(() => { if (!root.classList.contains('open')) { root.innerHTML = ''; root.style.top = root.style.height = root.style.bottom = ''; unlockScroll(); } }, 280);
+      setTimeout(() => { if (!root.classList.contains('open')) { root.innerHTML = ''; root.style.top = root.style.height = root.style.bottom = ''; root.classList.remove('kb-open'); unlockScroll(); } }, 280);
       document.removeEventListener('keydown', onKey);
     };
     const onKey = e => { if (e.key === 'Escape') close(); };

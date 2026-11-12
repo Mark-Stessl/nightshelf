@@ -735,3 +735,8 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   /* Fenster: immer mit Abstand zur Statusleiste, Höhe richtet sich nach dem sichtbaren Bereich */
   .modal { max-height: calc(100% - env(safe-area-inset-top) - 36px); }
 }
+
+/* Tastatur offen (Handy): Formular bekommt den ganzen sichtbaren Platz, Buttons kommen beim Schließen der Tastatur zurück */
+.modal-root.kb-open .modal-foot { display: none; }
+.modal-root.kb-open .modal { max-height: calc(100% - env(safe-area-inset-top) - 12px); }
+.modal-root.kb-open .modal-body { padding-bottom: 18px; }
