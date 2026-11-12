@@ -160,20 +160,33 @@
     // Handy: Fenster immer am sichtbaren Bereich ausrichten (iOS schiebt die Ansicht sonst bei Tastatur/Fokus hoch)
     const vv = window.visualViewport;
     const touch = window.matchMedia('(max-width: 820px)').matches;
+    // Tastatur offen: Buttons ausblenden, damit das Formular den Platz bekommt.
+    // Erkennung über das angetippte Feld (zuverlässig auf iOS) und zusätzlich über die geschrumpfte Höhe.
+    let maxH = vv ? vv.height : 0, sawShrink = false;
+    const typing = () => { const f = document.activeElement; return !!f && root.contains(f) && (f.matches('textarea, select, input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=button])')); };
+    const setKb = () => {
+      const shrunk = vv ? maxH - vv.height > 120 : false;
+      if (shrunk) sawShrink = true;
+      // Feld angetippt: sofort ausblenden. Ist die Tastatur danach wieder zu (Höhe zurück), Buttons zeigen, auch wenn das Feld noch aktiv ist.
+      const kb = touch && (shrunk || (typing() && !sawShrink));
+      if (kb === root.classList.contains('kb-open')) return;
+      root.classList.toggle('kb-open', kb);
+      if (kb) { const f = document.activeElement; f && root.contains(f) && setTimeout(() => f.scrollIntoView({ block: 'center', behavior: 'smooth' }), 250); }
+    };
     const fit = () => {
       if (!vv) return;
+      maxH = Math.max(maxH, vv.height);
       root.style.top = `${vv.offsetTop}px`; root.style.height = `${vv.height}px`; root.style.bottom = 'auto';
-      // Tastatur offen: Buttons ausblenden, damit das Formular den Platz bekommt
-      const kb = window.innerHeight - vv.height > 120;
-      if (kb !== root.classList.contains('kb-open')) {
-        root.classList.toggle('kb-open', kb);
-        if (kb) { const f = document.activeElement; f && root.contains(f) && setTimeout(() => f.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60); }
-      }
+      setKb();
     };
+    const onFocusIn = () => { sawShrink = false; setKb(); };
+    const onFocusOut = () => setTimeout(setKb, 80);
+    if (touch) { root.addEventListener('focusin', onFocusIn); root.addEventListener('focusout', onFocusOut); }
     if (vv && touch) { vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); fit(); }
     const close = () => {
       root.classList.remove('open');
       if (vv && touch) { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); }
+      if (touch) { root.removeEventListener('focusin', onFocusIn); root.removeEventListener('focusout', onFocusOut); }
       setTimeout(() => { if (!root.classList.contains('open')) { root.innerHTML = ''; root.style.top = root.style.height = root.style.bottom = ''; root.classList.remove('kb-open'); unlockScroll(); } }, 280);
       document.removeEventListener('keydown', onKey);
     };
