@@ -9,7 +9,12 @@
  *   POST /refresh   { refreshToken }  -> neues Token-Paar
  *   GET  /titles                      -> alle Spiele mit Trophäen-Fortschritt (Bearer-Token)
  *   GET  /trophies?id=&service=       -> Trophäen eines Spiels inkl. Verdient-Status (Bearer-Token)
- *   GET  /livechart?user=             -> öffentliche Anime-Liste eines LiveChart-Nutzers (ohne Anmeldung)
+ *   POST /claim     { keyHash }       -> Server einmalig mit einem persönlichen Schlüssel sichern
+ *   GET  /data                        -> gespeicherte Nightshelf-Daten (Schlüssel nötig)
+ *   PUT  /data      { items, deleted, baseVersion } -> Daten speichern (Schlüssel nötig)
+ *
+ * Sobald ein Schlüssel eingerichtet ist, brauchen alle Endpunkte außer / und /claim
+ * den Header X-Nightshelf-Key. Gespeichert wird nur der SHA-256-Hash des Schlüssels.
  *   POST /achievements { title, platform, genre, size } -> KI-Trophäenliste (Wikipedia + Workers AI)
  *   GET  /ai-usage                    -> heute verbrauchte Neurons (Schätzung aus Token-Zahlen)
  */
@@ -41,26 +46,13 @@ async function addUsage(env, neurons, { full = false } = {}) {
   const next = full ? { ...u, neurons: Math.max(u.neurons, AI_DAILY_LIMIT), full: true } : { ...u, neurons: u.neurons + neurons, runs: u.runs + 1 };
   await env.USAGE.put(usageKey(), JSON.stringify(next), { expirationTtl: 3 * 86400 });
 }
-const LIVECHART_GQL = 'https://www.livechart.me/graphql';
-const LC_QUERY = `query($u: String!) {
-  user(username: $u) {
-    username
-    library {
-      nodes {
-        animeId status rating episodesWatched updatedAt
-        anime { databaseId romajiTitle englishTitle poster { url } startDate { value } anilistUrl malUrl releaseStatus }
-      }
-    }
-  }
-}`;
-
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
     const cors = {
       'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Nightshelf-Key',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
       'Access-Control-Max-Age': '86400',
       'Vary': 'Origin',
     };
@@ -71,7 +63,43 @@ export default {
 
     const url = new URL(request.url);
     try {
-      if (url.pathname === '/') return json({ ok: true, service: 'nightshelf-psn' });
+      if (url.pathname === '/') return json({ ok: true, service: 'nightshelf-psn', claimed: !!(await ownerHash(env)) });
+
+      if (url.pathname === '/claim' && request.method === 'POST') {
+        if (!env?.DATA) return json({ error: 'storage_missing' }, 501);
+        if (await ownerHash(env)) return json({ error: 'already_claimed' }, 409);
+        const { keyHash } = await request.json().catch(() => ({}));
+        if (!/^[a-f0-9]{64}$/.test(keyHash || '')) return json({ error: 'key_invalid' }, 400);
+        await env.DATA.put('owner', keyHash);
+        return json({ ok: true });
+      }
+
+      // Ab hier: Schlüssel prüfen, sobald der Server gesichert ist
+      const owner = await ownerHash(env);
+      if (owner) {
+        const given = request.headers.get('X-Nightshelf-Key') || '';
+        if (!given || (await sha256(given)) !== owner) return json({ error: 'key_required' }, 403);
+      }
+
+      if (url.pathname === '/data') {
+        if (!env?.DATA) return json({ error: 'storage_missing' }, 501);
+        if (!owner) return json({ error: 'not_claimed' }, 403);
+        if (request.method === 'GET') {
+          const stored = await env.DATA.get('library', 'json');
+          return json(stored || { version: 0, items: [], deleted: [], updatedAt: null });
+        }
+        if (request.method === 'PUT') {
+          const body = await request.json().catch(() => null);
+          if (!body || !Array.isArray(body.items)) return json({ error: 'body_invalid' }, 400);
+          const stored = (await env.DATA.get('library', 'json')) || { version: 0 };
+          if ((body.baseVersion ?? -1) !== stored.version) return json({ error: 'conflict', version: stored.version }, 409);
+          const next = { version: stored.version + 1, items: body.items, deleted: (body.deleted || []).slice(-5000), updatedAt: new Date().toISOString() };
+          const text = JSON.stringify(next);
+          if (text.length > 20 * 1024 * 1024) return json({ error: 'too_large' }, 413);
+          await env.DATA.put('library', text);
+          return json({ ok: true, version: next.version, updatedAt: next.updatedAt });
+        }
+      }
 
       if (url.pathname === '/auth' && request.method === 'POST') {
         const { npsso } = await request.json().catch(() => ({}));
@@ -112,24 +140,6 @@ export default {
         const reset = new Date(); reset.setUTCHours(24, 0, 0, 0);
         const used = Math.min(AI_DAILY_LIMIT, Math.round(u.neurons));
         return json({ used, limit: AI_DAILY_LIMIT, remaining: AI_DAILY_LIMIT - used, runs: u.runs, avg: u.runs ? Math.round(u.neurons / u.runs) : null, full: !!u.full, resetAt: reset.toISOString() });
-      }
-
-      if (url.pathname === '/livechart') {
-        const user = (url.searchParams.get('user') || '').trim();
-        if (!/^[A-Za-z0-9_.-]{2,40}$/.test(user)) return json({ error: 'user_invalid' }, 400);
-        const res = await fetch(LIVECHART_GQL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': 'me.livechart.android/6.4.8' },
-          body: JSON.stringify({ query: LC_QUERY, variables: { u: user } }),
-        });
-        const text = await res.text();
-        let data;
-        try { data = JSON.parse(text); } catch { return json({ error: 'livechart_error', status: res.status, detail: text.slice(0, 200) }, 502); }
-        if (data.errors && !data.data?.user) return json({ error: 'livechart_query', detail: JSON.stringify(data.errors).slice(0, 400) }, 502);
-        if (!res.ok || !data.data) return json({ error: 'livechart_blocked', status: res.status }, 502);
-        const u = data.data?.user;
-        if (!u) return json({ error: 'user_not_found' }, 404);
-        return json({ username: u.username, entries: u.library?.nodes || [] });
       }
 
       const auth = request.headers.get('Authorization') || '';
@@ -306,4 +316,16 @@ Format: {"platinum":{"name":"...","desc":"..."},"trophies":[{"name":"...","desc"
   if (list.length < 4) throw new Error('ai_output_too_short');
   const plat = out.platinum && out.platinum.name ? { name: clean(out.platinum.name).slice(0, 60), desc: clean(out.platinum.desc || 'Erhalte alle anderen Trophäen'), tier: 'platinum' } : { name: `Meister von ${title}`, desc: 'Erhalte alle anderen Trophäen', tier: 'platinum' };
   return { trophies: [plat, ...list], neurons };
+}
+
+/* ---------- Schlüssel ---------- */
+
+async function ownerHash(env) {
+  if (!env?.DATA) return null;
+  return env.DATA.get('owner');
+}
+
+async function sha256(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 }

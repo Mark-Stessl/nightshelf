@@ -360,6 +360,11 @@
               const btn = $('#saveBtn', m);
               btn.textContent = 'Analysiere Spiel…'; btn.disabled = true;
               const r = await smartTrophies(title, data.genre, data.platform, form.elements.tsize?.value || 'normal');
+              if (r.reason === 'key_required') {
+                btn.textContent = 'Hinzufügen'; btn.disabled = false;
+                $('#titleErr', m).textContent = 'Dieses Gerät ist noch nicht mit deinem Schlüssel verbunden. Verbinde es unter Daten → Sync.';
+                return;
+              }
               if (r.reason === 'ai_quota') {
                 btn.textContent = 'Hinzufügen'; btn.disabled = false;
                 renderTMode();
@@ -495,12 +500,62 @@
   }
   const aiQuotaText = () => `Die KI-Trophäen sind für heute aufgebraucht. Ab ${aiResetTime()} Uhr geht es wieder.`;
 
+  /* ---------- Sync zwischen Geräten ---------- */
+  function syncLine(st) {
+    const when = st.lastSync ? new Date(st.lastSync).toLocaleString('de-AT', { dateStyle: 'medium', timeStyle: 'short' }) : null;
+    if (st.status === 'syncing' || st.status === 'pending') return '<span class="sync-dot busy"></span>Synchronisiere…';
+    if (st.status === 'error') return `<span class="sync-dot err"></span>${{ network: 'Server nicht erreichbar, nächster Versuch beim nächsten Speichern', key_required: 'Schlüssel ungültig, bitte neu verbinden', too_large: 'Deine Daten sind zu groß für den Speicher' }[st.error] || 'Sync fehlgeschlagen'}`;
+    return `<span class="sync-dot"></span>${when ? `Zuletzt synchronisiert: ${when}` : 'Verbunden'}`;
+  }
+  function renderSyncPanel() {
+    const el = $('#syncPanel'); if (!el) return;
+    const st = Sync.status();
+    if (Sync.enabled()) {
+      el.innerHTML = `<h3>Sync zwischen Geräten</h3>
+        <p>Dieses Gerät ist verbunden. Änderungen werden automatisch gespeichert und auf deinen anderen Geräten übernommen.</p>
+        <div class="tiny sync-line" id="syncLine">${syncLine(st)}</div>
+        <div class="field" style="margin-top:14px"><label>Dein Schlüssel</label>
+          <div class="key-row"><input class="input mono" id="syncKey" type="password" value="${esc(st.key)}" readonly><button class="btn" id="syncShow">Anzeigen</button><button class="btn" id="syncCopy">${I.copy || ''}Kopieren</button></div>
+          <div class="tiny">Gib diesen Schlüssel auf deinen anderen Geräten ein. Bewahre ihn gut auf, ohne ihn kommst du nicht an deine Daten.</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn btn-primary" id="syncNow">${I.refresh} Jetzt synchronisieren</button><button class="btn btn-ghost btn-danger" id="syncOff">Auf diesem Gerät trennen</button></div>`;
+      $('#syncShow').onclick = () => { const i = $('#syncKey'); const show = i.type === 'password'; i.type = show ? 'text' : 'password'; $('#syncShow').textContent = show ? 'Verbergen' : 'Anzeigen'; };
+      $('#syncCopy').onclick = async () => { try { await navigator.clipboard.writeText(st.key); toast('<div><b>Schlüssel kopiert</b></div>'); } catch { $('#syncKey').type = 'text'; $('#syncKey').select(); } };
+      $('#syncNow').onclick = () => Sync.syncNow();
+      $('#syncOff').onclick = () => confirmDialog('Dieses Gerät synchronisiert dann nicht mehr. Deine Daten bleiben hier und auf dem Server erhalten.', 'Trennen', () => { Sync.disconnect(); renderSyncPanel(); });
+      return;
+    }
+    el.innerHTML = `<h3>Sync zwischen Geräten</h3>
+      <p>Speichere deine Spiele, Serien, Anime, Filme und Trophäen auf deinem Cloudflare-Server, dann sind sie auf PC und Handy gleich. Ein persönlicher Schlüssel schützt deine Daten und deinen Server.</p>
+      <div class="sync-options">
+        <div class="sync-opt"><b>Erstes Gerät</b><span class="tiny">Richte den Sync auf dem Gerät mit deinen meisten Daten ein. Du bekommst einen Schlüssel.</span><button class="btn btn-primary" id="syncSetup">Sync einrichten</button></div>
+        <div class="sync-opt"><b>Weiteres Gerät</b><span class="tiny">Gib den Schlüssel ein, den du auf deinem ersten Gerät bekommen hast.</span>
+          <div class="key-row"><input class="input mono" id="syncIn" placeholder="ABCD-EFGH-…" autocomplete="off" spellcheck="false"><button class="btn" id="syncJoin">Verbinden</button></div></div>
+      </div>
+      <div class="field-error" id="syncErr" style="margin-top:10px"></div>`;
+    const err = msg => { $('#syncErr').textContent = msg; };
+    $('#syncIn').oninput = () => err('');
+    $('#syncSetup').onclick = async () => {
+      const b = $('#syncSetup'); b.disabled = true; b.textContent = 'Richte ein…'; err('');
+      try { await Sync.setup(); renderSyncPanel(); $('#syncKey').type = 'text'; toast('<div><b>Sync eingerichtet</b><small>Notiere dir deinen Schlüssel</small></div>'); render(); }
+      catch (e) { b.disabled = false; b.textContent = 'Sync einrichten'; err(e.code === 'already_claimed' ? 'Auf deinem Server ist schon ein Schlüssel eingerichtet. Gib ihn bei „Weiteres Gerät“ ein.' : e.code === 'network' ? 'Server nicht erreichbar. Versuch es gleich nochmal.' : 'Einrichten hat nicht geklappt.'); }
+    };
+    $('#syncJoin').onclick = async () => {
+      const v = $('#syncIn').value.trim();
+      if (!v) { err('Gib deinen Schlüssel ein.'); return; }
+      const b = $('#syncJoin'); b.disabled = true; b.textContent = 'Verbinde…';
+      try { await Sync.connect(v); renderSyncPanel(); toast('<div><b>Gerät verbunden</b><small>Deine Daten wurden zusammengeführt</small></div>'); render(); }
+      catch (e) { b.disabled = false; b.textContent = 'Verbinden'; err(e.code === 'key_wrong' ? 'Dieser Schlüssel passt nicht. Prüfe ihn auf deinem ersten Gerät.' : e.code === 'not_claimed' ? 'Auf dem Server ist noch kein Sync eingerichtet. Nimm „Sync einrichten“.' : 'Verbinden hat nicht geklappt. Versuch es gleich nochmal.'); }
+    };
+  }
+  Sync.onChange(st => { const l = $('#syncLine'); if (l) l.innerHTML = syncLine(st); });
+  window.addEventListener('nightshelf:synced', () => { if (!$('#modalRoot').classList.contains('open')) render(); });
+
   async function renderAiPanel() {
     const el = $('#aiPanel'); if (!el) return;
     el.innerHTML = `<h3>KI-Trophäen</h3><p style="margin:0">Lade dein Kontingent für heute…</p>`;
     let u;
     try {
-      const r = await fetch(`${PSN.worker()}/ai-usage`);
+      const r = await fetch(`${PSN.worker()}/ai-usage`, { headers: Sync.header() });
       u = await r.json();
       if (!r.ok) throw new Error(u.error);
     } catch {
@@ -527,7 +582,7 @@
     if (aiBlockedToday()) return { trophies: null, ai: false, reason: 'ai_quota' };
     try {
       const res = await fetch(`${PSN.worker()}/achievements`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...Sync.header() },
         body: JSON.stringify({ title, genre: Trophies.GENRES[genre] || '', platform: platform || '', size }),
       });
       const data = await res.json().catch(() => ({}));
@@ -538,6 +593,7 @@
       return { trophies, ai: true };
     } catch (e) {
       if (e.code === 'ai_quota') { try { localStorage.setItem(AI_KEY, utcDay()); } catch {} return { trophies: null, ai: false, reason: 'ai_quota' }; }
+      if (e.code === 'key_required') return { trophies: null, ai: false, reason: 'key_required' };
       return { trophies: Trophies.generate(title, genre, size), ai: false, reason: e.code };
     }
   }
@@ -567,7 +623,7 @@
           const r = await smartTrophies(game.title, genre, game.platform, size);
           if (!r.ai) {
             b.disabled = false; b.innerHTML = `${I.sparkle} Erstellen`;
-            $('#gErr', m).textContent = r.reason === 'ai_quota' ? 'Heute nicht mehr möglich: ' + aiQuotaText() : 'Die KI war gerade nicht erreichbar. Versuch es nochmal oder nimm die Genre-Vorlage.';
+            $('#gErr', m).textContent = r.reason === 'key_required' ? 'Dieses Gerät ist noch nicht mit deinem Schlüssel verbunden. Verbinde es unter Daten → Sync.' : r.reason === 'ai_quota' ? 'Heute nicht mehr möglich: ' + aiQuotaText() : 'Die KI war gerade nicht erreichbar. Versuch es nochmal oder nimm die Genre-Vorlage.';
             return;
           }
           Store.update(game.id, { genre, trophies: r.trophies, trophySource: 'ai' });
@@ -1072,6 +1128,7 @@
     const n = Store.all().length;
     view.innerHTML = `<div class="${A()}" style="max-width:720px">
       <div class="page-head"><div><h1 class="page-title">Daten</h1><p class="page-sub">${n} Einträge sind in diesem Browser gespeichert.</p></div></div>
+      <div class="panel" id="syncPanel"></div>
       <div class="panel" id="aiPanel"></div>
       <div class="panel" id="psnPanel"></div>
       <div class="panel"><h3>Automatische Infos</h3><p>Beim Hinzufügen werden Cover, Erscheinungsdatum und Genre automatisch gesucht. Serien und Spiele funktionieren ohne Schlüssel. Für Filme brauchst du einen kostenlosen TMDB-Schlüssel. Er bleibt nur in diesem Browser gespeichert.</p>
@@ -1109,6 +1166,7 @@
     $('#impReplace').onchange = doImport('replace');
     renderPsnPanel();
     renderAiPanel();
+    renderSyncPanel();
     const k = Lookup.keys();
     $('#kTmdb').value = k.tmdb || '';
     const saveKeys = () => Lookup.setKeys({ ...Lookup.keys(), tmdb: $('#kTmdb').value.trim() });
@@ -1158,7 +1216,7 @@
         runPsnSync();
       } catch (e) {
         b.disabled = false; b.textContent = 'Verbinden';
-        err.textContent = e.code === 'npsso_invalid' || e.code === 'auth_failed' ? 'Der Code wird nicht akzeptiert. Hol dir einen neuen (Schritt 2).' : e.code === 'network' ? 'Server nicht erreichbar. Prüfe die Server-Adresse.' : 'Verbinden hat nicht geklappt: ' + e.message;
+        err.textContent = e.code === 'npsso_invalid' || e.code === 'auth_failed' ? 'Der Code wird nicht akzeptiert. Hol dir einen neuen (Schritt 2).' : e.code === 'network' ? 'Server nicht erreichbar. Prüfe die Server-Adresse.' : e.code === 'key_required' ? 'Verbinde dieses Gerät zuerst oben unter „Sync zwischen Geräten“ mit deinem Schlüssel.' : 'Verbinden hat nicht geklappt: ' + e.message;
       }
     });
   }
@@ -1236,4 +1294,5 @@
 
   render();
   animate = false;
+  Sync.syncNow();
 })();

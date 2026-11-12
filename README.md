@@ -17,7 +17,7 @@ Persönliches Regal für Spiele, Serien und Filme – mit Trophäen-System im Pl
 
 ## Daten
 
-Alles wird lokal im Browser gespeichert (localStorage). Für ein anderes Gerät: Backup herunterladen und dort einlesen.
+Alles wird lokal im Browser gespeichert (localStorage). Mit „Sync zwischen Geräten“ (unter „Daten“) werden die Daten zusätzlich im eigenen Cloudflare Worker (KV) gespeichert und zwischen Geräten zusammengeführt. Ein persönlicher Schlüssel schützt Daten und Server; der Worker speichert nur dessen SHA-256-Hash.
 
 ## Starten
 

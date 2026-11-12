@@ -486,3 +486,15 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 .quota-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
 .quota-big { font-family: var(--display); font-size: 28px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
 .quota-bar.low > i { background: linear-gradient(90deg, var(--violet), var(--danger)); }
+
+/* Sync */
+.mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: .06em; }
+.sync-line { display: flex; align-items: center; gap: 8px; }
+.sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px rgba(34, 211, 238, .6); flex-shrink: 0; }
+.sync-dot.busy { background: var(--violet-2); box-shadow: 0 0 8px rgba(139, 92, 246, .7); animation: pulse 1s ease-in-out infinite; }
+.sync-dot.err { background: var(--danger); box-shadow: none; }
+@keyframes pulse { 50% { opacity: .35; } }
+.sync-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sync-opt { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
+.sync-opt .btn { align-self: flex-start; }
+@media (max-width: 820px) { .sync-options { grid-template-columns: 1fr; } }

@@ -17,7 +17,7 @@ const PSN = (() => {
     try {
       res = await fetch(worker() + path, {
         method,
-        headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...Sync.header() },
         body: body ? JSON.stringify(body) : undefined,
       });
     } catch { throw fail('network', 'Server nicht erreichbar'); }
