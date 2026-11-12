@@ -11,7 +11,7 @@ Persönliches Regal für Spiele, Serien und Filme – mit Trophäen-System im Pl
   - **Automatisch erstellen:** Für Spiele ohne Erfolge (z. B. Nintendo Switch) wird passend zum Genre eine eigene Liste erzeugt, die du bearbeiten kannst
 - **Automatische Infos** beim Hinzufügen: Cover, Erscheinungsdatum, Genre usw. – Serien über TVmaze, Spiele über Wikipedia/Wikidata (beide ohne Schlüssel), Filme über TMDB (kostenloser Schlüssel unter „Daten“)
 - **PlayStation-Sync:** alle PS4/PS5-Spiele mit echter Trophäenliste und verdienten Trophäen über einen eigenen Cloudflare Worker (`worker/psn-worker.js`). Anmeldung mit dem NPSSO-Code unter „Daten“; Tokens bleiben nur im Browser.
-- **LiveChart-Sync:** öffentliche Anime-Liste von LiveChart.me (Status, gesehene Folgen, Bewertung) per Benutzername, ergänzt um Cover und Folgenzahl von AniList.
+- **Anime mit Staffeln:** Beim Hinzufügen werden alle Staffeln und Filme einer Reihe von AniList geladen; pro Staffel Tabs mit eigenem Folgen-Zähler.
 - **Trophäen-Level** aus gesammelten Punkten (Bronze 15, Silber 30, Gold 90, Platin 300)
 - **Backup** als JSON-Datei herunterladen und wieder einlesen (Seite „Daten“)
 

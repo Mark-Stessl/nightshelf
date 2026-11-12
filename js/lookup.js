@@ -148,6 +148,30 @@ const Lookup = (() => {
     return out;
   }
 
+  const SEASON_FORMATS = ['TV', 'TV_SHORT', 'ONA', 'MOVIE'];
+  async function animeSeasons(startId) {
+    const q = `query($id: Int) { Media(id: $id, type: ANIME) { id title { romaji english } format episodes startDate { year month day } coverImage { extraLarge large }
+      relations { edges { relationType node { id type format } } } } }`;
+    const cache = new Map();
+    const get = async id => {
+      if (!cache.has(id)) { cache.set(id, (await anilist(q, { id }))?.Media || null); await new Promise(r => setTimeout(r, 250)); }
+      return cache.get(id);
+    };
+    const link = (m, type) => (m?.relations?.edges || []).find(e => e.relationType === type && e.node.type === 'ANIME' && SEASON_FORMATS.includes(e.node.format))?.node.id;
+    let first = await get(startId);
+    if (!first) return [];
+    for (let i = 0; i < 12; i++) { const prev = link(first, 'PREQUEL'); if (!prev || cache.has(prev)) break; const p = await get(prev); if (!p) break; first = p; }
+    const chain = [first];
+    for (let i = 0; i < 20; i++) { const next = link(chain[chain.length - 1], 'SEQUEL'); if (!next || chain.some(m => m.id === next)) break; const n = await get(next); if (!n) break; chain.push(n); }
+    let tv = 0, movie = 0;
+    return chain.map(m => {
+      const isMovie = m.format === 'MOVIE';
+      const label = isMovie ? `Film${++movie > 1 ? ' ' + movie : ''}` : `Staffel ${++tv}`;
+      return { anilistId: m.id, title: m.title?.english || m.title?.romaji, label, format: m.format, episodes: m.episodes || null,
+        year: m.startDate?.year || null, cover: m.coverImage?.extraLarge || m.coverImage?.large || '' };
+    });
+  }
+
   const SEARCH = { series: searchSeries, movie: searchMovies, game: searchGames, anime: searchAnime };
   const DETAIL = { series: detailSeries, movie: detailMovie, game: detailGame, anime: detailAnime };
   const NEEDS = { movie: 'tmdb' };
@@ -158,6 +182,6 @@ const Lookup = (() => {
     search: (type, q) => SEARCH[type](q),
     detail: (type, hit) => DETAIL[type](hit),
     async test(type) { await SEARCH[type]('star'); return true; },
-    animeByIds,
+    animeByIds, animeSeasons,
   };
 })();
