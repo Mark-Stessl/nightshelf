@@ -624,7 +624,7 @@
       <p>Installiere Nightshelf als App auf dem Handy und am PC oder Mac. Sie startet wie ein eigenes Programm und funktioniert auch offline mit deinen gespeicherten Daten.</p>
       <div class="field"><label>Als App installieren</label>${install}</div>
       <div class="field" style="margin-top:16px"><label>Benachrichtigungen</label>
-        <div class="tiny" style="margin-bottom:10px">Dein Server schaut alle 30 Minuten nach neuen Folgen, Staffeln und Manga-Kapiteln und schickt dir eine Nachricht, auch wenn Nightshelf geschlossen ist. Benachrichtigt wird bei allem, was du schaust oder liest, gesehen hast oder pausierst, nicht bei Merkliste und Abgebrochen.</div>
+        <div class="tiny" style="margin-bottom:10px">Dein Server schaut alle 30 Minuten nach neuen Folgen, Staffeln und Manga-Kapiteln und schickt dir eine Nachricht, auch wenn Nightshelf geschlossen ist. Gemeldet wird alles mit Status „Am Schauen“, „Am Lesen“, „Pausiert“ oder „Fertig“, nicht Merkliste und Abgebrochen. Für Anime nutzt der Server die Sendetermine, die Nightshelf beim Öffnen lädt; sie reichen etwa sechs Wochen im Voraus.</div>
         ${push}<div class="field-error" id="pushErr" style="margin-top:8px"></div></div>`;
     const err = m => { $('#pushErr').textContent = m; };
     $('#appInstall') && ($('#appInstall').onclick = async () => { await Pwa.install(); renderAppPanel(); });
@@ -1830,7 +1830,7 @@
           : '<div class="list-empty">Hake Trophäen in einem Spiel ab, dann erscheinen sie hier.</div>'}</div></div>
       </div>
       ${(() => {
-        const fresh = newItems().slice(0, 5), up = upcomingEntries().slice(0, 5);
+        const fresh = newItems().slice(0, 5), up = upcomingEntries().filter((u, i, all) => all.findIndex(o => o.it.id === u.it.id) === i).slice(0, 5);
         if (!fresh.length && !up.length) return '';
         return `<div class="two-col section">
           <div><h2 class="section-title">Neu für dich <a href="#/upcoming">Alle</a></h2><div class="list-card">${fresh.length ? fresh.map(newRow).join('') : '<div class="list-empty">Du bist überall auf dem neuesten Stand.</div>'}</div></div>
