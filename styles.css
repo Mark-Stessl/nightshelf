@@ -536,3 +536,5 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 .import-text small { font-size: 12px; color: var(--text-2); }
 .import-tags { display: flex; gap: 6px; align-items: center; }
 @media (max-width: 820px) { .import-row { grid-template-columns: auto 30px 1fr; } .import-tags { grid-column: 3; } }
+
+.import-row.skip { opacity: .55; cursor: default; }

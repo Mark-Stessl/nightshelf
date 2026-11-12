@@ -779,50 +779,35 @@
       const ratings = es.map(e => e.rating).filter(Boolean);
       const status = es.every(entryDone) ? 'done' : es.some(e => e.seen > 0) ? 'active' : 'planned';
       const ids = new Set(g.seasons.map(x => x.anilistId));
-      const existing = anime.find(a => a.anilistId === g.root || (a.seasonList || []).some(x => ids.has(x.anilistId)) || normTitle(a.title) === normTitle(g.seasons[0].title));
+      const names = new Set([g.title, ...g.seasons.map(x => x.title), ...g.entries.map(x => x.entry.title)].map(normTitle).filter(Boolean));
+      const existing = anime.find(a => ids.has(a.anilistId) || (a.seasonList || []).some(x => ids.has(x.anilistId)) || names.has(normTitle(a.title)) || (a.seasonList || []).some(x => names.has(normTitle(x.title))));
       return {
         key: 'g' + g.root, root: g.mainId || g.root, title: g.title || g.seasons[0].title, cover: g.cover || g.seasons[0].cover, year: g.year || g.seasons[0].year, genres: g.genres,
         seasons, status, rating: ratings.length ? Math.max(1, Math.min(5, Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length / 2))) : 0,
-        entries: es.length, existing, include: true,
+        entries: es.length, existing, include: !existing,
       };
     }).sort((a, b) => a.title.localeCompare(b.title, 'de'));
     const singles = result.unmatched.map((e, i) => ({
       key: 'u' + i, title: e.title, cover: '', seasons: [{ id: null, label: e.movie ? 'Film' : 'Staffel 1', title: e.title, episodes: e.total, seen: e.total ? Math.min(e.seen, e.total) : e.seen, complete: entryDone(e), format: e.movie ? 'MOVIE' : 'TV' }],
       status: entryDone(e) ? 'done' : e.seen > 0 ? 'active' : 'planned', rating: e.rating ? Math.max(1, Math.round(e.rating / 2)) : 0,
-      entries: 1, existing: anime.find(a => normTitle(a.title) === normTitle(e.title)), include: true, unmatched: true,
+      entries: 1, existing: anime.find(a => normTitle(a.title) === normTitle(e.title)), unmatched: true,
     }));
+    singles.forEach(r => { r.include = !r.existing; });
     return [...groups, ...singles];
   }
 
   function applyImport(rows) {
-    let added = 0, updated = 0;
-    rows.filter(r => r.include).forEach(r => {
-      if (r.existing) {
-        const cur = Store.get(r.existing.id);
-        if (!cur) return;
-        const old = cur.seasonList || [];
-        const list = r.seasons.map(sea => {
-          const prev = old.find(o => o.anilistId && o.anilistId === sea.anilistId);
-          const seen = Math.max(sea.seen || 0, prev?.seen || 0);
-          return { ...sea, id: prev?.id || Store.uid(), seen, complete: sea.complete || !!prev?.complete };
-        });
-        const patch = { seasonList: list, ...seasonTotals(list), status: r.status };
-        if (r.rating) patch.rating = r.rating;
-        if (!cur.cover && r.cover) patch.cover = r.cover;
-        if (r.root) { patch.anilistId = r.root; if (!cur.external) patch.external = `anilist:${r.root}`; }
-        Store.update(cur.id, patch);
-        updated++;
-      } else {
-        const list = r.seasons.map(sea => ({ ...sea, id: Store.uid() }));
-        Store.add({
-          type: 'anime', title: r.title, status: r.status, rating: r.rating, cover: r.cover || '', year: r.year || null,
-          genres: r.genres || [], seasonList: list, ...seasonTotals(list), notes: '',
-          ...(r.root ? { anilistId: r.root, external: `anilist:${r.root}` } : {}),
-        });
-        added++;
-      }
+    let added = 0;
+    rows.filter(r => r.include && !r.existing).forEach(r => {
+      const list = r.seasons.map(sea => ({ ...sea, id: Store.uid() }));
+      Store.add({
+        type: 'anime', title: r.title, status: r.status, rating: r.rating, cover: r.cover || '', year: r.year || null,
+        genres: r.genres || [], seasonList: list, ...seasonTotals(list), notes: '',
+        ...(r.root ? { anilistId: r.root, external: `anilist:${r.root}` } : {}),
+      });
+      added++;
     });
-    return { added, updated };
+    return { added };
   }
 
   function animeImport() {
@@ -857,31 +842,31 @@
             step.innerHTML = `<p class="field-error" style="margin:0">AniList war nicht erreichbar. Versuch es gleich nochmal.</p>`;
             go.textContent = 'Auswerten'; return;
           } finally { Lookup.onRateLimit = null; }
-          rows = buildImport(result);
+          rows = buildImport(result).sort((a, b) => (!!a.existing - !!b.existing));
           const renderPreview = () => {
-            const inc = rows.filter(r => r.include);
-            const newN = inc.filter(r => !r.existing).length, updN = inc.filter(r => r.existing).length;
+            const inc = rows.filter(r => r.include && !r.existing);
+            const skipN = rows.filter(r => r.existing).length;
             const sum = $('#lcSum');
-            if (sum) sum.textContent = `${entries.length} Einträge → ${rows.length} Anime · ${newN} neu, ${updN} werden aktualisiert${rows.some(r => r.unmatched) ? ` · ${rows.filter(r => r.unmatched).length} nicht auf AniList gefunden` : ''}`;
-            go.textContent = `${inc.length} übernehmen`; go.disabled = !inc.length;
+            if (sum) sum.textContent = `${entries.length} Einträge → ${rows.length} Anime · ${inc.length} werden hinzugefügt${skipN ? ` · ${skipN} schon in deinem Regal (bleiben unverändert)` : ''}${rows.some(r => r.unmatched && !r.existing) ? ` · ${rows.filter(r => r.unmatched && !r.existing).length} nicht auf AniList gefunden` : ''}`;
+              go.textContent = inc.length ? `${inc.length} hinzufügen` : 'Nichts Neues'; go.disabled = !inc.length;
           };
           step.innerHTML = `<p class="muted" id="lcSum" style="margin:0 0 12px"></p>
             <div class="import-list">${rows.map((r, i) => `
-              <label class="import-row">
-                <input type="checkbox" data-i="${i}" checked>
+              <label class="import-row ${r.existing ? 'skip' : ''}">
+                <input type="checkbox" data-i="${i}" ${r.existing ? 'disabled' : 'checked'}>
                 <span class="import-thumb">${r.cover ? `<img src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>
                 <span class="import-text"><b>${esc(r.title)}</b>
                   <small>${r.unmatched ? 'Nicht auf AniList gefunden · wird ohne Cover angelegt' : `${r.seasons.length} ${r.seasons.length === 1 ? 'Teil' : 'Teile'} · ${r.seasons.filter(seasonDone).length} fertig${r.entries > 1 ? ` · aus ${r.entries} LiveChart-Einträgen` : ''}`}</small></span>
-                <span class="import-tags">${r.existing ? '<span class="tier-tag tt-dlc">Update</span>' : ''}${statusPill({ type: 'anime', status: r.status })}</span>
+                <span class="import-tags">${r.existing ? '<span class="tier-tag tt-silver">Schon da</span>' : statusPill({ type: 'anime', status: r.status })}</span>
               </label>`).join('')}</div>`;
           $$('.import-row input', m).forEach(c => c.onchange = () => { rows[+c.dataset.i].include = c.checked; renderPreview(); });
           renderPreview();
-          go.disabled = false;
           go.onclick = () => {
             const r = applyImport(rows);
+            Object.assign(libState.anime, { q: '', status: 'all', sort: 'added' });
             close();
             if (!location.hash.startsWith('#/anime')) location.hash = '#/anime'; else render();
-            toast(`<div><b>LiveChart-Liste übernommen</b><small>${r.added} neue Anime, ${r.updated} aktualisiert</small></div>`);
+            toast(`<div><b>LiveChart-Liste übernommen</b><small>${r.added} neue Anime hinzugefügt</small></div>`);
           };
         };
       },
