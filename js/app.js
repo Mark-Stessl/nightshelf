@@ -651,7 +651,7 @@
       movie: ['Noch keine Filme', 'Sammle alle Filme, die du gesehen hast, mit Bewertung.'],
     }[type];
     return `<div class="empty ${A()}"><div class="empty-icon">${typeIcon(type)}</div><h3>${txt[0]}</h3><p>${txt[1]}</p>
-      <button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button></div>`;
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button>${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}</div></div>`;
   }
 
   function cardHTML(item) {
@@ -680,7 +680,7 @@
     const s = libState[type];
     const items = Store.all(type);
     const head = `<div class="page-head"><div><h1 class="page-title">${TYPES[type].plural}</h1><p class="page-sub">${items.length} ${items.length === 1 ? 'Eintrag' : 'Einträge'}</p></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}<button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button></div></div>`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}<button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button></div></div>`;
     if (!items.length) { view.innerHTML = head + emptyState(type); return; }
 
     const platforms = type === 'game' ? [...new Set(items.map(i => i.platform).filter(Boolean))] : [];
@@ -742,6 +742,152 @@
   }
 
   const detailFilter = { value: 'all' };
+
+  /* ---------- LiveChart-Liste einfügen ---------- */
+  function parseLiveChart(text) {
+    const lines = text.split(/\r?\n/).map(l => l.trim());
+    const PROG = /^(\d+)\s*\/\s*(\d+|–|-|\?)$/;
+    const out = [];
+    lines.forEach((l, p) => {
+      const m = l.match(PROG);
+      if (!m || p < 4) return;
+      const rating = lines[p - 1], status = lines[p - 2], format = lines[p - 3], title = lines[p - 4];
+      if (!title || /^\d+([.,]\d+)?$/.test(title) || PROG.test(title)) return;
+      const r = /^\d{1,2}$/.test(rating) ? +rating : null;
+      out.push({
+        title, format, status, movie: /^THTR\b/i.test(format),
+        rating: r && r <= 10 ? r : null,
+        seen: +m[1], total: /^\d+$/.test(m[2]) ? +m[2] : null,
+        upcoming: /^\d{4}$/.test(status) || /\d+d\s+\d+h/.test(status),
+      });
+    });
+    return out;
+  }
+  const entryDone = e => !!e.total && e.seen >= e.total;
+  const normTitle = t => (t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '');
+
+  function buildImport(result) {
+    const anime = Store.all('anime');
+    const groups = result.groups.map(g => {
+      const seasons = g.seasons.map(sea => {
+        const hit = g.entries.find(x => x.anilistId === sea.anilistId);
+        const e = hit?.entry;
+        const seen = e ? (e.total ? Math.min(e.seen, e.total) : e.seen) : 0;
+        return { ...sea, episodes: sea.episodes || e?.total || null, seen, complete: !!e && entryDone(e) };
+      });
+      const es = g.entries.map(x => x.entry);
+      const ratings = es.map(e => e.rating).filter(Boolean);
+      const status = es.every(entryDone) ? 'done' : es.some(e => e.seen > 0) ? 'active' : 'planned';
+      const ids = new Set(g.seasons.map(x => x.anilistId));
+      const existing = anime.find(a => a.anilistId === g.root || (a.seasonList || []).some(x => ids.has(x.anilistId)) || normTitle(a.title) === normTitle(g.seasons[0].title));
+      return {
+        key: 'g' + g.root, root: g.root, title: g.seasons[0].title, cover: g.seasons[0].cover, year: g.seasons[0].year, genres: g.genres,
+        seasons, status, rating: ratings.length ? Math.max(1, Math.min(5, Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length / 2))) : 0,
+        entries: es.length, existing, include: true,
+      };
+    }).sort((a, b) => a.title.localeCompare(b.title, 'de'));
+    const singles = result.unmatched.map((e, i) => ({
+      key: 'u' + i, title: e.title, cover: '', seasons: [{ id: null, label: e.movie ? 'Film' : 'Staffel 1', title: e.title, episodes: e.total, seen: e.total ? Math.min(e.seen, e.total) : e.seen, complete: entryDone(e), format: e.movie ? 'MOVIE' : 'TV' }],
+      status: entryDone(e) ? 'done' : e.seen > 0 ? 'active' : 'planned', rating: e.rating ? Math.max(1, Math.round(e.rating / 2)) : 0,
+      entries: 1, existing: anime.find(a => normTitle(a.title) === normTitle(e.title)), include: true, unmatched: true,
+    }));
+    return [...groups, ...singles];
+  }
+
+  function applyImport(rows) {
+    let added = 0, updated = 0;
+    rows.filter(r => r.include).forEach(r => {
+      if (r.existing) {
+        const cur = Store.get(r.existing.id);
+        if (!cur) return;
+        const old = cur.seasonList || [];
+        const list = r.seasons.map(sea => {
+          const prev = old.find(o => o.anilistId && o.anilistId === sea.anilistId);
+          const seen = Math.max(sea.seen || 0, prev?.seen || 0);
+          return { ...sea, id: prev?.id || Store.uid(), seen, complete: sea.complete || !!prev?.complete };
+        });
+        const patch = { seasonList: list, ...seasonTotals(list), status: r.status };
+        if (r.rating) patch.rating = r.rating;
+        if (!cur.cover && r.cover) patch.cover = r.cover;
+        if (r.root) { patch.anilistId = r.root; if (!cur.external) patch.external = `anilist:${r.root}`; }
+        Store.update(cur.id, patch);
+        updated++;
+      } else {
+        const list = r.seasons.map(sea => ({ ...sea, id: Store.uid() }));
+        Store.add({
+          type: 'anime', title: r.title, status: r.status, rating: r.rating, cover: r.cover || '', year: r.year || null,
+          genres: r.genres || [], seasonList: list, ...seasonTotals(list), notes: '',
+          ...(r.root ? { anilistId: r.root, external: `anilist:${r.root}` } : {}),
+        });
+        added++;
+      }
+    });
+    return { added, updated };
+  }
+
+  function animeImport() {
+    let rows = [];
+    openModal({
+      title: 'LiveChart-Liste einfügen', wide: true,
+      body: `<div id="lcStep">
+        <div class="hint-box">${I.paste}<div>Öffne deine Bibliothek auf LiveChart.me, markiere alles (Strg+A bzw. Cmd+A), kopiere es und füge es hier ein. Staffeln derselben Reihe werden zu einem Anime mit Staffel-Tabs zusammengefasst, Cover und Folgenzahlen kommen von AniList.</div></div>
+        <textarea class="input" id="lcText" style="margin-top:12px;min-height:200px;font-size:13px" placeholder="Hier deine LiveChart-Bibliothek einfügen"></textarea>
+        <div class="tiny" id="lcCount" style="margin-top:6px">&nbsp;</div>
+        <div class="field-error" id="lcErr"></div></div>`,
+      foot: `<button class="btn btn-ghost" data-close>Abbrechen</button><button class="btn btn-primary" id="lcGo">Auswerten</button>`,
+      onMount: (m, close) => {
+        const ta = $('#lcText', m);
+        ta.oninput = () => { const n = parseLiveChart(ta.value).length; $('#lcErr', m).textContent = ''; $('#lcCount', m).textContent = n ? `${n} Anime erkannt` : ' '; };
+        $('#lcGo', m).onclick = async () => {
+          const entries = parseLiveChart(ta.value);
+          if (!entries.length) { $('#lcErr', m).textContent = 'Darin habe ich keine LiveChart-Einträge gefunden. Kopiere die ganze Bibliothek-Seite.'; return; }
+          const go = $('#lcGo', m); go.disabled = true; go.textContent = 'Werte aus…';
+          const step = $('#lcStep', m);
+          step.innerHTML = `<p class="muted" id="lcPhase" style="margin:0 0 12px">Suche ${entries.length} Anime auf AniList…</p><div class="bar"><i id="lcBar" style="width:3%"></i></div><p class="tiny" id="lcWait" style="margin-top:10px">&nbsp;</p>`;
+          Lookup.onRateLimit = sec => { const w = $('#lcWait'); if (w) w.textContent = `AniList bremst gerade, kurze Pause (${sec} Sekunden)…`; };
+          let result;
+          try {
+            result = await Lookup.matchAnimeList(entries, p => {
+              const bar = $('#lcBar'), ph = $('#lcPhase'), w = $('#lcWait');
+              if (w) w.innerHTML = '&nbsp;';
+              if (p.phase === 'match') { if (bar) bar.style.width = Math.round(p.done / p.total * 75) + '%'; if (ph) ph.textContent = `Suche Anime auf AniList… ${p.done} von ${p.total}`; }
+              else { if (bar) bar.style.width = Math.min(97, 75 + p.done * 4) + '%'; if (ph) ph.textContent = 'Fasse Staffeln zu Reihen zusammen…'; }
+            });
+          } catch {
+            step.innerHTML = `<p class="field-error" style="margin:0">AniList war nicht erreichbar. Versuch es gleich nochmal.</p>`;
+            go.textContent = 'Auswerten'; return;
+          } finally { Lookup.onRateLimit = null; }
+          rows = buildImport(result);
+          const renderPreview = () => {
+            const inc = rows.filter(r => r.include);
+            const newN = inc.filter(r => !r.existing).length, updN = inc.filter(r => r.existing).length;
+            const sum = $('#lcSum');
+            if (sum) sum.textContent = `${entries.length} Einträge → ${rows.length} Anime · ${newN} neu, ${updN} werden aktualisiert${rows.some(r => r.unmatched) ? ` · ${rows.filter(r => r.unmatched).length} nicht auf AniList gefunden` : ''}`;
+            go.textContent = `${inc.length} übernehmen`; go.disabled = !inc.length;
+          };
+          step.innerHTML = `<p class="muted" id="lcSum" style="margin:0 0 12px"></p>
+            <div class="import-list">${rows.map((r, i) => `
+              <label class="import-row">
+                <input type="checkbox" data-i="${i}" checked>
+                <span class="import-thumb">${r.cover ? `<img src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>
+                <span class="import-text"><b>${esc(r.title)}</b>
+                  <small>${r.unmatched ? 'Nicht auf AniList gefunden · wird ohne Cover angelegt' : `${r.seasons.length} ${r.seasons.length === 1 ? 'Teil' : 'Teile'} · ${r.seasons.filter(seasonDone).length} fertig${r.entries > 1 ? ` · aus ${r.entries} LiveChart-Einträgen` : ''}`}</small></span>
+                <span class="import-tags">${r.existing ? '<span class="tier-tag tt-dlc">Update</span>' : ''}${statusPill({ type: 'anime', status: r.status })}</span>
+              </label>`).join('')}</div>`;
+          $$('.import-row input', m).forEach(c => c.onchange = () => { rows[+c.dataset.i].include = c.checked; renderPreview(); });
+          renderPreview();
+          go.disabled = false;
+          go.onclick = () => {
+            const r = applyImport(rows);
+            close();
+            if (!location.hash.startsWith('#/anime')) location.hash = '#/anime'; else render();
+            toast(`<div><b>LiveChart-Liste übernommen</b><small>${r.added} neue Anime, ${r.updated} aktualisiert</small></div>`);
+          };
+        };
+      },
+    });
+  }
+  document.addEventListener('click', e => { if (e.target.closest('[data-lcimport]')) { e.preventDefault(); animeImport(); } });
 
   /* ---------- Staffeln (Anime und Serien) ---------- */
   const seasonTab = {};

@@ -127,10 +127,18 @@ const Lookup = (() => {
   /* ---------- Anime: AniList (ohne Schlüssel) ---------- */
   const ANILIST = 'https://graphql.anilist.co';
   const AL_FIELDS = 'id title { romaji english } coverImage { extraLarge large } startDate { year month day } episodes genres format description(asHtml: false)';
-  async function anilist(query, variables) {
+  let onRateLimit = null;
+  async function anilist(query, variables, attempt = 0) {
     const r = await fetch(ANILIST, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ query, variables }) });
-    if (!r.ok) throw new Error('http');
-    return (await r.json()).data;
+    if (r.status === 429 && attempt < 4) {
+      const wait = Math.min(90, +(r.headers.get('Retry-After') || 60));
+      onRateLimit && onRateLimit(wait);
+      await new Promise(res => setTimeout(res, wait * 1000 + 500));
+      return anilist(query, variables, attempt + 1);
+    }
+    const j = await r.json().catch(() => null);
+    if (!j || (!r.ok && !j.data)) throw new Error('http');
+    return j.data;
   }
   const alDate = d => d?.year ? `${d.year}-${String(d.month || 1).padStart(2, '0')}-${String(d.day || 1).padStart(2, '0')}` : null;
   const FORMAT = { TV: 'TV', TV_SHORT: 'TV kurz', MOVIE: 'Film', SPECIAL: 'Special', OVA: 'OVA', ONA: 'ONA', MUSIC: 'Musik' };
@@ -185,6 +193,64 @@ const Lookup = (() => {
     });
   }
 
+  /* Viele Anime auf einmal zuordnen und zu Reihen (Prequel/Sequel-Ketten) gruppieren */
+  const GROUP_FIELDS = 'id title { romaji english } format episodes genres startDate { year month day } coverImage { extraLarge large } relations { edges { relationType node { id type format } } }';
+  function seasonFromMedia(m, label) {
+    return { anilistId: m.id, title: m.title?.english || m.title?.romaji, label, format: m.format, episodes: m.episodes || null, year: m.startDate?.year || null, cover: m.coverImage?.extraLarge || m.coverImage?.large || '' };
+  }
+  async function matchAnimeList(entries, onProgress = () => {}) {
+    const media = new Map();
+    const matched = new Array(entries.length).fill(null);
+    const CHUNK = 8;
+    for (let i = 0; i < entries.length; i += CHUNK) {
+      const part = entries.slice(i, i + CHUNK);
+      const vars = {}, defs = [], body = [];
+      part.forEach((e, k) => {
+        vars['q' + k] = e.title;
+        defs.push(`$q${k}: String`);
+        body.push(`a${k}: Media(search: $q${k}, type: ANIME${e.movie ? ', format: MOVIE' : ''}) { ${GROUP_FIELDS} }`);
+      });
+      let data = null;
+      try { data = await anilist(`query(${defs.join(', ')}) { ${body.join(' ')} }`, vars); } catch {}
+      part.forEach((e, k) => { const m = data?.['a' + k]; if (m) { media.set(m.id, m); matched[i + k] = m.id; } });
+      onProgress({ phase: 'match', done: Math.min(entries.length, i + CHUNK), total: entries.length });
+      await new Promise(r => setTimeout(r, 400));
+    }
+    const link = (m, type) => (m?.relations?.edges || []).filter(e => e.relationType === type && e.node.type === 'ANIME' && SEASON_FORMATS.includes(e.node.format)).map(e => e.node.id);
+    for (let round = 0; round < 20; round++) {
+      const missing = new Set();
+      media.forEach(m => [...link(m, 'PREQUEL'), ...link(m, 'SEQUEL')].forEach(id => { if (!media.has(id)) missing.add(id); }));
+      if (!missing.size) break;
+      const ids = [...missing];
+      for (let i = 0; i < ids.length; i += 50) {
+        let data = null;
+        try { data = await anilist(`query($ids: [Int]) { Page(perPage: 50) { media(id_in: $ids, type: ANIME) { ${GROUP_FIELDS} } } }`, { ids: ids.slice(i, i + 50) }); } catch {}
+        (data?.Page?.media || []).forEach(m => media.set(m.id, m));
+        ids.slice(i, i + 50).forEach(id => { if (!media.has(id)) media.set(id, { id, relations: { edges: [] }, missing: true }); });
+        await new Promise(r => setTimeout(r, 400));
+      }
+      onProgress({ phase: 'chains', done: round + 1 });
+    }
+    const chainOf = id => {
+      let first = media.get(id);
+      const seen = new Set([id]);
+      for (let i = 0; i < 15; i++) { const prev = link(first, 'PREQUEL')[0]; if (!prev || seen.has(prev) || !media.get(prev) || media.get(prev).missing) break; seen.add(prev); first = media.get(prev); }
+      const chain = [first];
+      for (let i = 0; i < 25; i++) { const next = link(chain[chain.length - 1], 'SEQUEL')[0]; if (!next || chain.some(m => m.id === next) || !media.get(next) || media.get(next).missing) break; chain.push(media.get(next)); }
+      let tv = 0, movie = 0;
+      return chain.map(m => seasonFromMedia(m, m.format === 'MOVIE' ? `Film${++movie > 1 ? ' ' + movie : ''}` : `Staffel ${++tv}`));
+    };
+    const groups = new Map();
+    matched.forEach((id, i) => {
+      if (!id) return;
+      const chain = chainOf(id);
+      const root = chain[0].anilistId;
+      if (!groups.has(root)) groups.set(root, { root, seasons: chain, genres: media.get(root)?.genres || [], entries: [] });
+      groups.get(root).entries.push({ entry: entries[i], anilistId: id });
+    });
+    return { groups: [...groups.values()], unmatched: entries.filter((_, i) => !matched[i]) };
+  }
+
   const SEARCH = { series: searchSeries, movie: searchMovies, game: searchGames, anime: searchAnime };
   const DETAIL = { series: detailSeries, movie: detailMovie, game: detailGame, anime: detailAnime };
   const NEEDS = { movie: 'tmdb' };
@@ -195,6 +261,7 @@ const Lookup = (() => {
     search: (type, q) => SEARCH[type](q),
     detail: (type, hit) => DETAIL[type](hit),
     async test(type) { await SEARCH[type]('star'); return true; },
-    animeByIds, animeSeasons, seriesSeasons,
+    animeByIds, animeSeasons, seriesSeasons, matchAnimeList,
+    set onRateLimit(fn) { onRateLimit = fn; },
   };
 })();
