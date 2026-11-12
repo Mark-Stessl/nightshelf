@@ -17,6 +17,8 @@
  * den Header X-Nightshelf-Key. Gespeichert wird nur der SHA-256-Hash des Schlüssels.
  *   POST /achievements { title, platform, genre, size } -> KI-Trophäenliste (Wikipedia + Workers AI)
  *   GET  /ai-usage                    -> heute verbrauchte Neurons (Schätzung aus Token-Zahlen)
+ *   GET  /manga/search?q=             -> Manga-Suche über MangaUpdates
+ *   POST /manga/latest { ids }        -> aktuelle Kapitelzahl für bis zu 40 Manga
  */
 
 const ALLOWED_ORIGINS = [
@@ -31,6 +33,18 @@ const CLIENT_BASIC = 'Basic MDk1MTUxNTktNzIzNy00MzcwLTliNDAtMzgwNmU2N2MwODkxOnVj
 const REDIRECT_URI = 'com.scee.psxandroid.scecompcall://redirect';
 const SCOPE = 'psn:mobile.v2.core psn:clientapp';
 const TROPHY_API = 'https://m.np.playstation.com/api/trophy/v1';
+const MU_API = 'https://api.mangaupdates.com/v1';
+const MU_HEADERS = { 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': 'Nightshelf/1.0 (https://mark-stessl.github.io/nightshelf/)' };
+function muSeries(x, full = false) {
+  const strip = t => String(t || '').replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#039;/g, "'").replace(/\s+/g, ' ').trim();
+  return {
+    id: String(x.series_id), title: strip(x.title), type: x.type || '', year: x.year ? +x.year : null,
+    cover: x.image?.url?.original || x.image?.url?.thumb || '', thumb: x.image?.url?.thumb || x.image?.url?.original || '',
+    latest: x.latest_chapter ?? null, completed: !!x.completed, status: strip(x.status),
+    genres: (x.genres || []).map(g => g.genre).slice(0, 6),
+    ...(full ? { summary: strip(x.description).slice(0, 3000), authors: (x.authors || []).map(a => a.name).slice(0, 3) } : {}),
+  };
+}
 const AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const AI_DAILY_LIMIT = 10000;
 // Cloudflare-Preisliste: Neurons pro Million Tokens für Llama 3.3 70B fp8-fast
@@ -79,6 +93,36 @@ export default {
       if (owner) {
         const given = request.headers.get('X-Nightshelf-Key') || '';
         if (!given || (await sha256(given)) !== owner) return json({ error: 'key_required' }, 403);
+      }
+
+      if (url.pathname === '/manga/search') {
+        const q = (url.searchParams.get('q') || '').trim().slice(0, 100);
+        if (q.length < 2) return json({ results: [] });
+        const r = await fetch(`${MU_API}/series/search`, { method: 'POST', headers: MU_HEADERS, body: JSON.stringify({ search: q, perpage: 8 }) });
+        if (!r.ok) return json({ error: 'mu_error', status: r.status }, 502);
+        const d = await r.json();
+        return json({ results: (d.results || []).map(x => muSeries(x.record)) });
+      }
+
+      if (url.pathname === '/manga/series') {
+        const id = url.searchParams.get('id');
+        if (!/^\d+$/.test(id || '')) return json({ error: 'id_invalid' }, 400);
+        const r = await fetch(`${MU_API}/series/${id}`, { headers: MU_HEADERS });
+        if (!r.ok) return json({ error: 'mu_error', status: r.status }, 502);
+        return json(muSeries(await r.json(), true));
+      }
+
+      if (url.pathname === '/manga/latest' && request.method === 'POST') {
+        const { ids } = await request.json().catch(() => ({}));
+        const list = (Array.isArray(ids) ? ids : []).filter(i => /^\d+$/.test(String(i))).slice(0, 40);
+        const out = {};
+        for (const id of list) {
+          try {
+            const r = await fetch(`${MU_API}/series/${id}`, { headers: MU_HEADERS });
+            if (r.ok) { const d = await r.json(); out[id] = { latest: d.latest_chapter ?? null, completed: !!d.completed, status: d.status || '' }; }
+          } catch {}
+        }
+        return json({ series: out });
       }
 
       if (url.pathname === '/data') {
