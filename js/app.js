@@ -389,6 +389,24 @@
             data.seasonList = fetched.seasonList.map((x, i) => ({ ...x, id: Store.uid(), seen: i < doneUpTo ? (x.episodes || 0) : 0, complete: i < doneUpTo }));
             Object.assign(data, seasonTotals(data.seasonList), { seasons: data.seasonList.length, seasonSeen: Math.min(doneUpTo, data.seasonList.length) });
           }
+          if (type === 'anime' && fetched?.anilistId && fetched.format === 'MOVIE') {
+            const btn = $('#saveBtn', m);
+            btn.textContent = 'Suche passende Reihe…'; btn.disabled = true;
+            let related = [];
+            try { related = await Lookup.animeRelatedIds(fetched.anilistId); } catch {}
+            const hit = findAnimeFor({ anilistId: fetched.anilistId, relatedIds: related, title: data.title });
+            if (hit) {
+              if (!hit.already) {
+                const seen = data.status === 'done' || (data.episodesSeen || 0) > 0;
+                attachMovies(hit.item, [{ anilistId: fetched.anilistId, title: data.title, episodes: fetched.episodes || 1, seen: seen ? (fetched.episodes || 1) : 0, complete: seen, year: data.year, cover: data.cover }]);
+              }
+              close();
+              location.hash = `#/item/${hit.item.id}`;
+              toast(hit.already ? `<div><b>Schon vorhanden</b><small>${esc(data.title)} ist bei ${esc(hit.item.title)} dabei</small></div>` : `<div><b>Film hinzugefügt</b><small>bei ${esc(hit.item.title)}</small></div>`);
+              return;
+            }
+            btn.textContent = 'Hinzufügen'; btn.disabled = false;
+          }
           if (type === 'anime' && fetched?.anilistId) {
             const btn = $('#saveBtn', m);
             btn.textContent = 'Lade Staffeln…'; btn.disabled = true;
@@ -743,6 +761,29 @@
 
   const detailFilter = { value: 'all' };
 
+  /* ---------- Anime-Filme zur passenden Reihe ---------- */
+  const titleSegment = t => normTitle(String(t || '').split(/[:!]| - |-(?=[A-Za-z])/)[0]);
+  function findAnimeFor({ anilistId, relatedIds = [], title }) {
+    const anime = Store.all('anime');
+    const idsOf = a => [a.anilistId, ...(a.seasonList || []).map(x => x.anilistId)].filter(Boolean);
+    const own = anime.find(a => idsOf(a).includes(anilistId));
+    if (own) return { item: own, already: true };
+    const rel = anime.find(a => idsOf(a).some(id => relatedIds.includes(id)));
+    if (rel) return { item: rel, already: false };
+    const seg = titleSegment(title);
+    const byName = seg.length >= 6 && anime.find(a => { const sa = titleSegment(a.title); return sa.length >= 6 && (seg.startsWith(sa) || sa.startsWith(seg)); });
+    return byName ? { item: byName, already: false } : null;
+  }
+  function attachMovies(item, movies) {
+    const list = materialize(item);
+    let n = list.filter(x => x.format === 'MOVIE').length;
+    movies.forEach(mv => {
+      if (mv.anilistId && list.some(x => x.anilistId === mv.anilistId)) return;
+      list.push({ ...mv, id: Store.uid(), format: 'MOVIE', label: `Film${++n > 1 ? ' ' + n : ''}` });
+    });
+    saveSeasons(item, list, { autoStatus: false });
+  }
+
   /* ---------- LiveChart-Liste einfügen ---------- */
   function parseLiveChart(text) {
     const lines = text.split(/\r?\n/).map(l => l.trim());
@@ -781,7 +822,10 @@
       const ids = new Set(g.seasons.map(x => x.anilistId));
       const names = new Set([g.title, ...g.seasons.map(x => x.title), ...g.entries.map(x => x.entry.title)].map(normTitle).filter(Boolean));
       const existing = anime.find(a => ids.has(a.anilistId) || (a.seasonList || []).some(x => ids.has(x.anilistId)) || names.has(normTitle(a.title)) || (a.seasonList || []).some(x => names.has(normTitle(x.title))));
+      const movieOnly = g.seasons.every(x => x.format === 'MOVIE');
+      const attach = !existing && movieOnly ? findAnimeFor({ anilistId: g.mainId, relatedIds: g.relatedIds || [], title: g.title }) : null;
       return {
+        attachTo: attach && !attach.already ? attach.item : null,
         key: 'g' + g.root, root: g.mainId || g.root, title: g.title || g.seasons[0].title, cover: g.cover || g.seasons[0].cover, year: g.year || g.seasons[0].year, genres: g.genres,
         seasons, status, rating: ratings.length ? Math.max(1, Math.min(5, Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length / 2))) : 0,
         entries: es.length, existing, include: !existing,
@@ -799,6 +843,7 @@
   function applyImport(rows) {
     let added = 0;
     rows.filter(r => r.include && !r.existing).forEach(r => {
+      if (r.attachTo) { const cur = Store.get(r.attachTo.id); if (cur) { attachMovies(cur, r.seasons); added++; } return; }
       const list = r.seasons.map(sea => ({ ...sea, id: Store.uid() }));
       Store.add({
         type: 'anime', title: r.title, status: r.status, rating: r.rating, cover: r.cover || '', year: r.year || null,
@@ -857,7 +902,7 @@
                 <span class="import-thumb">${r.cover ? `<img src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>
                 <span class="import-text"><b>${esc(r.title)}</b>
                   <small>${r.unmatched ? 'Nicht auf AniList gefunden · wird ohne Cover angelegt' : `${r.seasons.length} ${r.seasons.length === 1 ? 'Teil' : 'Teile'} · ${r.seasons.filter(seasonDone).length} fertig${r.entries > 1 ? ` · aus ${r.entries} LiveChart-Einträgen` : ''}`}</small></span>
-                <span class="import-tags">${r.existing ? '<span class="tier-tag tt-silver">Schon da</span>' : statusPill({ type: 'anime', status: r.status })}</span>
+                <span class="import-tags">${r.existing ? '<span class="tier-tag tt-silver">Schon da</span>' : r.attachTo ? `<span class="tier-tag tt-dlc">Film zu ${esc(r.attachTo.title)}</span>` : statusPill({ type: 'anime', status: r.status })}</span>
               </label>`).join('')}</div>`;
           $$('.import-row input', m).forEach(c => c.onchange = () => { rows[+c.dataset.i].include = c.checked; renderPreview(); });
           renderPreview();
@@ -930,32 +975,40 @@
     const pct = seasonDone(sea) ? 100 : sea.episodes ? Math.min(100, Math.round((sea.seen || 0) / sea.episodes * 100)) : 0;
     const totPct = tot.episodes ? Math.min(100, Math.round(tot.episodesSeen / tot.episodes * 100)) : 0;
     const coverSrc = sea.cover || item.cover;
-    const unit = item.type === 'anime' ? (list.length === 1 ? 'Teil' : 'Teile') : (list.length === 1 ? 'Staffel' : 'Staffeln');
+    const nShows = list.filter(x => x.format !== 'MOVIE').length, nFilms = list.length - nShows;
+    const unit = item.type === 'anime'
+      ? [nShows ? `${nShows} ${nShows === 1 ? 'Staffel' : 'Staffeln'}` : '', nFilms ? `${nFilms} ${nFilms === 1 ? 'Film' : 'Filme'}` : ''].filter(Boolean).join(' · ')
+      : (list.length === 1 ? 'Staffel' : 'Staffeln');
     const noEpisodes = list.every(x => !x.episodes);
     return `<section class="section">
       <div class="trophy-head">
-        <div><h2 class="section-title" style="margin:0">Staffeln</h2><div class="tiny">${list.length} ${unit}${noEpisodes ? ` · ${list.filter(seasonDone).length} fertig` : ` · ${tot.episodesSeen}/${tot.episodes || '?'} Folgen gesehen${tot.episodes ? ` · ${totPct} %` : ''}`}</div></div>
+        <div><h2 class="section-title" style="margin:0">${nShows ? 'Staffeln' : 'Filme'}${nShows && nFilms ? ' & Filme' : ''}</h2><div class="tiny">${item.type === 'anime' ? unit : `${list.length} ${unit}`}${noEpisodes ? ` · ${list.filter(seasonDone).length} fertig` : ` · ${tot.episodesSeen}/${tot.episodes || '?'} Folgen gesehen${tot.episodes ? ` · ${totPct} %` : ''}`}</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-sm" id="sAdd">${I.plus} Staffel</button>
           <button class="btn btn-sm ${noEpisodes ? 'btn-primary' : ''}" id="sLoad">${I.refresh} Von ${seasonSource(item)} laden</button>
         </div>
       </div>
       ${noEpisodes ? `<div class="hint-box" style="margin-bottom:14px">${I.info}<div>Lade die Staffeln von ${seasonSource(item)}, dann bekommst du Folgenzahlen und Cover pro Staffel. Deine fertigen Staffeln bleiben abgehakt.</div></div>` : ''}
-      <div class="season-tabs" role="tablist">${list.map(x => `<button class="season-tab ${x.id === activeId ? 'on' : ''} ${seasonDone(x) ? 'done' : ''}" role="tab" aria-selected="${x.id === activeId}" data-season="${x.id}">
-        <span>${esc(x.label)}</span><small>${seasonDone(x) ? '✓' : `${x.seen || 0}/${x.episodes || '?'}`}</small></button>`).join('')}</div>
+      ${(() => {
+        const tab = x => `<button class="season-tab ${x.id === activeId ? 'on' : ''} ${seasonDone(x) ? 'done' : ''}" role="tab" aria-selected="${x.id === activeId}" data-season="${x.id}">
+          <span>${esc(x.label)}</span><small>${seasonDone(x) ? '✓' : x.format === 'MOVIE' ? 'offen' : `${x.seen || 0}/${x.episodes || '?'}`}</small></button>`;
+        const shows = list.filter(x => x.format !== 'MOVIE'), films = list.filter(x => x.format === 'MOVIE');
+        return `${shows.length ? `<div class="season-tabs" role="tablist" aria-label="Staffeln">${shows.map(tab).join('')}</div>` : ''}
+          ${films.length ? `<div class="season-row-label">Filme</div><div class="season-tabs" role="tablist" aria-label="Filme">${films.map(tab).join('')}</div>` : ''}`;
+      })()}
       <div class="season-panel ${A()}">
         <div class="season-cover">${coverSrc ? `<img src="${esc(coverSrc)}" alt="" onerror="this.remove()">` : ''}</div>
         <div class="season-body">
           <div class="season-title">${esc(sea.title || item.title)}</div>
           <div class="card-meta" style="margin-top:4px">${[esc(sea.label), sea.year, sea.episodes ? `${sea.episodes} Folgen` : 'Folgenzahl unbekannt'].filter(Boolean).join('<span class="dot"></span>')}</div>
-          <div class="ep-stepper">
+          ${sea.format === 'MOVIE' && (sea.episodes || 1) === 1 ? '' : `<div class="ep-stepper">
             <button class="btn icon-btn" id="epMinus" aria-label="Eine Folge weniger">−</button>
             <div class="ep-count"><input type="number" id="epInput" min="0" ${sea.episodes ? `max="${sea.episodes}"` : ''} value="${sea.seen || 0}" aria-label="Gesehene Folgen"><span>/ ${sea.episodes || '?'} Folgen</span></div>
             <button class="btn icon-btn btn-primary" id="epPlus" aria-label="Eine Folge mehr">+</button>
-          </div>
-          <div class="bar" style="max-width:420px"><i style="width:${pct}%"></i></div>
+          </div>`}
+          ${sea.format === 'MOVIE' && (sea.episodes || 1) === 1 ? `<div class="movie-state ${seasonDone(sea) ? 'on' : ''}">${seasonDone(sea) ? `${I.check} Gesehen` : 'Noch nicht gesehen'}</div>` : `<div class="bar" style="max-width:420px"><i style="width:${pct}%"></i></div>`}
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
-            ${seasonDone(sea) ? `<button class="btn btn-sm" id="sReset">Zurücksetzen</button>` : `<button class="btn btn-sm btn-primary" id="sDone">${I.check} Ganz gesehen</button>`}
+            ${seasonDone(sea) ? `<button class="btn btn-sm" id="sReset">${sea.format === 'MOVIE' ? 'Als ungesehen markieren' : 'Zurücksetzen'}</button>` : `<button class="btn btn-sm btn-primary" id="sDone">${I.check} ${sea.format === 'MOVIE' ? 'Gesehen' : 'Ganz gesehen'}</button>`}
             <button class="btn btn-sm" id="sEdit">${I.edit} Bearbeiten</button>
             ${list.length > 1 ? `<button class="btn btn-sm btn-ghost btn-danger" id="sDel">${I.trash} Entfernen</button>` : ''}
           </div>
@@ -975,14 +1028,14 @@
     };
     $$('[data-season]').forEach(b => b.onclick = () => { seasonTab[item.id] = b.dataset.season; render(); });
     const setSeen = v => withList((list, i) => { const x = list[i]; x.seen = Math.max(0, x.episodes ? Math.min(x.episodes, v) : v); if (!x.episodes || x.seen < x.episodes) x.complete = false; });
-    $('#epMinus').onclick = () => setSeen((+$('#epInput').value || 0) - 1);
-    $('#epPlus').onclick = () => {
+    if ($('#epMinus')) $('#epMinus').onclick = () => setSeen((+$('#epInput').value || 0) - 1);
+    if ($('#epPlus')) $('#epPlus').onclick = () => {
       const it = fresh(); const cur = seasonsOf(it).find(x => x.id === seasonTab[it.id]);
       const next = (cur.seen || 0) + 1;
       setSeen(next);
       if (cur.episodes && next === cur.episodes) toast(`<div><b>${esc(cur.label)} fertig</b><small>${esc(it.title)}</small></div>`);
     };
-    $('#epInput').onchange = e => setSeen(Math.round(+e.target.value || 0));
+    if ($('#epInput')) $('#epInput').onchange = e => setSeen(Math.round(+e.target.value || 0));
     $('#sDone') && ($('#sDone').onclick = () => {
       const it = fresh(); const cur = seasonsOf(it).find(x => x.id === seasonTab[it.id]);
       withList((list, i) => { if (list[i].episodes) list[i].seen = list[i].episodes; list[i].complete = true; });
@@ -1035,10 +1088,11 @@
 
   function seasonEdit(item, isNew = false) {
     const list = seasonsOf(item);
-    const cur = isNew ? { label: `Staffel ${list.filter(x => x.format !== 'MOVIE').length + 1}`, title: '', episodes: null, seen: 0, year: null } : list.find(x => x.id === seasonTab[item.id]);
+    const cur = isNew ? { label: `Staffel ${list.filter(x => x.format !== 'MOVIE').length + 1}`, title: '', episodes: null, seen: 0, year: null, format: 'TV' } : list.find(x => x.id === seasonTab[item.id]);
     openModal({
       title: isNew ? 'Staffel hinzufügen' : 'Staffel bearbeiten',
       body: `<form class="form" id="sf" novalidate>
+        ${item.type === 'anime' ? `<div class="field"><label>Art</label><div class="seg" id="sKind"><button type="button" data-k="TV" class="${cur.format !== 'MOVIE' ? 'on' : ''}">Staffel</button><button type="button" data-k="MOVIE" class="${cur.format === 'MOVIE' ? 'on' : ''}">Film</button></div></div>` : ''}
         <div class="grid-2">
           <div class="field"><label>Bezeichnung</label><input class="input" name="label" value="${esc(cur.label)}" placeholder="Staffel 2"><div class="field-error" id="sErr"></div></div>
           <div class="field"><label>Jahr</label><input class="input" name="year" type="number" value="${cur.year || ''}" placeholder="2024"></div>
@@ -1052,13 +1106,21 @@
       foot: `<button class="btn btn-ghost" data-close>Abbrechen</button><button class="btn btn-primary" id="sSave">Speichern</button>`,
       onMount: (m, close) => {
         const F = $('#sf', m).elements;
+        let kind = cur.format === 'MOVIE' ? 'MOVIE' : 'TV';
+        $$('#sKind button', m).forEach(b => b.onclick = () => {
+          kind = b.dataset.k; $$('#sKind button', m).forEach(x => x.classList.toggle('on', x === b));
+          if (isNew) {
+            F.label.value = kind === 'MOVIE' ? `Film${list.filter(x => x.format === 'MOVIE').length ? ' ' + (list.filter(x => x.format === 'MOVIE').length + 1) : ''}` : `Staffel ${list.filter(x => x.format !== 'MOVIE').length + 1}`;
+            if (kind === 'MOVIE' && !F.episodes.value) F.episodes.value = 1;
+          }
+        });
         F.label.oninput = () => { $('#sErr', m).textContent = ''; };
         $('#sSave', m).onclick = () => {
           const label = F.label.value.trim();
           if (!label) { $('#sErr', m).textContent = 'Gib eine Bezeichnung ein.'; F.label.focus(); return; }
           const episodes = F.episodes.value ? +F.episodes.value : null;
           const seen = Math.max(0, episodes ? Math.min(episodes, +F.seen.value || 0) : +F.seen.value || 0);
-          const patch = { label, title: F.title.value.trim() || item.title, year: F.year.value ? +F.year.value : null, episodes, seen };
+          const patch = { label, title: F.title.value.trim() || item.title, year: F.year.value ? +F.year.value : null, episodes, seen, ...(item.type === 'anime' ? { format: kind } : {}) };
           const next = materialize(item);
           if (isNew) { const s2 = { id: Store.uid(), format: 'TV', cover: '', ...patch }; next.push(s2); seasonTab[item.id] = s2.id; }
           else { const i = list.findIndex(x => x.id === cur.id); Object.assign(next[i], patch); if (episodes && seen < episodes) next[i].complete = false; seasonTab[item.id] = next[i].id; }

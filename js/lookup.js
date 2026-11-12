@@ -147,8 +147,14 @@ const Lookup = (() => {
       title: m.title?.english || m.title?.romaji, year: m.startDate?.year || null,
       cover: m.coverImage?.extraLarge || m.coverImage?.large || '', episodes: m.episodes || null,
       genres: m.genres || [], released: alDate(m.startDate), summary: strip(m.description).replace(/\s+/g, ' ').slice(0, 900),
-      external: `anilist:${m.id}`, anilistId: m.id,
+      external: `anilist:${m.id}`, anilistId: m.id, format: m.format,
     };
+  }
+  const REL_SKIP = ['CHARACTER', 'OTHER', 'ADAPTATION', 'SOURCE'];
+  const relatedOf = m => (m?.relations?.edges || []).filter(e => e.node.type === 'ANIME' && !REL_SKIP.includes(e.relationType)).map(e => e.node.id);
+  async function animeRelatedIds(id) {
+    const d = await anilist(`query($id: Int) { Media(id: $id, type: ANIME) { relations { edges { relationType node { id type } } } } }`, { id });
+    return relatedOf(d?.Media);
   }
   async function searchAnime(q) {
     const d = await anilist(`query($q: String) { Page(perPage: 6) { media(search: $q, type: ANIME, sort: SEARCH_MATCH) { ${AL_FIELDS} } } }`, { q });
@@ -266,8 +272,20 @@ const Lookup = (() => {
       groups.get(root).entries.push({ entry: entries[i], anilistId: id });
     });
 
+    // Filme, die zu einer anderen Reihe gehören (Nebengeschichte, Fortsetzung …), in diese Reihe holen
+    let list = [...groups.values()];
+    list.forEach(g => { g.relatedIds = [...new Set(g.seasons.flatMap(sea => relatedOf(media.get(sea.anilistId))))]; });
+    list.filter(g => g.seasons.every(x => x.format === 'MOVIE')).forEach(g => {
+      const target = list.find(o => o !== g && !o.absorbed && o.seasons.some(x => x.format !== 'MOVIE') && o.seasons.some(x => g.relatedIds.includes(x.anilistId)));
+      if (!target) return;
+      g.seasons.forEach(sea => { if (!target.seasons.some(x => x.anilistId === sea.anilistId)) target.seasons.push(sea); });
+      target.entries.push(...g.entries);
+      target.relatedIds = [...new Set([...target.relatedIds, ...g.relatedIds])];
+      g.absorbed = true;
+    });
+    list = list.filter(g => !g.absorbed);
+
     // Anzeigename: dein frühester Eintrag dieser Reihe (nicht ein Prolog oder Vorgängerfilm)
-    const list = [...groups.values()];
     const named = g => {
       const sea = g.seasons.find(x => ['TV', 'TV_SHORT'].includes(x.format)) || g.seasons.find(x => g.entries.some(e => e.anilistId === x.anilistId)) || g.seasons[0];
       const own = g.entries.find(e => e.anilistId === sea.anilistId);
@@ -286,6 +304,7 @@ const Lookup = (() => {
       if (!into) { merged.push(g); return; }
       g.seasons.forEach(sea => { if (!into.seasons.some(x => x.anilistId === sea.anilistId)) into.seasons.push(sea); });
       into.entries.push(...g.entries);
+      into.relatedIds = [...new Set([...(into.relatedIds || []), ...(g.relatedIds || [])])];
       into.genres = [...new Set([...(into.genres || []), ...(g.genres || [])])];
     });
     merged.forEach(g => {
@@ -309,7 +328,7 @@ const Lookup = (() => {
     search: (type, q) => SEARCH[type](q),
     detail: (type, hit) => DETAIL[type](hit),
     async test(type) { await SEARCH[type]('star'); return true; },
-    animeByIds, animeSeasons, seriesSeasons, matchAnimeList,
+    animeByIds, animeSeasons, seriesSeasons, matchAnimeList, animeRelatedIds,
     set onRateLimit(fn) { onRateLimit = fn; },
   };
 })();
