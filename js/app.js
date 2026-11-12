@@ -414,7 +414,7 @@
               const list = await Lookup.animeSeasons(fetched.anilistId);
               if (list.length) {
                 data.seasonList = list.map(x => ({ ...x, id: Store.uid(), seen: 0 }));
-                distributeSeen(data.seasonList, data.episodesSeen || 0, data.status === 'done');
+                distributeSeen(data.seasonList.filter(x => x.format !== 'MOVIE'), data.episodesSeen || 0, data.status === 'done');
                 Object.assign(data, seasonTotals(data.seasonList));
                 const base = data.seasonList[0];
                 if (data.seasonList.length > 1 && base.anilistId !== fetched.anilistId) {
@@ -1076,7 +1076,7 @@
           const done = prev && seasonDone(prev);
           return { ...x, id: (prev && !isImplicit(prev)) ? prev.id : Store.uid(), seen: done ? (x.episodes || prev.seen || 0) : Math.min(prev?.seen || 0, x.episodes || Infinity), complete: !!done };
         });
-        if (!matched && it.type === 'anime') distributeSeen(list, old.reduce((a, x) => a + (x.seen || 0), 0), it.status === 'done');
+        if (!matched && it.type === 'anime') distributeSeen(list.filter(x => x.format !== 'MOVIE'), old.reduce((a, x) => a + (x.seen || 0), 0), it.status === 'done');
         delete seasonTab[it.id];
         if (Object.keys(patch).length) Store.update(it.id, patch);
         saveSeasons(Store.get(it.id), list, { autoStatus: false });

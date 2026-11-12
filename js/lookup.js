@@ -190,13 +190,26 @@ const Lookup = (() => {
     for (let i = 0; i < 12; i++) { const prev = link(first, 'PREQUEL'); if (!prev || cache.has(prev)) break; const p = await get(prev); if (!p) break; first = p; }
     const chain = [first];
     for (let i = 0; i < 20; i++) { const next = link(chain[chain.length - 1], 'SEQUEL'); if (!next || chain.some(m => m.id === next)) break; const n = await get(next); if (!n) break; chain.push(n); }
-    let tv = 0, movie = 0;
-    return chain.map(m => {
-      const isMovie = m.format === 'MOVIE';
-      const label = isMovie ? `Film${++movie > 1 ? ' ' + movie : ''}` : `Staffel ${++tv}`;
-      return { anilistId: m.id, title: m.title?.english || m.title?.romaji, label, format: m.format, episodes: m.episodes || null,
-        year: m.startDate?.year || null, cover: m.coverImage?.extraLarge || m.coverImage?.large || '' };
-    });
+    // Zusätzlich alle Filme, die AniList mit einer Staffel der Reihe verknüpft (Nebengeschichte, Vorgeschichte …)
+    const inChain = new Set(chain.map(m => m.id));
+    const extraIds = [...new Set(chain.flatMap(m => (m.relations?.edges || [])
+      .filter(e => e.node.type === 'ANIME' && e.node.format === 'MOVIE' && !REL_SKIP.includes(e.relationType) && !inChain.has(e.node.id))
+      .map(e => e.node.id)))].slice(0, 50);
+    let extras = [];
+    if (extraIds.length) {
+      try {
+        const d = await anilist(`query($ids: [Int]) { Page(perPage: 50) { media(id_in: $ids, type: ANIME) { id title { romaji english } format episodes startDate { year month day } coverImage { extraLarge large } } } }`, { ids: extraIds });
+        extras = d?.Page?.media || [];
+      } catch {}
+    }
+    const toSeason = m => ({ anilistId: m.id, title: m.title?.english || m.title?.romaji, format: m.format, episodes: m.episodes || null,
+      year: m.startDate?.year || null, cover: m.coverImage?.extraLarge || m.coverImage?.large || '', _d: m.startDate });
+    const dateKey = x => [x._d?.year || 9999, x._d?.month || 12, x._d?.day || 31].map(n => String(n).padStart(4, '0')).join('-');
+    const shows = chain.filter(m => m.format !== 'MOVIE').map(toSeason);
+    const movies = [...chain.filter(m => m.format === 'MOVIE'), ...extras].map(toSeason).sort((a, b) => dateKey(a).localeCompare(dateKey(b)));
+    shows.forEach((x, i) => { x.label = `Staffel ${i + 1}`; });
+    movies.forEach((x, i) => { x.label = `Film${movies.length > 1 ? ' ' + (i + 1) : ''}`; });
+    return [...shows, ...movies].map(({ _d, ...x }) => x);
   }
 
   /* Viele Anime auf einmal zuordnen und zu Reihen (Prequel/Sequel-Ketten) gruppieren */
