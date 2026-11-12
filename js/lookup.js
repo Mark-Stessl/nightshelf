@@ -220,8 +220,10 @@ const Lookup = (() => {
         part.forEach((ei, k) => {
           const list = data?.['a' + k]?.media || [];
           const want = normT(entries[ei].title);
-          const names = m => [m.title?.english, m.title?.romaji, ...(m.synonyms || [])].map(normT);
-          const m = list.find(x => names(x).includes(want)) || list.find(x => names(x).some(n => n && (n.startsWith(want) || want.startsWith(n)))) || list[0];
+          const main = m => [m.title?.english, m.title?.romaji].map(normT);
+          const names = m => [...main(m), ...(m.synonyms || []).map(normT)];
+          const m = list.find(x => main(x).includes(want)) || list.find(x => names(x).includes(want))
+            || list.find(x => main(x).some(n => n && (n.startsWith(want) || want.startsWith(n)))) || list[0];
           if (m) { media.set(m.id, m); matched[ei] = m.id; }
         });
         if (withFilter) onProgress({ phase: 'match', done: Math.min(idxs.length, i + CHUNK), total: idxs.length });
@@ -263,7 +265,38 @@ const Lookup = (() => {
       if (!groups.has(root)) groups.set(root, { root, seasons: chain, genres: media.get(root)?.genres || [], entries: [] });
       groups.get(root).entries.push({ entry: entries[i], anilistId: id });
     });
-    return { groups: [...groups.values()], unmatched: entries.filter((_, i) => !matched[i]) };
+
+    // Anzeigename: dein frühester Eintrag dieser Reihe (nicht ein Prolog oder Vorgängerfilm)
+    const list = [...groups.values()];
+    const named = g => {
+      const pos = x => g.seasons.findIndex(sea => sea.anilistId === x.anilistId);
+      const first = g.entries.slice().sort((a, b) => pos(a) - pos(b))[0];
+      const sea = g.seasons[pos(first)] || g.seasons[0];
+      g.title = first.entry.title; g.cover = sea.cover || g.seasons[0].cover; g.year = sea.year || g.seasons[0].year; g.mainId = sea.anilistId;
+      return g;
+    };
+    list.forEach(named);
+
+    // Reihen zusammenführen, die AniList nicht verknüpft hat (z. B. "Date A Live" und "Date A Live II")
+    const segment = t => normT(String(t).split(/[:!]| - /)[0]);
+    const merged = [];
+    list.sort((a, b) => segment(a.title).length - segment(b.title).length).forEach(g => {
+      const sg = segment(g.title);
+      const into = sg.length >= 6 && merged.find(m => { const sm = segment(m.title); return sm.length >= 6 && (sg.startsWith(sm) || sm.startsWith(sg)); });
+      if (!into) { merged.push(g); return; }
+      g.seasons.forEach(sea => { if (!into.seasons.some(x => x.anilistId === sea.anilistId)) into.seasons.push(sea); });
+      into.entries.push(...g.entries);
+      into.genres = [...new Set([...(into.genres || []), ...(g.genres || [])])];
+    });
+    merged.forEach(g => {
+      if (g.seasons.length > 1) {
+        g.seasons.sort((a, b) => (a.year || 9999) - (b.year || 9999));
+        let tv = 0, movie = 0;
+        g.seasons.forEach(sea => { sea.label = sea.format === 'MOVIE' ? `Film${++movie > 1 ? ' ' + movie : ''}` : `Staffel ${++tv}`; });
+      }
+      named(g);
+    });
+    return { groups: merged, unmatched: entries.filter((_, i) => !matched[i]) };
   }
 
   const SEARCH = { series: searchSeries, movie: searchMovies, game: searchGames, anime: searchAnime };

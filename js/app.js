@@ -781,7 +781,7 @@
       const ids = new Set(g.seasons.map(x => x.anilistId));
       const existing = anime.find(a => a.anilistId === g.root || (a.seasonList || []).some(x => ids.has(x.anilistId)) || normTitle(a.title) === normTitle(g.seasons[0].title));
       return {
-        key: 'g' + g.root, root: g.root, title: g.seasons[0].title, cover: g.seasons[0].cover, year: g.seasons[0].year, genres: g.genres,
+        key: 'g' + g.root, root: g.mainId || g.root, title: g.title || g.seasons[0].title, cover: g.cover || g.seasons[0].cover, year: g.year || g.seasons[0].year, genres: g.genres,
         seasons, status, rating: ratings.length ? Math.max(1, Math.min(5, Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length / 2))) : 0,
         entries: es.length, existing, include: true,
       };
