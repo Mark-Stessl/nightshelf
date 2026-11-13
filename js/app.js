@@ -1115,7 +1115,9 @@
   function viewLibrary(type) {
     const s = libState[type];
     const items = Store.all(type);
-    const head = `<div class="page-head"><div><h1 class="page-title">${TYPES[type].plural}</h1><p class="page-sub">${items.length} ${items.length === 1 ? 'Eintrag' : 'Einträge'}</p></div>
+    // Regal: Umschalter zwischen den Arten
+    const shelfTabs = `<div class="shelf-tabs" role="tablist">${ORDER_TYPES.map(t => `<a role="tab" href="#/${TYPES[t].route}" class="shelf-tab ${t === type ? 'on' : ''}" aria-selected="${t === type}">${TYPES[t].plural}<span>${Store.all(t).length}</span></a>`).join('')}</div>`;
+    const head = shelfTabs + `<div class="page-head"><div><h1 class="page-title">${TYPES[type].plural}</h1><p class="page-sub">${items.length} ${items.length === 1 ? 'Eintrag' : 'Einträge'}</p></div>
       <div class="head-actions" style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}${type === 'game' && Steam.connected() && Steam.hasProfile() ? `<button class="btn" data-steamsync>${I.refresh} Steam sync</button>` : ''}${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}${type === 'manga' && items.length ? `<button class="btn" data-mangacheck>${I.refresh} Neue Kapitel prüfen</button>` : ''}${['anime', 'series'].includes(type) && items.length ? `<button class="btn" data-aircheck>${I.refresh} Neue Folgen prüfen</button>` : ''}<button class="btn btn-primary fab" data-add="${type}" aria-label="${TYPES[type].label} hinzufügen">${I.plus}<span>${TYPES[type].label} hinzufügen</span></button></div></div>`;
     if (!items.length) { view.innerHTML = head + emptyState(type); return; }
 
@@ -2497,7 +2499,7 @@
     const byType = t => st.finished.filter(i => i.type === t).length;
     view.innerHTML = `<div class="${A()}">
       <div class="page-head"><div><h1 class="page-title">${st.all ? 'Statistik' : `Dein ${statsState.year}`}</h1><p class="page-sub">${st.all ? 'Alles, was du je gespielt und geschaut hast' : 'Dein Jahresrückblick'}</p></div>
-        <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;min-width:0"><button class="btn btn-primary" id="shareYear">${I.share} ${st.all ? 'Rückblick teilen' : `${statsState.year} teilen`}</button>
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;min-width:0"><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><a class="btn" href="#/trophies">${I.trophy} Alle Trophäen</a><button class="btn btn-primary" id="shareYear">${I.share} ${st.all ? 'Rückblick teilen' : `${statsState.year} teilen`}</button></div>
         <div class="chips" id="yearChips">${st.years.map(y => `<button class="chip ${statsState.year === y ? 'on' : ''}" data-y="${y}">${y}</button>`).join('')}<button class="chip ${st.all ? 'on' : ''}" data-y="all">Gesamt</button></div></div></div>
 
       <div class="stats">
@@ -2785,7 +2787,12 @@
     const [route, param] = hash.split('/');
     let active = route || 'home';
     if (route === 'item') { const it = Store.get(param); active = it ? TYPES[it.type].route : 'home'; }
-    $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === active));
+    // Regal: Spiele, Serien, Anime, Manga, Filme teilen sich einen Tab; Trophäen gehören zur Statistik
+    const SHELF = ['games', 'series', 'anime', 'manga', 'movies'];
+    if (SHELF.includes(active)) { try { localStorage.setItem('nightshelf.shelf', active); } catch {} }
+    const lastShelf = (() => { try { return localStorage.getItem('nightshelf.shelf') || 'games'; } catch { return 'games'; } })();
+    const navShelf = $('#navShelf'); if (navShelf) navShelf.href = `#/${lastShelf}`;
+    $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === active || (a.dataset.route === 'shelf' && SHELF.includes(active)) || (a.dataset.route === 'stats' && active === 'trophies')));
     const tipEl = $('#chartTip'); if (tipEl) tipEl.style.opacity = '0';
 
     if (!route) viewHome();
