@@ -28,6 +28,7 @@
  *   GET  /steam/search?q=             -> Spiele im Steam-Store finden (App-ID)
  *   GET  /steam/achievements?appid=   -> Erfolge mit Seltenheit und (falls Profil) freigeschalteten Erfolgen
  *   GET  /steam/games                 -> Spiele im eigenen Steam-Konto (für die Synchronisierung)
+ *   GET  /playtime  (Bearer PSN)      -> Spielzeit der PS4/PS5-Spiele
  */
 
 const ALLOWED_ORIGINS = [
@@ -271,6 +272,26 @@ export default {
           if (!(page.trophyTitles || []).length) break;
         }
         return json({ titles });
+      }
+
+      // Spielzeit (PS5 und die meisten PS4-Spiele) aus der PlayStation-Spieleliste
+      if (url.pathname === '/playtime') {
+        const out = [];
+        for (let offset = 0; offset < 2000; offset += 200) {
+          const res = await fetch(`https://m.np.playstation.com/api/gamelist/v2/users/me/titles?categories=ps4_game,ps5_native_game&limit=200&offset=${offset}`, {
+            headers: { Authorization: auth, 'Accept-Language': lang, Accept: 'application/json' },
+          });
+          if (res.status === 401 || res.status === 403) return json({ error: 'token_expired' }, 401);
+          if (!res.ok) return json({ error: 'psn_error' }, 502);
+          const d = await res.json();
+          (d.titles || []).forEach(t => {
+            const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(t.playDuration || '');
+            const minutes = m ? (+(m[1] || 0)) * 60 + (+(m[2] || 0)) + Math.round(+(m[3] || 0) / 60) : null;
+            out.push({ name: t.name || t.concept?.name || '', titleId: t.titleId, platform: t.category === 'ps5_native_game' ? 'PS5' : 'PS4', minutes, lastPlayed: t.lastPlayedDateTime || null, plays: t.playCount || null });
+          });
+          if (!(d.titles || []).length || out.length >= (d.totalItemCount ?? out.length)) break;
+        }
+        return json({ titles: out });
       }
 
       if (url.pathname === '/trophies') {
@@ -699,8 +720,16 @@ async function handleSteam(url, request, env, json) {
         (pa?.playerstats?.achievements || []).forEach(a => { mine[a.apiname] = a.achieved ? (a.unlocktime ? new Date(a.unlocktime * 1000).toISOString() : true) : false; });
       } catch (e) { playerError = e.code === 'steam_forbidden' ? 'profile_private' : 'unavailable'; }
     }
+    let playMinutes = null, lastPlayed = null;
+    if (cfg.steamid) {
+      try {
+        const og = await steamJSON(`${STEAM_API}/IPlayerService/GetOwnedGames/v1/?key=${cfg.key}&steamid=${cfg.steamid}&include_played_free_games=1&appids_filter%5B0%5D=${appid}`);
+        const g = og?.response?.games?.[0];
+        if (g) { playMinutes = g.playtime_forever || 0; lastPlayed = g.rtime_last_played ? new Date(g.rtime_last_played * 1000).toISOString() : null; }
+      } catch {}
+    }
     return json({
-      appid: +appid, name: game.gameName || null, cover: await steamCover(appid), playerError,
+      appid: +appid, name: game.gameName || null, cover: await steamCover(appid), playerError, playMinutes, lastPlayed,
       achievements: list.map(a => ({ api: a.name, name: a.displayName || a.name, desc: a.description || '', hidden: !!a.hidden, icon: a.icon || '', rarity: pct[a.name] ?? null, done: !!mine[a.name], doneAt: typeof mine[a.name] === 'string' ? mine[a.name] : null })),
     });
   }

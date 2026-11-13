@@ -55,6 +55,9 @@
     game: '<svg viewBox="0 0 24 24"><path d="M6 8h12a4 4 0 0 1 4 4v1a4 4 0 0 1-7 2.6L14 15h-4l-1 .6A4 4 0 0 1 2 13v-1a4 4 0 0 1 4-4zM7 11v3M5.5 12.5h3M16 12h.01M18 14h.01"/></svg>',
     tv: '<svg viewBox="0 0 24 24"><path d="M3 7h18v12H3zM8 3l4 4 4-4"/></svg>',
     image: '<svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5"/><circle cx="15.5" cy="9" r="1.5"/></svg>',
+    clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    share: '<svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M5 13v7h14v-7"/></svg>',
+    download: '<svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>',
     pause: '<svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg>',
     play: '<svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>',
     bookmark: '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
@@ -126,6 +129,23 @@
     }
     coverBusy = false;
     if (changed) render();
+  }
+
+  function playtimeEditor(it) {
+    const cur = hoursOf(it);
+    openModal({
+      title: 'Spielzeit',
+      body: `<div class="form"><div class="field"><label>Gespielte Stunden</label>
+        <div class="unit-wrap"><input class="input" id="playIn" type="number" inputmode="decimal" min="0" step="0.5" value="${cur != null ? Math.round(cur * 10) / 10 : ''}" placeholder="z. B. 35"><span>Stunden</span></div>
+        <div class="tiny">${it.playMin != null ? `Automatisch (${PLAY_SRC[it.playSrc] || ''}): ${fmtHours(it.playMin / 60)}. Was du hier einträgst, gilt stattdessen und wird nicht überschrieben.` : 'Bei Steam- und PlayStation-Spielen kommt die Zeit automatisch. Deine Angabe wird nie überschrieben.'}</div></div></div>`,
+      foot: `${it.playH != null ? '<button class="btn btn-ghost btn-danger" id="playClear">Entfernen</button>' : ''}<button class="btn btn-ghost" data-close>Abbrechen</button><button class="btn btn-primary" id="playSave">Speichern</button>`,
+      onMount: (m, close) => {
+        const save = () => { const v = $('#playIn', m).value.trim(); Store.update(it.id, { playH: v === '' ? null : Math.max(0, Math.round(+v.replace(',', '.') * 10) / 10) }); close(); render(); };
+        $('#playSave', m).onclick = save;
+        $('#playIn', m).onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); save(); } };
+        $('#playClear', m) && ($('#playClear', m).onclick = () => { Store.update(it.id, { playH: null }); close(); render(); });
+      },
+    });
   }
 
   /* Eigenes Cover: Bild vom Gerät (automatisch aufs Hochformat 2:3 zugeschnitten) oder Link */
@@ -378,9 +398,10 @@
         ${seriesFields}${animeFields}${mangaFields}
         <div class="field"><label>Bewertung</label>${starsInput(d.rating)}</div>
         <details class="form-more" ${(isEdit && d.notes) || window.matchMedia('(min-width: 821px)').matches ? 'open' : ''}>
-          <summary>Weitere Angaben <span class="tiny">Notizen, Cover</span></summary>
+          <summary>Weitere Angaben <span class="tiny">${type === 'game' ? 'Notizen, Spielzeit, Cover' : 'Notizen, Cover'}</span></summary>
           <div class="form-more-body">
             <div class="field"><label>Notizen</label><textarea class="input" name="notes" placeholder="Was hat dir gefallen?">${esc(d.notes || '')}</textarea></div>
+            ${type === 'game' ? `<div class="field"><label>Spielzeit <span class="tiny">(optional)</span></label><div class="unit-wrap"><input class="input" name="playH" type="number" inputmode="decimal" min="0" step="0.5" value="${d.playH != null ? d.playH : ''}" placeholder="${d.playMin != null ? `automatisch: ${Math.round(d.playMin / 60)}` : 'z. B. 35'}"><span>Stunden</span></div></div>` : ''}
             <div class="field"><label>Cover-Bild (Link, optional)</label><input class="input" name="cover" value="${esc(d.cover || '')}" placeholder="https://…/cover.jpg">
               <label class="add-pick-btn cover-pick" for="coverFile" style="margin-top:4px"><span class="add-pick-icon" id="coverPickIcon">${I.upload}</span><span class="add-pick-text"><b id="coverPickTitle">Bild auswählen</b><small id="coverPickSub">Vom Handy oder PC, wird aufs Hochformat zugeschnitten</small></span></label>
               <input type="file" id="coverFile" accept="image/*" hidden><div class="field-error" id="coverErr"></div></div>
@@ -568,7 +589,11 @@
             cover: form.elements.cover.value.trim(),
             notes: form.elements.notes.value.trim(),
           };
-          if (type === 'game') { data.platform = form.elements.platform.value; data.genre = form.elements.genre.value; }
+          if (type === 'game') {
+            data.platform = form.elements.platform.value; data.genre = form.elements.genre.value;
+            const ph = form.elements.playH.value.trim();
+            data.playH = ph === '' ? null : Math.max(0, Math.round(+ph.replace(',', '.') * 10) / 10);
+          }
           if (customCover) Object.assign(data, { cover: customCover, coverCustom: true, coverV: COVER_V, coverTried: true });
           data.released = released || null; // nur was im Formular steht (Jahr allein = kein genaues Datum)
           // „Fertig am“ setzt die App selbst: beim Status „Fertig“ das heutige Datum, beim Bearbeiten bleibt das alte
@@ -999,6 +1024,11 @@
       <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button>${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}</div></div>`;
   }
 
+  /* Spielzeit: eigene Angabe gilt vor automatischer (Steam/PlayStation) */
+  const hoursOf = it => it.playH != null ? it.playH : it.playMin != null ? it.playMin / 60 : null;
+  const fmtHours = h => h == null ? '' : h > 0 && h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : `${Math.round(h).toLocaleString('de-AT')} h`;
+  const PLAY_SRC = { steam: 'Steam', psn: 'PlayStation' };
+
   /* Zustand einer Karte: noch nicht erschienen hat Vorrang, sonst der Status */
   function releaseInfo(item) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -1058,6 +1088,7 @@
     const rel = releaseInfo(item);
     const state = rel ? 'upcoming' : item.status;
     if (rel) extra += `<div class="cover-release">${I.calendar}<span>${esc(releaseLabel(rel))}</span></div>`;
+    else if (item.type === 'game' && hoursOf(item) > 0) extra += `<div class="cover-hrs" title="Spielzeit">${I.clock}${fmtHours(hoursOf(item))}</div>`;
     else {
       const b = STATE_BADGE[item.status];
       if (b) extra += `<div class="cover-state" title="${esc(statusLabel(item))}">${I[b[0]]}</div>`;
@@ -1987,7 +2018,15 @@
       const src = { generated: 'Genre-Vorlage', ai: 'Von der KI passend zum Spiel erstellt', imported: 'Importiert', custom: 'Eigene Liste', psn: 'Von PlayStation', steam: 'Von Steam · Stufe nach Seltenheit' }[item.trophySource] || '';
       const sorted = list.slice().sort((a, b) => Trophies.ORDER.indexOf(a.tier) - Trophies.ORDER.indexOf(b.tier));
       const filtered = sorted.filter(t => detailFilter.value === 'all' || (detailFilter.value === 'open' ? !t.done : t.done));
-      trophySection = `<section class="section">
+      const h = hoursOf(item), manual = item.playH != null, auto = item.playMin != null;
+      const playBox = `<section class="section"><div class="play-box ${h == null ? 'empty' : ''}">
+        <div class="play-icon">${I.clock}</div>
+        <div class="grow">${h != null
+          ? `<div class="play-big">${fmtHours(h)}</div><div class="play-src">${manual ? `Selbst eingetragen${auto ? ` · ${PLAY_SRC[item.playSrc] || 'Automatisch'}: ${fmtHours(item.playMin / 60)} <button type="button" class="link-btn" id="playAuto">übernehmen</button>` : ''}` : `Von <b>${PLAY_SRC[item.playSrc] || 'automatisch'}</b>${item.lastPlayed ? ` · zuletzt gespielt ${relTime(item.lastPlayed)}` : ''}`}</div>`
+          : `<div class="play-big muted">Noch keine Spielzeit</div><div class="play-src">${['Steam', 'PS5', 'PS4'].includes(item.platform) ? 'Kommt beim nächsten Sync automatisch, oder trag sie selbst ein' : `Für ${esc(item.platform || 'diese Plattform')} gibt es keine automatische Angabe`}</div>`}</div>
+        <div class="play-btns">${h != null ? `<button class="btn btn-sm" id="playPlus">+1 h</button><button class="btn btn-sm" id="playEdit">Ändern</button>` : `<button class="btn btn-sm btn-primary" id="playEdit">Eintragen</button>`}</div>
+      </div></section>`;
+      trophySection = playBox + `<section class="section">
         <div class="trophy-head">
           <div><h2 class="section-title" style="margin:0">Trophäen</h2>${src ? `<div class="tiny">${src}</div>` : ''}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -2104,6 +2143,9 @@
         } catch (err) { toast(`<div><b>${err.code === 'key_rejected' ? 'Steam lehnt den Schlüssel ab' : 'Steam nicht erreichbar'}</b><small>${err.code === 'key_rejected' ? 'Unter Daten neu verbinden' : 'Später nochmal versuchen'}</small></div>`); }
         render();
       });
+      $('#playPlus') && ($('#playPlus').onclick = () => { const it = g(); Store.update(it.id, { playH: Math.round((hoursOf(it) || 0)) + 1 }); render(); });
+      $('#playAuto') && ($('#playAuto').onclick = () => { Store.update(g().id, { playH: null }); render(); });
+      $('#playEdit') && ($('#playEdit').onclick = () => playtimeEditor(g()));
       $('#tGen').onclick = () => (g().trophies?.length ? trophyGenerate(g()) : trophyGenerate(g()));
       $('#tGen2') && ($('#tGen2').onclick = () => trophyGenerate(g()));
       $('#tImp2') && ($('#tImp2').onclick = () => trophyImport(g()));
@@ -2309,6 +2351,116 @@
     </div>`;
   }
 
+  /* ---------- Jahresrückblick als Bild (zum Teilen/Speichern, ohne Konto) ---------- */
+  function loadImg(src) {
+    return new Promise(res => {
+      if (!src) return res(null);
+      const i = new Image();
+      if (!src.startsWith('data:')) i.crossOrigin = 'anonymous';
+      const t = setTimeout(() => res(null), 5000);
+      i.onload = () => { clearTimeout(t); res(i); };
+      i.onerror = () => { clearTimeout(t); res(null); };
+      i.src = src;
+    });
+  }
+  function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function fitText(ctx, text, max) { if (ctx.measureText(text).width <= max) return text; let t = text; while (t.length > 1 && ctx.measureText(t + '…').width > max) t = t.slice(0, -1); return t + '…'; }
+
+  async function makeYearCard(st, year) {
+    await document.fonts?.ready;
+    const W = 1080, H = 1920, c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    // Hintergrund
+    x.fillStyle = '#0E0B16'; x.fillRect(0, 0, W, H);
+    const glow = (cx, cy, r, col) => { const g = x.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(14,11,22,0)'); x.fillStyle = g; x.fillRect(0, 0, W, H); };
+    glow(160, 120, 900, 'rgba(139,92,246,.45)'); glow(1000, 1500, 800, 'rgba(34,211,238,.18)'); glow(900, 300, 500, 'rgba(196,181,253,.12)');
+    const display = '"Space Grotesk", Inter, sans-serif', body = 'Inter, system-ui, sans-serif';
+    // Kopf
+    x.fillStyle = '#C4B5FD'; x.font = `600 30px ${body}`; x.letterSpacing = '8px'; x.fillText('NIGHTSHELF', 80, 140); x.letterSpacing = '0px';
+    x.fillStyle = '#F4F1FA'; x.font = `700 136px ${display}`; x.fillText(st.all ? 'Mein Regal' : `Mein ${year}`, 72, 300);
+    x.fillStyle = '#B8AECD'; x.font = `500 38px ${body}`; x.fillText(st.all ? 'Alles, was ich je gespielt und geschaut habe' : 'Mein Jahr in Spielen, Serien & Anime', 80, 370);
+    // Kacheln
+    const games = Store.all('game'), hrs = games.reduce((a, g) => a + (hoursOf(g) || 0), 0);
+    const by = t => st.finished.filter(i => i.type === t).length;
+    const tiles = [
+      ['Platin', st.tierCount.platinum, '#22D3EE'],
+      ['Trophäen', st.trophies.length, '#E9BE58'],
+      ['Spiele fertig', by('game'), '#F4F1FA'],
+      ['Folgen gesehen', st.episodes, '#F4F1FA'],
+      ['Serien & Anime fertig', by('series') + by('anime'), '#F4F1FA'],
+      ['Filme gesehen', by('movie'), '#F4F1FA'],
+      ['Manga-Kapitel', Math.round(st.chapters), '#F4F1FA'],
+      ...(st.all && hrs ? [['Stunden gespielt', Math.round(hrs), '#C4B5FD']] : []),
+    ].filter(t => t[1] > 0).slice(0, 6);
+    const tw = (W - 160 - 30) / 2, th = 210;
+    tiles.forEach(([label, val, col], i) => {
+      const tx = 80 + (i % 2) * (tw + 30), ty = 450 + Math.floor(i / 2) * (th + 30);
+      rr(x, tx, ty, tw, th, 36); x.fillStyle = i === 0 ? 'rgba(34,211,238,.10)' : 'rgba(26,21,38,.85)'; x.fill();
+      x.strokeStyle = i === 0 ? 'rgba(34,211,238,.45)' : 'rgba(255,255,255,.08)'; x.lineWidth = 2; x.stroke();
+      x.fillStyle = col; x.font = `700 92px ${display}`; x.fillText(val.toLocaleString('de-AT'), tx + 40, ty + 120);
+      x.fillStyle = '#B8AECD'; x.font = `500 32px ${body}`; x.fillText(label, tx + 42, ty + 172);
+    });
+    let y = 450 + Math.ceil(Math.max(tiles.length, 1) / 2) * (th + 30) + 40;
+    // Highlights mit Covern
+    const hi = st.rated.slice(0, 3);
+    if (hi.length) {
+      x.fillStyle = '#F4F1FA'; x.font = `700 48px ${display}`; x.fillText(st.all ? 'Meine Favoriten' : 'Highlights', 80, y); y += 40;
+      const cw = (W - 160 - 2 * 30) / 3, ch = cw * 1.5;
+      const imgs = await Promise.all(hi.map(i => loadImg(i.cover)));
+      hi.forEach((it, i) => {
+        const cx = 80 + i * (cw + 30);
+        x.save(); rr(x, cx, y, cw, ch, 28); x.clip();
+        const g = x.createLinearGradient(cx, y, cx + cw, y + ch); g.addColorStop(0, '#4c2c8a'); g.addColorStop(1, '#140c22'); x.fillStyle = g; x.fillRect(cx, y, cw, ch);
+        const im = imgs[i];
+        if (im) { const sc = Math.max(cw / im.naturalWidth, ch / im.naturalHeight); const w = im.naturalWidth * sc, h = im.naturalHeight * sc; x.drawImage(im, cx + (cw - w) / 2, y + (ch - h) / 2, w, h); }
+        else { x.fillStyle = 'rgba(255,255,255,.9)'; x.font = `700 70px ${display}`; x.fillText(initials(it.title), cx + 28, y + ch - 50); }
+        x.restore();
+        x.strokeStyle = 'rgba(255,255,255,.1)'; x.lineWidth = 2; rr(x, cx, y, cw, ch, 28); x.stroke();
+        x.fillStyle = '#F4F1FA'; x.font = `600 30px ${body}`; x.fillText(fitText(x, it.title, cw), cx, y + ch + 46);
+        x.fillStyle = '#C4B5FD'; x.font = `500 28px ${body}`; x.fillText('★'.repeat(it.rating || 0), cx, y + ch + 86);
+      });
+      y += ch + 130;
+    }
+    // Letzte Platin
+    const plat = st.plats[0];
+    if (plat && y < H - 260) {
+      rr(x, 80, y, W - 160, 130, 32); x.fillStyle = 'rgba(26,21,38,.85)'; x.fill(); x.strokeStyle = 'rgba(34,211,238,.35)'; x.lineWidth = 2; x.stroke();
+      x.fillStyle = '#22D3EE'; x.font = `600 28px ${body}`; x.fillText(st.all ? 'Letzte Platin' : `Platin #${plat.n}`, 120, y + 52);
+      x.fillStyle = '#F4F1FA'; x.font = `600 38px ${body}`; x.fillText(fitText(x, plat.g.title, W - 240), 120, y + 100);
+    }
+    // Fuß
+    x.fillStyle = '#7D7296'; x.font = `500 28px ${body}`; x.fillText('mark-stessl.github.io/nightshelf', 80, H - 80);
+    x.textAlign = 'right'; x.fillText(new Date().toLocaleDateString('de-AT', { day: 'numeric', month: 'long', year: 'numeric' }), W - 80, H - 80); x.textAlign = 'left';
+    return c;
+  }
+
+  async function shareYear(st, year) {
+    openModal({
+      title: st.all ? 'Rückblick teilen' : `Dein ${year} teilen`,
+      body: `<div class="share-prev" id="sharePrev"><div class="tiny">Bild wird erstellt…</div></div>`,
+      foot: `<button class="btn btn-ghost" data-close>Schließen</button><button class="btn" id="shareSave" disabled>${I.download || I.upload} Speichern</button><button class="btn btn-primary" id="shareGo" disabled>${I.share} Teilen</button>`,
+      onMount: async m => {
+        const canvas = await makeYearCard(st, year);
+        let blob;
+        try { blob = await new Promise(r => canvas.toBlob(r, 'image/png')); } catch { blob = null; }
+        const prev = $('#sharePrev', m); if (!prev) return;
+        if (!blob) { prev.innerHTML = '<div class="tiny">Das Bild konnte nicht erstellt werden.</div>'; return; }
+        const url = URL.createObjectURL(blob);
+        const name = `nightshelf-${st.all ? 'rueckblick' : year}.png`;
+        prev.innerHTML = `<img src="${url}" alt="Jahresrückblick">`;
+        const file = new File([blob], name, { type: 'image/png' });
+        const go = $('#shareGo', m), save = $('#shareSave', m);
+        save.disabled = false;
+        save.onclick = () => { const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); };
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          go.disabled = false;
+          go.onclick = () => navigator.share({ files: [file], title: 'Nightshelf' }).catch(() => {});
+        } else go.remove();
+      },
+    });
+  }
+
   function viewStats() {
     const st = collectStats(statsState.year);
     if (!st.all && !st.years.includes(statsState.year)) statsState.year = st.years[0];
@@ -2316,7 +2468,8 @@
     const byType = t => st.finished.filter(i => i.type === t).length;
     view.innerHTML = `<div class="${A()}">
       <div class="page-head"><div><h1 class="page-title">${st.all ? 'Statistik' : `Dein ${statsState.year}`}</h1><p class="page-sub">${st.all ? 'Alles, was du je gespielt und geschaut hast' : 'Dein Jahresrückblick'}</p></div>
-        <div class="chips" id="yearChips">${st.years.map(y => `<button class="chip ${statsState.year === y ? 'on' : ''}" data-y="${y}">${y}</button>`).join('')}<button class="chip ${st.all ? 'on' : ''}" data-y="all">Gesamt</button></div></div>
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;min-width:0"><button class="btn btn-primary" id="shareYear">${I.share} ${st.all ? 'Rückblick teilen' : `${statsState.year} teilen`}</button>
+        <div class="chips" id="yearChips">${st.years.map(y => `<button class="chip ${statsState.year === y ? 'on' : ''}" data-y="${y}">${y}</button>`).join('')}<button class="chip ${st.all ? 'on' : ''}" data-y="all">Gesamt</button></div></div></div>
 
       <div class="stats">
         <div class="stat feature"><div class="stat-label">${I.trophy} Trophäen ${period}</div><div class="stat-value">${st.trophies.length.toLocaleString('de-AT')}</div><div class="stat-hint">${['gold', 'silver', 'bronze'].map(t => `${st.tierCount[t]} ${Trophies.TIERS[t].label}`).join(' · ')}</div></div>
@@ -2342,15 +2495,32 @@
         </div>
       </div>
 
+      ${(() => {
+        const games = Store.all('game').filter(g => g.status !== 'planned');
+        const withH = games.filter(g => hoursOf(g) > 0).sort((a, b) => hoursOf(b) - hoursOf(a));
+        if (!withH.length) return '';
+        const total = withH.reduce((a, g) => a + hoursOf(g), 0), missing = games.length - withH.length;
+        const src = k => withH.filter(g => g.playH == null && g.playSrc === k).reduce((a, g) => a + g.playMin / 60, 0);
+        const manual = withH.filter(g => g.playH != null).reduce((a, g) => a + g.playH, 0);
+        const top = withH.slice(0, 5), max = hoursOf(top[0]);
+        return `<section class="section"><h2 class="section-title">Spielzeit<span class="tiny" style="font-family:var(--font)">insgesamt, nicht nach Jahren</span></h2>
+          <div class="panel play-stats">
+            <div class="play-total"><div class="stat-value">${fmtHours(total)}</div><div class="stat-hint">in ${withH.length} ${withH.length === 1 ? 'Spiel' : 'Spielen'}${missing ? ` · ${missing} ${missing === 1 ? 'Spiel' : 'Spiele'} ohne Spielzeit` : ''}</div>
+              <div class="play-split">${[['Steam', src('steam')], ['PlayStation', src('psn')], ['Selbst eingetragen', manual]].filter(x => x[1] > 0).map(([l, v]) => `<span><b>${fmtHours(v)}</b> ${l}</span>`).join('')}</div></div>
+            <div class="play-bars">${top.map(g => `<a class="play-bar" href="#/item/${g.id}"><span class="n">${esc(g.title)}</span><i style="width:${Math.max(4, hoursOf(g) / max * 100)}%"></i><span class="v">${fmtHours(hoursOf(g))}</span></a>`).join('')}</div>
+          </div></section>`;
+      })()}
+
       <section class="section"><h2 class="section-title">Folgen ${st.all ? 'pro Jahr' : 'pro Monat'}</h2>
         <div class="panel chart-panel">${st.episodes ? simpleChart(st, 'episodes', 'Folgen') : '<div class="list-empty">Gezählt wird ab jetzt: Jede Folge, die du bei Serien und Anime mit + abhakst, landet hier.</div>'}</div></section>
 
       <section class="section"><h2 class="section-title">Abgeschlossen ${period}</h2><div class="list-card">${st.finished.length ? st.finished.slice(0, 30).map(i => listRow(i, `${TYPES[i.type].label} · ${fmtDate(i.finishedAt)}`)).join('')
         : '<div class="list-empty">Noch nichts mit Datum. Wenn du etwas auf „Durchgespielt“, „Fertig geschaut“ oder „Gesehen“ setzt, wird das Datum gespeichert.</div>'}</div>
-        ${st.undatedFinished ? `<p class="tiny" style="margin-top:8px">${st.undatedFinished} abgeschlossene Einträge haben kein Datum. Du kannst es beim Bearbeiten unter „Fertig am“ nachtragen.</p>` : ''}</section>
+        ${st.undatedFinished ? `<p class="tiny" style="margin-top:8px">${st.undatedFinished} abgeschlossene Einträge haben kein Datum und fehlen deshalb in den Jahren.</p>` : ''}</section>
     </div>`;
 
     $$('#yearChips .chip').forEach(c => c.onclick = () => { statsState.year = c.dataset.y; animate = true; render(); animate = false; });
+    $('#shareYear').onclick = () => shareYear(st, statsState.year);
     bindChartTips();
   }
 

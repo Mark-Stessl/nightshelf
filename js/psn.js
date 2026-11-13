@@ -118,8 +118,23 @@ const PSN = (() => {
     return Store.update(item.id, patch);
   }
 
+  /* Spielzeit (PS5/PS4) – einmal pro Sync laden, per Name zuordnen */
+  async function playtimes() {
+    try { return (await api('/playtime')).titles || []; } catch (e) { if (e.code === 'expired') throw e; return []; }
+  }
+  function applyPlaytime(item, list) {
+    const n = norm(item.title);
+    const hits = list.filter(p => p.minutes != null && norm(p.name) === n);
+    if (!hits.length) return;
+    const minutes = hits.reduce((a, p) => a + p.minutes, 0); // PS4- und PS5-Version zusammenzählen
+    const lastPlayed = hits.map(p => p.lastPlayed).filter(Boolean).sort().pop() || null;
+    const cur = Store.get(item.id);
+    if (cur && (cur.playMin !== minutes || cur.lastPlayed !== lastPlayed)) Store.update(item.id, { playMin: minutes, playSrc: 'psn', lastPlayed });
+  }
+
   async function syncAll({ onProgress, enrich = true } = {}) {
     const all = await titles(true);
+    const play = await playtimes();
     const groups = new Map();
     all.forEach(t => {
       const k = norm(t.name);
@@ -140,6 +155,7 @@ const PSN = (() => {
         let item = games.find(g => g.psnId === t.id) || games.find(g => norm(g.title) === norm(t.name));
         if (item) {
           applyToItem(item, t, trophyList);
+          applyPlaytime(item, play);
           result.updated++;
         } else {
           const recent = t.updated && (Date.now() - Date.parse(t.updated)) < 30 * 864e5;
@@ -164,6 +180,7 @@ const PSN = (() => {
           item = Store.add(data);
           games.push(item);
           applyToItem(item, t, trophyList);
+          applyPlaytime(item, play);
           result.added++;
         }
       } catch (e) {
@@ -182,6 +199,7 @@ const PSN = (() => {
     if (!t) return null;
     const list = await trophies(t);
     applyToItem(item, t, list);
+    applyPlaytime(item, await playtimes());
     return list;
   }
 

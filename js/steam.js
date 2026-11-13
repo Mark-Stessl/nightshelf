@@ -63,6 +63,7 @@ const Steam = (() => {
   function patchFor(item, appid, res) {
     const trophies = toTrophies(appid, res.achievements, item.trophies || []);
     const patch = { trophies, trophySource: 'steam', steamAppId: appid };
+    if (res.playMinutes != null) Object.assign(patch, { playMin: res.playMinutes, playSrc: 'steam', lastPlayed: res.lastPlayed || null });
     if (res.cover) { patch.cover = res.cover; patch.coverTried = true; patch.coverV = 2; }
     const plat = trophies.find(t => t.tier === 'platinum');
     if (plat?.done) { patch.status = 'done'; patch.finishedAt = plat.doneAt || item.finishedAt || null; }
@@ -81,7 +82,7 @@ const Steam = (() => {
       const mine = Store.all('game');
       const existing = mine.find(x => x.steamAppId === g.appid) || mine.find(x => norm(x.title) === norm(g.name) && (x.platform === 'Steam' || !x.platform));
       try {
-        const res = await achievementsFor(g.appid);
+        const res = { ...(await achievementsFor(g.appid)), playMinutes: g.minutes, lastPlayed: g.lastPlayed };
         const before = existing ? Trophies.progress(existing.trophies || []).done : 0;
         if (existing) {
           Store.update(existing.id, patchFor(existing, g.appid, res));
