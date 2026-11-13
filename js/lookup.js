@@ -81,7 +81,7 @@ const Lookup = (() => {
     [/nintendo switch 2/i, 'Switch 2'], [/^nintendo switch$/i, 'Switch'], [/^wii u$/i, 'Wii U'], [/^wii$/i, 'Wii'], [/gamecube/i, 'GameCube'],
     [/nintendo 3ds/i, '3DS'], [/^nintendo ds$/i, 'DS'], [/nintendo 64/i, 'N64'],
     [/xbox series/i, 'Xbox Series'], [/^xbox one$/i, 'Xbox One'], [/^xbox 360$/i, 'Xbox 360'], [/^xbox( \(console\))?$/i, 'Xbox'],
-    [/^steam$/i, 'Steam'], [/^(microsoft windows|linux|macos)$/i, 'PC'], [/steam deck/i, 'Steam Deck'], [/^(ios|android)$/i, 'Mobile'],
+    [/^(steam|steam deck|microsoft windows|linux|macos)$/i, 'Steam'], [/^(ios|android)$/i, 'Mobile'],
   ];
   const GENRE_RULES = [
     [/role-playing/i, 'rpg'], [/platform game|platformer/i, 'platformer'], [/shooter/i, 'shooter'], [/racing|kart/i, 'racing'],

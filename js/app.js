@@ -28,12 +28,12 @@
     ['PlayStation', ['PS5', 'PS4', 'PS3', 'PS2', 'PS1', 'PS Vita', 'PSP']],
     ['Nintendo', ['Switch 2', 'Switch', 'Wii U', 'Wii', 'GameCube', '3DS', 'DS', 'N64']],
     ['Xbox', ['Xbox Series', 'Xbox One', 'Xbox 360', 'Xbox']],
-    ['Steam', ['Steam', 'Steam Deck']],
-    ['PC', ['PC']],
+    ['Steam', ['Steam']],
     ['Sonstige', ['Mobile', 'Andere']],
   ];
   const PLATFORMS = PLATFORM_GROUPS.flatMap(([, list]) => list);
-  const familyOf = p => (PLATFORM_GROUPS.find(([, list]) => list.includes(p)) || ['Sonstige'])[0];
+  const LEGACY_FAMILY = { PC: 'Steam', 'Steam Deck': 'Steam' }; // alte Einträge zählen weiter zu Steam
+  const familyOf = p => LEGACY_FAMILY[p] || (PLATFORM_GROUPS.find(([, list]) => list.includes(p)) || ['Sonstige'])[0];
   const platformOptions = sel => PLATFORM_GROUPS.map(([g, list]) => `<optgroup label="${g}">${list.map(p => `<option ${p === sel ? 'selected' : ''}>${p}</option>`).join('')}</optgroup>`).join('')
     + (sel && !PLATFORMS.includes(sel) ? `<option selected>${esc(sel)}</option>` : '');
   const psDefault = p => isPS(p) ? (PSN.connected() ? 'psn' : 'paste') : 'auto';
@@ -373,7 +373,7 @@
             if (type === 'game') {
               if (dt.genre && F.genre) F.genre.value = dt.genre;
               if (dt.platforms?.length && !dt.platforms.includes(F.platform.value)) {
-                const pref = ['PS5', 'Switch 2', 'Switch', 'PS4', 'Steam', 'PC', 'Xbox Series', 'Xbox One', 'Wii U', 'PS3', 'Xbox 360', 'Wii', '3DS', 'Mobile'].find(p => dt.platforms.includes(p));
+                const pref = ['PS5', 'Switch 2', 'Switch', 'PS4', 'Steam', 'Xbox Series', 'Xbox One', 'Wii U', 'PS3', 'Xbox 360', 'Wii', '3DS', 'Mobile'].find(p => dt.platforms.includes(p));
                 if (pref) { F.platform.value = pref; F.platform.onchange && F.platform.onchange(); }
               }
             }
