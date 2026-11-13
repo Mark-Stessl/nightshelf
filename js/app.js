@@ -2597,6 +2597,7 @@
     });
   }
 
+  const PLAT_SHOW = 5;
   function viewStats() {
     const st = collectStats(statsState.year);
     if (!st.all && !st.years.includes(statsState.year)) statsState.year = st.years[0];
@@ -2618,10 +2619,10 @@
         <div class="panel chart-panel">${st.trophies.length ? stackedChart(st) : '<div class="list-empty">In diesem Zeitraum hast du noch keine Trophäen mit Datum.</div>'}</div></section>
 
       <div class="two-col section">
-        <div><h2 class="section-title">Platin-Chronik</h2><div class="list-card">${st.plats.length ? st.plats.map(({ t, g, n }) => `
-          <a class="list-row" href="#/item/${g.id}"><div class="plat-n">#${n}</div><div class="thumb">${coverHTML(g, { noTitle: true })}</div>
+        <div><h2 class="section-title">Platin-Chronik${st.plats.length > PLAT_SHOW ? `<span class="tiny" style="font-family:var(--font)">${st.plats.length} Platin</span>` : ''}</h2><div class="list-card plat-chron" id="platChron">${st.plats.length ? st.plats.map(({ t, g, n }, idx) => `
+          <a class="list-row${idx >= PLAT_SHOW ? ' plat-extra' : ''}" href="#/item/${g.id}"><div class="plat-n">#${n}</div><div class="thumb">${coverHTML(g, { noTitle: true })}</div>
             <div class="grow"><div class="title">${esc(g.title)}</div><div class="sub">${esc(t.name)} · ${fmtDate(t.doneAt)}</div></div></a>`).join('')
-          : '<div class="list-empty">Keine Platin-Trophäe in diesem Zeitraum.</div>'}</div></div>
+          : '<div class="list-empty">Keine Platin-Trophäe in diesem Zeitraum.</div>'}${st.plats.length > PLAT_SHOW ? `<button type="button" class="plat-more" onclick="const c=this.closest('.plat-chron');const o=c.classList.toggle('open');this.textContent=o?'Weniger anzeigen':'Alle ${st.plats.length} anzeigen'">Alle ${st.plats.length} anzeigen</button>` : ''}</div></div>
         <div>
           <h2 class="section-title">Seltenste Trophäen</h2><div class="list-card" style="margin-bottom:26px">${st.rare.length ? st.rare.map(({ t, g }) => `
             <a class="list-row" href="#/item/${g.id}"><div class="tbadge">${Trophies.icon(t.tier, 22)}</div><div class="grow"><div class="title">${esc(t.name)}</div><div class="sub">${esc(g.title)}</div></div><b class="rare-pct">${String(t.rarity).replace('.', ',')} %</b></a>`).join('')

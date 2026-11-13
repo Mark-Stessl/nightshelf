@@ -1020,3 +1020,9 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 @media (min-width: 821px) {
   .nav.shelf-folded a#navShelf.active { box-shadow: inset 2px 0 0 var(--lilac); background: rgba(139, 92, 246, .1); color: var(--text); }
 }
+
+/* Platin-Chronik: nur die letzten zeigen, Rest aufklappbar */
+.plat-chron .plat-extra { display: none; }
+.plat-chron.open .plat-extra { display: flex; }
+.plat-more { display: block; width: calc(100% + 12px); margin: 6px -6px -6px; padding: 12px; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--lilac); font: 600 13px var(--font, inherit); cursor: pointer; transition: background .15s var(--ease); }
+.plat-more:hover { background: rgba(139, 92, 246, .08); }
