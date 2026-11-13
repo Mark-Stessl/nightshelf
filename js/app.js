@@ -54,6 +54,9 @@
     trophy: '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"/></svg>',
     game: '<svg viewBox="0 0 24 24"><path d="M6 8h12a4 4 0 0 1 4 4v1a4 4 0 0 1-7 2.6L14 15h-4l-1 .6A4 4 0 0 1 2 13v-1a4 4 0 0 1 4-4zM7 11v3M5.5 12.5h3M16 12h.01M18 14h.01"/></svg>',
     tv: '<svg viewBox="0 0 24 24"><path d="M3 7h18v12H3zM8 3l4 4 4-4"/></svg>',
+    pause: '<svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg>',
+    play: '<svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>',
+    bookmark: '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
     calendar: '<svg viewBox="0 0 24 24"><path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"/></svg>',
     bell: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/></svg>',
     install: '<svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>',
@@ -88,6 +91,7 @@
     return gen + (inner || '');
   }
   function stars(n) { return n ? '★'.repeat(n) + '☆'.repeat(5 - n) : ''; }
+  const statusLabel = item => (STATUS[item.type] || {})[item.status] || '';
   function statusPill(item) {
     const label = (STATUS[item.type] || {})[item.status];
     if (!label) return '';
@@ -821,6 +825,46 @@
       <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn btn-primary" data-add="${type}">${I.plus} ${TYPES[type].label} hinzufügen</button>${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}</div></div>`;
   }
 
+  /* Zustand einer Karte: noch nicht erschienen hat Vorrang, sonst der Status */
+  function releaseInfo(item) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const future = d => d && /^\d{4}-\d{2}-\d{2}/.test(d) && Date.parse(d.slice(0, 10) + 'T00:00:00') > today.getTime();
+    if (['game', 'movie'].includes(item.type) && future(item.released)) return { date: item.released.slice(0, 10) };
+    if (['anime', 'series'].includes(item.type) && item.seasonList?.length) {
+      const shows = item.seasonList.filter(x => x.format !== 'MOVIE');
+      if (shows.length && shows.every(x => x.airing === 'NOT_YET_RELEASED' || (x.aired === 0 && !x.seen))) {
+        const x = shows[0];
+        return { date: x.nextAt ? x.nextAt.slice(0, 10) : x.start || (future(item.released) ? item.released.slice(0, 10) : null) };
+      }
+    }
+    if (!item.released && item.year && item.year > today.getFullYear() && item.type !== 'manga') return { year: item.year };
+    return null;
+  }
+  function releaseLabel(r) {
+    if (r.year) return `Erscheint ${r.year}`;
+    if (!r.date) return 'Bald';
+    const d = new Date(r.date + 'T00:00:00');
+    const days = Math.round((d - new Date(new Date().toDateString())) / 86400000);
+    if (days === 1) return 'Morgen';
+    if (days < 7) return `In ${days} Tagen`;
+    return d.toLocaleDateString('de-AT', { day: 'numeric', month: 'short', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
+  }
+  // Fortschritt 0..1 für laufende Einträge (Folgen, Kapitel)
+  function mediaProgress(item) {
+    if (['anime', 'series'].includes(item.type) && item.seasonList?.length) {
+      const shows = item.seasonList.filter(x => x.format !== 'MOVIE');
+      const total = shows.reduce((a, x) => a + (released(x) || 0), 0);
+      const seen = shows.reduce((a, x) => a + Math.min(x.seen || 0, released(x) || x.seen || 0), 0);
+      return total ? seen / total : null;
+    }
+    if (item.type === 'anime' && item.episodes) return (item.episodesSeen || 0) / item.episodes;
+    if (item.type === 'manga' && item.chapters) return Math.min(1, (item.chaptersRead || 0) / item.chapters);
+    return null;
+  }
+  const STATE_BADGE = {
+    done: ['check', 'Fertig'], active: ['play', 'Läuft'], paused: ['pause', 'Pausiert'], planned: ['bookmark', 'Merkliste'], dropped: ['x', 'Abgebrochen'],
+  };
+
   function cardHTML(item) {
     const meta = [];
     if (item.type === 'game' && item.platform) meta.push(esc(item.platform));
@@ -837,7 +881,18 @@
     }
     const behind = newCount(item);
     if (behind > 0 && ['active', 'paused', 'done'].includes(item.status)) extra += `<div class="cover-new" title="${behind} ${item.type === 'manga' ? 'ungelesene Kapitel' : 'neue Folgen'}">+${behind > 99 ? '99' : fmtCh(behind)}</div>`;
-    return `<a class="card ${A()}" href="#/item/${item.id}">
+    const rel = releaseInfo(item);
+    const state = rel ? 'upcoming' : item.status;
+    if (rel) extra += `<div class="cover-release">${I.calendar}<span>${esc(releaseLabel(rel))}</span></div>`;
+    else {
+      const b = STATE_BADGE[item.status];
+      if (b) extra += `<div class="cover-state" title="${esc(statusLabel(item))}">${I[b[0]]}</div>`;
+      if (item.type !== 'game' && ['active', 'paused'].includes(item.status)) {
+        const pr = mediaProgress(item);
+        if (pr != null) extra += `<div class="cover-progress"><i style="width:${Math.round(Math.min(1, pr) * 100)}%"></i></div>`;
+      }
+    }
+    return `<a class="card st-${state} ${A()}" href="#/item/${item.id}">
       <div class="cover">${coverHTML(item)}${item.type === 'game' && item.platform ? `<span class="cover-tag">${esc(item.platform)}</span>` : ''}${extra}</div>
       <div><div class="card-title">${esc(item.title)}</div>
       <div class="card-meta">${meta.join('<span class="dot"></span>')}${item.rating ? `${meta.length ? '<span class="dot"></span>' : ''}<span class="stars-mini">${'★'.repeat(item.rating)}</span>` : ''}</div></div>
@@ -1787,7 +1842,7 @@
         <div class="cover">${coverHTML(item)}</div>
         <div class="hero-info">
           <div class="hero-head">
-            ${statusPill(item)}
+            ${statusPill(item)}${(() => { const r = releaseInfo(item); return r ? `<span class="status-pill st-upcoming">${I.calendar} ${r.date && !r.year ? `Erscheint am ${new Date(r.date + 'T00:00:00').toLocaleDateString('de-AT', { day: 'numeric', month: 'long', year: 'numeric' })}` : esc(releaseLabel(r))}</span>` : ''; })()}
             <h1 class="hero-title">${esc(item.title)}</h1>
             <div class="hero-meta">${meta.join('<span class="dot"></span>')}</div>
             <div class="hero-stars" style="margin-top:12px">${starsInput(item.rating, 'heroRating')}</div>

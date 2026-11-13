@@ -769,3 +769,50 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   /* Hinter der Uhr/Statusleiste nichts durchscheinen lassen */
   body::after { content: ''; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: rgba(14, 11, 22, .94); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); z-index: 45; pointer-events: none; }
 }
+
+/* ---------- Zustände auf den Covern ---------- */
+.cover-state { position: absolute; left: 8px; bottom: 10px; z-index: 2; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(14, 11, 22, .78); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, .12); color: var(--text-2); }
+.cover-state svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.cover .cover-img-wrap, .card .cover img, .card .cover .cover-gen { transition: filter .3s var(--ease), opacity .3s var(--ease); }
+
+/* Fertig: cyan Haken, leichter Rahmen */
+.card.st-done .cover { box-shadow: 0 0 0 1.5px rgba(34, 211, 238, .45); }
+.card.st-done .cover-state { background: var(--cyan); border-color: var(--cyan); color: #0E0B16; box-shadow: 0 0 12px rgba(34, 211, 238, .55); }
+.card.st-done:has(.cover-plat) .cover { box-shadow: 0 0 0 1.5px var(--platinum), 0 0 22px -4px rgba(34, 211, 238, .7); }
+
+/* Läuft: violetter Punkt + Fortschritt */
+.card.st-active .cover-state { background: var(--violet); border-color: var(--violet); color: #fff; box-shadow: 0 0 12px rgba(139, 92, 246, .6); }
+.card.st-active .cover-state svg { fill: currentColor; stroke-width: 1.5; width: 11px; height: 11px; margin-left: 2px; }
+.card.st-active .cover-state, .card.st-paused .cover-state { bottom: 12px; }
+
+/* Pausiert: leicht abgedunkelt */
+.card.st-paused .cover img, .card.st-paused .cover .cover-gen { filter: brightness(.72); }
+.card.st-paused .cover-state { color: var(--lilac); }
+
+/* Merkliste: Lesezeichen */
+.card.st-planned .cover-state { color: var(--lilac); border-color: rgba(196, 181, 253, .35); }
+
+/* Abgebrochen: grau und blass */
+.card.st-dropped .cover img, .card.st-dropped .cover .cover-gen { filter: grayscale(1) brightness(.6); }
+.card.st-dropped .cover-state { color: var(--danger); border-color: rgba(248, 113, 113, .4); }
+.card.st-dropped .card-title { color: var(--text-3); }
+
+/* Noch nicht erschienen: entsättigt, gestrichelter Rahmen, Datum unten */
+.card.st-upcoming .cover { outline: 1.5px dashed rgba(196, 181, 253, .45); outline-offset: -1.5px; }
+.card.st-upcoming .cover img, .card.st-upcoming .cover .cover-gen { filter: saturate(.35) brightness(.62); }
+.cover-release { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 8px; border-radius: 10px; background: rgba(14, 11, 22, .82); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid rgba(196, 181, 253, .3); font-size: 12px; font-weight: 600; color: var(--lilac); white-space: nowrap; overflow: hidden; }
+.cover-release svg { width: 13px; height: 13px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.cover-release span { overflow: hidden; text-overflow: ellipsis; }
+.status-pill.st-upcoming { background: rgba(196, 181, 253, .1); color: var(--lilac); border-color: rgba(196, 181, 253, .35); display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; }
+.status-pill.st-upcoming::before { display: none; }
+.status-pill.st-upcoming svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+@media (max-width: 820px) {
+  .cover-state { width: 22px; height: 22px; left: 6px; bottom: 8px; }
+  .cover-state svg { width: 11px; height: 11px; }
+  .card.st-active .cover-state, .card.st-paused .cover-state { bottom: 9px; }
+  .cover-release { left: 5px; right: 5px; bottom: 5px; padding: 4px 5px; font-size: 10.5px; border-radius: 8px; gap: 4px; }
+  .cover-release svg { width: 11px; height: 11px; }
+  .cover-plat, .cover-new { top: 6px; right: 6px; }
+  .cover-tag { top: 6px; left: 6px; font-size: 10px; padding: 2px 6px; }
+}
