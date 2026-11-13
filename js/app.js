@@ -80,15 +80,19 @@
   const coverQueue = [];
   let coverBusy = false;
   const coverNorm = t => (t || '').toLowerCase().replace(/[-–]?\s*troph(ä|ae)en$/i, '').replace(/[™®©]/g, '').replace(/[^a-z0-9]+/g, '');
+  const COVER_V = 2; // Version der Cover-Suche: alte Einträge werden mit der neuen Suche einmal nachgeholt
+  const queueCover = id => { const it = Store.get(id); if (it && it.type === 'game' && (it.coverV || 0) < COVER_V && !coverQueue.includes(id)) { coverQueue.push(id); runCoverQueue(); } };
   window.__nsCover = img => {
     const box = img.parentElement;
     if (!box || !img.naturalWidth) return;
     if (img.naturalWidth / img.naturalHeight <= 0.85) return;
-    box.classList.add('cover-wide');
-    box.style.setProperty('--cover-bg', `url("${img.currentSrc || img.src}")`);
-    const id = img.dataset.id, it = id && Store.get(id);
-    if (it && it.type === 'game' && !it.coverTried && !coverQueue.includes(id)) { coverQueue.push(id); runCoverQueue(); }
+    const src = img.currentSrc || img.src;
+    // Logos (meist durchsichtige PNG/SVG) auf dem Farbverlauf zeigen, Fotos mit unscharfem Hintergrund
+    if (/\.(png|svg)(\?|$)|logo/i.test(src)) box.classList.add('cover-logo');
+    else { box.classList.add('cover-wide'); box.style.setProperty('--cover-bg', `url("${src}")`); }
+    if (img.dataset.id) queueCover(img.dataset.id);
   };
+  window.__nsCoverErr = img => { const id = img.dataset.id; img.remove(); if (id) queueCover(id); };
   const imgRatio = src => new Promise(res => { const i = new Image(); i.onload = () => res(i.naturalWidth / i.naturalHeight); i.onerror = () => res(null); i.src = src; });
   async function runCoverQueue() {
     if (coverBusy) return;
@@ -96,18 +100,28 @@
     let changed = false;
     while (coverQueue.length) {
       const id = coverQueue.shift(), it = Store.get(id);
-      if (!it || it.coverTried) continue;
+      if (!it || (it.coverV || 0) >= COVER_V) continue;
       let better = null;
-      try {
-        const q = it.title.replace(/[-–]?\s*Troph(ä|ae)en$/i, '').replace(/[™®©]/g, '').trim();
-        const want = coverNorm(q), wantShort = coverNorm(q.split(':')[0]);
-        const hits = await Lookup.search('game', q);
-        const hit = hits.find(h => h.cover && coverNorm(h.title) === want) || hits.find(h => h.cover && coverNorm(h.title.split(':')[0]) === wantShort && wantShort.length >= 4);
-        if (hit) { const r = await imgRatio(hit.cover); if (r && r < 0.85) better = hit.cover; }
-      } catch {}
-      Store.update(id, better ? { cover: better, coverTried: true } : { coverTried: true });
+      const q = it.title.replace(/[-–]?\s*Troph(ä|ae)en$/i, '').replace(/[™®©]/g, '').trim();
+      // 1. Steam (offizielle Store-Bilder, auch für Spiele, die nicht auf Steam gespielt werden)
+      if (Sync.enabled()) {
+        try {
+          const hit = it.steamAppId ? { appid: it.steamAppId } : await Steam.find(q);
+          if (hit) { const c = await Steam.cover(hit.appid); const r = c.portrait ? await imgRatio(c.portrait) : null; if (r && r < 0.85) better = c.portrait; }
+        } catch {}
+      }
+      // 2. Wikipedia-Packungsbild
+      if (!better) {
+        try {
+          const want = coverNorm(q), wantShort = coverNorm(q.split(':')[0]);
+          const hits = await Lookup.search('game', q);
+          const hit = hits.find(h => h.cover && coverNorm(h.title) === want) || hits.find(h => h.cover && coverNorm(h.title.split(':')[0]) === wantShort && wantShort.length >= 4);
+          if (hit) { const r = await imgRatio(hit.cover); if (r && r < 0.85) better = hit.cover; }
+        } catch {}
+      }
+      Store.update(id, better ? { cover: better, coverTried: true, coverV: COVER_V } : { coverTried: true, coverV: COVER_V });
       if (better) changed = true;
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 300));
     }
     coverBusy = false;
     if (changed) render();
@@ -116,8 +130,8 @@
   function coverHTML(item, opts = {}) {
     let inner;
     if (item.cover) {
-      inner = `<img src="${esc(item.cover)}" alt="" loading="lazy" data-id="${esc(item.id || '')}" onload="window.__nsCover && window.__nsCover(this)" onerror="this.remove()">`;
-    }
+      inner = `<img src="${esc(item.cover)}" alt="" loading="lazy" data-id="${esc(item.id || '')}" onload="window.__nsCover && window.__nsCover(this)" onerror="window.__nsCoverErr ? window.__nsCoverErr(this) : this.remove()">`;
+    } else if (item.type === 'game' && item.id && (item.coverV || 0) < COVER_V) setTimeout(() => queueCover(item.id), 0);
     const h = hash(item.title);
     const hue = 248 + (h % 46);
     const hue2 = (h >> 3) % 3 === 0 ? 188 : hue + 30;

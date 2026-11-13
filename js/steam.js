@@ -57,12 +57,13 @@ const Steam = (() => {
   }
 
   async function achievementsFor(appid) { return call(`/steam/achievements?appid=${appid}`); }
+  async function cover(appid) { return call(`/steam/cover?appid=${appid}`); }
 
   // Patch für ein Spiel: Erfolge, App-ID, Hochformat-Cover (falls bisher keins), Status bei 100 %
   function patchFor(item, appid, res) {
     const trophies = toTrophies(appid, res.achievements, item.trophies || []);
     const patch = { trophies, trophySource: 'steam', steamAppId: appid };
-    if (res.cover && (!item.cover || !item.coverTried)) { patch.cover = res.cover; patch.coverTried = true; }
+    if (res.cover) { patch.cover = res.cover; patch.coverTried = true; patch.coverV = 2; }
     const plat = trophies.find(t => t.tier === 'platinum');
     if (plat?.done) { patch.status = 'done'; patch.finishedAt = plat.doneAt || item.finishedAt || null; }
     return patch;
@@ -99,5 +100,5 @@ const Steam = (() => {
     return result;
   }
 
-  return { connected, profile, refresh, connect, disconnect, find, achievementsFor, patchFor, toTrophies, syncAll, hasProfile: () => !!state.steamid };
+  return { connected, profile, refresh, connect, disconnect, find, achievementsFor, cover, patchFor, toTrophies, syncAll, hasProfile: () => !!state.steamid };
 })();

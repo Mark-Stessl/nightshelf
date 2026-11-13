@@ -619,12 +619,20 @@ async function steamResolve(key, input) {
   const d = await steamJSON(`${STEAM_API}/ISteamUser/ResolveVanityURL/v1/?key=${key}&vanityurl=${encodeURIComponent(vanity)}`);
   return d?.response?.success === 1 ? d.response.steamid : null;
 }
+// Offizielle Store-Bilder (Pfade enthalten bei neueren Spielen eine Prüfsumme, daher über die Store-API)
+async function steamAssets(appid) {
+  const input = { ids: [{ appid: +appid }], context: { language: 'german', country_code: 'AT' }, data_request: { include_assets: true } };
+  try {
+    const d = await steamJSON(`${STEAM_API}/IStoreBrowseService/GetItems/v1/?input_json=${encodeURIComponent(JSON.stringify(input))}`);
+    const a = d?.response?.store_items?.[0]?.assets;
+    if (!a?.asset_url_format) return null;
+    const u = f => `https://shared.cloudflare.steamstatic.com/store_item_assets/${a.asset_url_format.replace('${FILENAME}', f)}`;
+    return { portrait: a.library_capsule_2x ? u(a.library_capsule_2x) : a.library_capsule ? u(a.library_capsule) : null, header: a.header ? u(a.header) : null };
+  } catch { return null; }
+}
 async function steamCover(appid) {
-  // Hochformat-Cover aus der Steam-Bibliothek, sonst das breite Store-Bild
-  for (const u of [`https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900_2x.jpg`, `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900.jpg`]) {
-    try { const r = await fetch(u, { method: 'HEAD' }); if (r.ok) return u; } catch {}
-  }
-  return `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/header.jpg`;
+  const a = await steamAssets(appid);
+  return a?.portrait || a?.header || null;
 }
 
 async function handleSteam(url, request, env, json) {
@@ -659,6 +667,12 @@ async function handleSteam(url, request, env, json) {
     if (!q) return json({ results: [] });
     const d = await steamJSON(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(q)}&l=german&cc=AT`).catch(() => null);
     return json({ results: (d?.items || []).filter(i => i.type === 'app').slice(0, 10).map(i => ({ appid: i.id, name: i.name, thumb: i.tiny_image })) });
+  }
+
+  if (p === '/steam/cover') {
+    const appid = (url.searchParams.get('appid') || '').replace(/\D/g, '');
+    if (!appid) return json({ error: 'appid_missing' }, 400);
+    return json({ appid: +appid, ...(await steamAssets(appid) || {}) });
   }
 
   if (!cfg.key) return json({ error: 'steam_not_connected' }, 400);

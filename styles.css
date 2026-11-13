@@ -823,3 +823,7 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .cover.cover-wide, .thumb.cover-wide { overflow: hidden; }
 
 .cover.cover-wide .cover-gen .initials, .cover.cover-wide .cover-gen .ctitle { display: none; }
+
+/* Logos im Querformat (durchsichtig): auf dem Farbverlauf, mit hellem Schein, damit dunkle Schrift sichtbar bleibt */
+.cover.cover-logo img, .thumb.cover-logo img { object-fit: contain; padding: 14% 10%; filter: drop-shadow(0 0 1px rgba(255, 255, 255, .7)) drop-shadow(0 2px 10px rgba(255, 255, 255, .25)); }
+.cover.cover-logo .cover-gen .initials, .cover.cover-logo .cover-gen .ctitle { display: none; }
