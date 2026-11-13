@@ -2355,15 +2355,28 @@
 
   /* ---------- Jahresrückblick als Bild (zum Teilen/Speichern, ohne Konto) ---------- */
   function loadImg(src) {
-    return new Promise(res => {
-      if (!src) return res(null);
+    const direct = u => new Promise(res => {
       const i = new Image();
-      if (!src.startsWith('data:')) i.crossOrigin = 'anonymous';
-      const t = setTimeout(() => res(null), 5000);
+      if (!u.startsWith('data:') && !u.startsWith('blob:')) i.crossOrigin = 'anonymous';
+      const t = setTimeout(() => res(null), 6000);
       i.onload = () => { clearTimeout(t); res(i); };
       i.onerror = () => { clearTimeout(t); res(null); };
-      i.src = src;
+      i.src = u;
     });
+    return (async () => {
+      if (!src) return null;
+      // 1. direkt (klappt, wenn die Quelle CORS erlaubt; eigener Parameter umgeht alte Zwischenspeicher)
+      const sep = src.includes('?') ? '&' : '?';
+      const a = await direct(src.startsWith('data:') ? src : `${src}${sep}ns=1`);
+      if (a) return a;
+      // 2. über den eigenen Server (für Quellen ohne Freigabe)
+      if (!Sync.enabled() || src.startsWith('data:')) return null;
+      try {
+        const r = await fetch(`${PSN.worker()}/img?u=${encodeURIComponent(src)}`, { headers: Sync.header() });
+        if (!r.ok) return null;
+        return await direct(URL.createObjectURL(await r.blob()));
+      } catch { return null; }
+    })();
   }
   function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
   function fitText(ctx, text, max) { if (ctx.measureText(text).width <= max) return text; let t = text; while (t.length > 1 && ctx.measureText(t + '…').width > max) t = t.slice(0, -1); return t + '…'; }

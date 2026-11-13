@@ -1,5 +1,5 @@
 /* Nightshelf – Service Worker: App offline verfügbar machen und Benachrichtigungen anzeigen */
-const VERSION = '71';
+const VERSION = '72';
 const SHELL = `nightshelf-shell-${VERSION}`;
 const IMAGES = 'nightshelf-img';
 const FONTS = 'nightshelf-fonts';
@@ -70,7 +70,8 @@ self.addEventListener('fetch', e => {
   }
 
   // Cover-Bilder: einmal laden, dann offline verfügbar
-  if (req.destination === 'image') {
+  // Bilder für den Rückblick (crossorigin) nicht aus dem Speicher bedienen, sonst sind sie für Canvas gesperrt
+  if (req.destination === 'image' && req.mode !== 'cors') {
     e.respondWith((async () => {
       const c = await caches.open(IMAGES);
       const hit = await c.match(req);

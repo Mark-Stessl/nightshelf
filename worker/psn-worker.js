@@ -29,6 +29,7 @@
  *   GET  /steam/achievements?appid=   -> Erfolge mit Seltenheit und (falls Profil) freigeschalteten Erfolgen
  *   GET  /steam/games                 -> Spiele im eigenen Steam-Konto (für die Synchronisierung)
  *   GET  /playtime  (Bearer PSN)      -> Spielzeit der PS4/PS5-Spiele
+ *   GET  /img?u=                      -> Bild mit CORS-Freigabe (für den teilbaren Jahresrückblick)
  */
 
 const ALLOWED_ORIGINS = [
@@ -147,6 +148,16 @@ export default {
 
       if (url.pathname.startsWith('/push/')) return handlePush(url, request, env, json);
       if (url.pathname.startsWith('/steam/')) return handleSteam(url, request, env, json);
+      // Bild-Weiterleitung für den Jahresrückblick (Canvas braucht Bilder mit CORS-Freigabe)
+      if (url.pathname === '/img') {
+        const u = url.searchParams.get('u') || '';
+        if (!/^https:\/\/[^\s]+$/.test(u) || u.length > 1500) return json({ error: 'url_invalid' }, 400);
+        const r = await fetch(u, { headers: { Accept: 'image/*', 'User-Agent': 'Nightshelf/1.0' }, cf: { cacheTtl: 86400 } });
+        const type = r.headers.get('Content-Type') || '';
+        const len = +(r.headers.get('Content-Length') || 0);
+        if (!r.ok || !/^image\//.test(type) || len > 6e6) return json({ error: 'not_image' }, 404);
+        return new Response(r.body, { headers: { 'Content-Type': type, 'Cache-Control': 'private, max-age=86400', 'Access-Control-Allow-Origin': '*' } });
+      }
 
       if (url.pathname === '/manga/search') {
         const q = (url.searchParams.get('q') || '').trim().slice(0, 100);
