@@ -2900,6 +2900,12 @@
       folded = !nav.classList.contains('shelf-folded'); apply(folded);
       try { localStorage.setItem(KEY, folded ? '1' : '0'); } catch {}
     });
+    // Klick auf „Regal“ selbst klappt automatisch auf
+    document.getElementById('navShelf')?.addEventListener('click', e => {
+      if (e.target.closest('#shelfFold') || !nav.classList.contains('shelf-folded')) return;
+      folded = false; apply(false);
+      try { localStorage.setItem(KEY, '0'); } catch {}
+    });
   })();
 
   function render() {
