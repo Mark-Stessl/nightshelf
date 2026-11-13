@@ -24,6 +24,10 @@
  *   POST /push/subscribe { subscription, device } / POST /push/unsubscribe { endpoint }
  *   POST /push/test                   -> Testnachricht an ein oder alle Geräte
  *   POST /push/run                    -> Prüfung sofort ausführen (läuft sonst per Cron alle 30 Minuten)
+ *   POST /steam/connect { apiKey, profile? } / POST /steam/disconnect / GET /steam/status
+ *   GET  /steam/search?q=             -> Spiele im Steam-Store finden (App-ID)
+ *   GET  /steam/achievements?appid=   -> Erfolge mit Seltenheit und (falls Profil) freigeschalteten Erfolgen
+ *   GET  /steam/games                 -> Spiele im eigenen Steam-Konto (für die Synchronisierung)
  */
 
 const ALLOWED_ORIGINS = [
@@ -141,6 +145,7 @@ export default {
       }
 
       if (url.pathname.startsWith('/push/')) return handlePush(url, request, env, json);
+      if (url.pathname.startsWith('/steam/')) return handleSteam(url, request, env, json);
 
       if (url.pathname === '/manga/search') {
         const q = (url.searchParams.get('q') || '').trim().slice(0, 100);
@@ -595,4 +600,105 @@ async function runChecks(env) {
   const result = messages.length ? await broadcast(env, subs, messages) : { sent: 0 };
   if (JSON.stringify(state) !== JSON.stringify(prev)) await env.DATA.put('push-state', JSON.stringify(state));
   return { checked: { anime: animeChecked, rotating: done, of: n }, news: news.length, ...result };
+}
+
+/* ---------- Steam (offizielle Steam Web API, eigener Schlüssel des Besitzers) ---------- */
+const STEAM_API = 'https://api.steampowered.com';
+async function steamJSON(url) {
+  const r = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (r.status === 403 || r.status === 401) { const e = new Error('steam_forbidden'); e.code = 'steam_forbidden'; throw e; }
+  if (!r.ok) { const e = new Error('steam_' + r.status); e.code = 'steam_unavailable'; throw e; }
+  return r.json();
+}
+async function steamResolve(key, input) {
+  const s = String(input || '').trim();
+  const id = s.match(/(?:profiles\/)?(7656\d{13})/);
+  if (id) return id[1];
+  const vanity = (s.match(/steamcommunity\.com\/id\/([^/?#]+)/) || [])[1] || (/^[\w-]{2,32}$/.test(s) ? s : null);
+  if (!vanity) return null;
+  const d = await steamJSON(`${STEAM_API}/ISteamUser/ResolveVanityURL/v1/?key=${key}&vanityurl=${encodeURIComponent(vanity)}`);
+  return d?.response?.success === 1 ? d.response.steamid : null;
+}
+async function steamCover(appid) {
+  // Hochformat-Cover aus der Steam-Bibliothek, sonst das breite Store-Bild
+  for (const u of [`https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900_2x.jpg`, `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900.jpg`]) {
+    try { const r = await fetch(u, { method: 'HEAD' }); if (r.ok) return u; } catch {}
+  }
+  return `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appid}/header.jpg`;
+}
+
+async function handleSteam(url, request, env, json) {
+  if (!env?.DATA) return json({ error: 'storage_missing' }, 501);
+  const cfg = (await env.DATA.get('steam', 'json')) || {};
+  const p = url.pathname;
+
+  if (p === '/steam/status') return json({ connected: !!cfg.key, steamid: cfg.steamid || null, name: cfg.name || null });
+
+  if (p === '/steam/connect' && request.method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    const key = String(body.apiKey || '').trim().toUpperCase();
+    if (!/^[0-9A-F]{32}$/.test(key)) return json({ error: 'key_invalid' }, 400);
+    let steamid = null, name = null;
+    try {
+      if (body.profile) {
+        steamid = await steamResolve(key, body.profile);
+        if (!steamid) return json({ error: 'profile_not_found' }, 400);
+        const s = await steamJSON(`${STEAM_API}/ISteamUser/GetPlayerSummaries/v2/?key=${key}&steamids=${steamid}`);
+        const pl = s?.response?.players?.[0];
+        name = pl?.personaname || null;
+        // Schlüssel prüfen, falls kein Profil angegeben wurde: Schema eines bekannten Spiels laden
+      } else await steamJSON(`${STEAM_API}/ISteamUserStats/GetSchemaForGame/v2/?key=${key}&appid=620`);
+    } catch (e) { return json({ error: e.code === 'steam_forbidden' ? 'key_rejected' : 'steam_unavailable' }, 400); }
+    await env.DATA.put('steam', JSON.stringify({ key, steamid, name }));
+    return json({ ok: true, steamid, name });
+  }
+  if (p === '/steam/disconnect' && request.method === 'POST') { await env.DATA.delete('steam'); return json({ ok: true }); }
+
+  if (p === '/steam/search') {
+    const q = (url.searchParams.get('q') || '').slice(0, 120);
+    if (!q) return json({ results: [] });
+    const d = await steamJSON(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(q)}&l=german&cc=AT`).catch(() => null);
+    return json({ results: (d?.items || []).filter(i => i.type === 'app').slice(0, 10).map(i => ({ appid: i.id, name: i.name, thumb: i.tiny_image })) });
+  }
+
+  if (!cfg.key) return json({ error: 'steam_not_connected' }, 400);
+
+  if (p === '/steam/achievements') {
+    const appid = (url.searchParams.get('appid') || '').replace(/\D/g, '');
+    if (!appid) return json({ error: 'appid_missing' }, 400);
+    let schema;
+    try { schema = await steamJSON(`${STEAM_API}/ISteamUserStats/GetSchemaForGame/v2/?key=${cfg.key}&appid=${appid}&l=german`); }
+    catch (e) { return json({ error: e.code === 'steam_forbidden' ? 'key_rejected' : 'steam_unavailable' }, 502); }
+    const game = schema?.game || {};
+    const list = game.availableGameStats?.achievements || [];
+    const pct = {};
+    try {
+      const g = await steamJSON(`${STEAM_API}/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?gameid=${appid}`);
+      (g?.achievementpercentages?.achievements || []).forEach(a => { pct[a.name] = +(+a.percent).toFixed(1); });
+    } catch {}
+    const mine = {};
+    let playerError = null;
+    if (cfg.steamid && list.length) {
+      try {
+        const pa = await steamJSON(`${STEAM_API}/ISteamUserStats/GetPlayerAchievements/v1/?key=${cfg.key}&steamid=${cfg.steamid}&appid=${appid}`);
+        if (pa?.playerstats?.success === false) playerError = 'not_owned';
+        (pa?.playerstats?.achievements || []).forEach(a => { mine[a.apiname] = a.achieved ? (a.unlocktime ? new Date(a.unlocktime * 1000).toISOString() : true) : false; });
+      } catch (e) { playerError = e.code === 'steam_forbidden' ? 'profile_private' : 'unavailable'; }
+    }
+    return json({
+      appid: +appid, name: game.gameName || null, cover: await steamCover(appid), playerError,
+      achievements: list.map(a => ({ api: a.name, name: a.displayName || a.name, desc: a.description || '', hidden: !!a.hidden, icon: a.icon || '', rarity: pct[a.name] ?? null, done: !!mine[a.name], doneAt: typeof mine[a.name] === 'string' ? mine[a.name] : null })),
+    });
+  }
+
+  if (p === '/steam/games') {
+    if (!cfg.steamid) return json({ error: 'profile_missing' }, 400);
+    try {
+      const d = await steamJSON(`${STEAM_API}/IPlayerService/GetOwnedGames/v1/?key=${cfg.key}&steamid=${cfg.steamid}&include_appinfo=1&include_played_free_games=1`);
+      const games = (d?.response?.games || []).map(g => ({ appid: g.appid, name: g.name, minutes: g.playtime_forever || 0, lastPlayed: g.rtime_last_played ? new Date(g.rtime_last_played * 1000).toISOString() : null }));
+      if (!games.length && !d?.response?.game_count) return json({ error: 'profile_private' }, 400);
+      return json({ games });
+    } catch (e) { return json({ error: e.code === 'steam_forbidden' ? 'profile_private' : 'steam_unavailable' }, 502); }
+  }
+  return json({ error: 'not_found' }, 404);
 }

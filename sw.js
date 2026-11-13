@@ -1,12 +1,12 @@
 /* Nightshelf – Service Worker: App offline verfügbar machen und Benachrichtigungen anzeigen */
-const VERSION = '56';
+const VERSION = '57';
 const SHELL = `nightshelf-shell-${VERSION}`;
 const IMAGES = 'nightshelf-img';
 const FONTS = 'nightshelf-fonts';
 const FILES = [
   './', 'index.html', 'manifest.webmanifest',
   `styles.css?v=${VERSION}`,
-  ...['store', 'trophies', 'lookup', 'airing', 'psn', 'sync', 'pwa', 'app'].map(f => `js/${f}.js?v=${VERSION}`),
+  ...['store', 'trophies', 'lookup', 'airing', 'psn', 'steam', 'sync', 'pwa', 'app'].map(f => `js/${f}.js?v=${VERSION}`),
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/badge-96.png',
 ];
 

@@ -36,7 +36,7 @@
   const familyOf = p => LEGACY_FAMILY[p] || (PLATFORM_GROUPS.find(([, list]) => list.includes(p)) || ['Sonstige'])[0];
   const platformOptions = sel => PLATFORM_GROUPS.map(([g, list]) => `<optgroup label="${g}">${list.map(p => `<option ${p === sel ? 'selected' : ''}>${p}</option>`).join('')}</optgroup>`).join('')
     + (sel && !PLATFORMS.includes(sel) ? `<option selected>${esc(sel)}</option>` : '');
-  const psDefault = p => isPS(p) ? (PSN.connected() ? 'psn' : 'paste') : 'auto';
+  const psDefault = p => isPS(p) ? (PSN.connected() ? 'psn' : 'paste') : (p === 'Steam' || p === 'PC' || p === 'Steam Deck') ? (Steam.connected() ? 'steam' : 'paste') : 'auto';
   const isPS = p => /^(PS5|PS4|PS3|PS Vita)$/.test(p || ''); // Plattformen mit offiziellen PlayStation-Trophäen
 
   const I = {
@@ -316,6 +316,7 @@
         <label>Trophäen</label>
         <div class="seg" id="tmode">
           ${PSN.connected() ? '<button type="button" data-m="psn">Von PlayStation</button>' : ''}
+          ${Steam.connected() ? '<button type="button" data-m="steam">Von Steam</button>' : ''}
           <button type="button" data-m="auto">${'Automatisch erstellen'}</button>
           <button type="button" data-m="paste">Liste einfügen</button>
           <button type="button" data-m="none">Später</button>
@@ -355,7 +356,9 @@
           const body = $('#tmodeBody', m);
           if (!body) return;
           $$('#tmode button', m).forEach(b => b.classList.toggle('on', b.dataset.m === trophyMode));
-          if (trophyMode === 'psn') {
+          if (trophyMode === 'steam') {
+            body.innerHTML = `<div class="hint-box">${I.trophy}<div>Die Erfolge werden von Steam geladen, mit Namen, Beschreibung und wie selten sie sind. Die Stufe kommt aus der Seltenheit: unter 5 % Gold, unter 20 % Silber, sonst Bronze. Platin gibt es für alle Erfolge.${Steam.hasProfile() ? ' Schon freigeschaltete Erfolge werden direkt abgehakt.' : ''}</div></div>`;
+          } else if (trophyMode === 'psn') {
             body.innerHTML = `<div class="hint-box">${I.trophy}<div>Die echte Trophäenliste wird von deinem PlayStation-Konto geladen, mit deinen schon verdienten Trophäen. Das klappt für Spiele, die du auf PS4 oder PS5 mindestens einmal gestartet hast.</div></div>`;
           } else if (trophyMode === 'auto') {
             body.innerHTML = aiBlockedToday() ? `<div class="hint-box quota">${I.info}<div><b>Heute nicht mehr möglich.</b> ${aiQuotaText()} Wähle „Später“ und erstelle die Trophäen dann auf der Spielseite.</div></div>` : `<div class="hint-box">${I.sparkle}<div>Die KI liest sich Infos zum Spiel durch und erstellt Trophäen, die genau zu diesem Spiel passen, mit Bronze, Silber, Gold und Platin. Du kannst danach jede Trophäe umbenennen, löschen oder eigene hinzufügen.</div></div>
@@ -475,7 +478,26 @@
             return;
           }
           if (type === 'game') {
-            if (trophyMode === 'psn') {
+            if (trophyMode === 'steam') {
+              const btn = $('#saveBtn', m);
+              btn.textContent = 'Lade Erfolge…'; btn.disabled = true;
+              try {
+                const hit = await Steam.find(title);
+                if (hit) {
+                  const res = await Steam.achievementsFor(hit.appid);
+                  if (res.achievements.length) Object.assign(data, Steam.patchFor({ ...data, coverTried: false }, hit.appid, res));
+                  else { data.steamAppId = hit.appid; data.trophies = Trophies.generate(title, data.genre, 'normal'); data.trophySource = 'generated'; setTimeout(() => toast(`<div><b>Keine Steam-Erfolge</b><small>Dieses Spiel hat auf Steam keine Erfolge, Trophäen wurden erstellt</small></div>`), 400); }
+                  if (res.playerError === 'profile_private') setTimeout(() => toast(`<div><b>Steam-Profil ist privat</b><small>Freigeschaltete Erfolge konnten nicht gelesen werden</small></div>`), 900);
+                } else {
+                  data.trophies = Trophies.generate(title, data.genre, 'normal'); data.trophySource = 'generated';
+                  setTimeout(() => toast(`<div><b>Auf Steam nicht gefunden</b><small>Trophäen wurden automatisch erstellt</small></div>`), 400);
+                }
+              } catch (err) {
+                btn.textContent = 'Hinzufügen'; btn.disabled = false;
+                $('#titleErr', m).textContent = err.code === 'key_required' ? 'Dieses Gerät ist noch nicht mit deinem Schlüssel verbunden (Daten → Sync).' : err.code === 'key_rejected' ? 'Steam lehnt den API-Schlüssel ab. Prüfe ihn unter Daten → Steam.' : 'Steam ist gerade nicht erreichbar. Wähle eine andere Option.';
+                return;
+              }
+            } else if (trophyMode === 'psn') {
               const btn = $('#saveBtn', m);
               btn.textContent = 'Lade Trophäen…'; btn.disabled = true;
               try {
@@ -942,7 +964,7 @@
     const s = libState[type];
     const items = Store.all(type);
     const head = `<div class="page-head"><div><h1 class="page-title">${TYPES[type].plural}</h1><p class="page-sub">${items.length} ${items.length === 1 ? 'Eintrag' : 'Einträge'}</p></div>
-      <div class="head-actions" style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}${type === 'manga' && items.length ? `<button class="btn" data-mangacheck>${I.refresh} Neue Kapitel prüfen</button>` : ''}${['anime', 'series'].includes(type) && items.length ? `<button class="btn" data-aircheck>${I.refresh} Neue Folgen prüfen</button>` : ''}<button class="btn btn-primary fab" data-add="${type}" aria-label="${TYPES[type].label} hinzufügen">${I.plus}<span>${TYPES[type].label} hinzufügen</span></button></div></div>`;
+      <div class="head-actions" style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}${type === 'game' && Steam.connected() && Steam.hasProfile() ? `<button class="btn" data-steamsync>${I.refresh} Steam sync</button>` : ''}${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}${type === 'manga' && items.length ? `<button class="btn" data-mangacheck>${I.refresh} Neue Kapitel prüfen</button>` : ''}${['anime', 'series'].includes(type) && items.length ? `<button class="btn" data-aircheck>${I.refresh} Neue Folgen prüfen</button>` : ''}<button class="btn btn-primary fab" data-add="${type}" aria-label="${TYPES[type].label} hinzufügen">${I.plus}<span>${TYPES[type].label} hinzufügen</span></button></div></div>`;
     if (!items.length) { view.innerHTML = head + emptyState(type); return; }
 
     const platforms = type === 'game' ? [...new Set(items.map(i => i.platform).filter(Boolean))] : [];
@@ -1843,7 +1865,7 @@
         <div class="tier-box">${Trophies.ORDER.filter(t => p.counts[t][1]).map(t => `<div class="tier-stat"><div class="t">${Trophies.icon(t, 14)} ${Trophies.TIERS[t].label}</div><b>${p.counts[t][0]}<span class="muted" style="font-size:13px;font-weight:500"> / ${p.counts[t][1]}</span></b></div>`).join('')}</div>
       </div>` : '';
 
-      const src = { generated: 'Genre-Vorlage', ai: 'Von der KI passend zum Spiel erstellt', imported: 'Importiert', custom: 'Eigene Liste', psn: 'Von PlayStation' }[item.trophySource] || '';
+      const src = { generated: 'Genre-Vorlage', ai: 'Von der KI passend zum Spiel erstellt', imported: 'Importiert', custom: 'Eigene Liste', psn: 'Von PlayStation', steam: 'Von Steam · Stufe nach Seltenheit' }[item.trophySource] || '';
       const sorted = list.slice().sort((a, b) => Trophies.ORDER.indexOf(a.tier) - Trophies.ORDER.indexOf(b.tier));
       const filtered = sorted.filter(t => detailFilter.value === 'all' || (detailFilter.value === 'open' ? !t.done : t.done));
       trophySection = `<section class="section">
@@ -1855,6 +1877,7 @@
             <button class="btn btn-sm" id="tAdd">${I.plus} Eigene</button>
             <button class="btn btn-sm" id="tImp">${I.paste} Liste einfügen</button>
             ${item.psnId && PSN.connected() ? `<button class="btn btn-sm" id="tPsn">${I.refresh} Von PlayStation</button>` : ''}
+            ${Steam.connected() && (item.steamAppId || ['Steam', 'PC', 'Steam Deck'].includes(item.platform)) ? `<button class="btn btn-sm" id="tSteam">${I.refresh} Von Steam</button>` : ''}
             <button class="btn btn-sm" id="tGen">${I.sparkle} Erstellen</button>
           </div>
         </div>
@@ -1942,6 +1965,24 @@
         const b = $('#tPsn'); b.disabled = true; b.textContent = 'Lade…';
         try { const r = await PSN.syncOne(g()); toast(r ? `<div><b>Trophäen aktualisiert</b><small>${r.filter(t => t.done).length} von ${r.length} verdient</small></div>` : `<div><b>Nicht im PlayStation-Verlauf gefunden</b></div>`); }
         catch (err) { toast(`<div><b>${err.code === 'expired' ? 'PlayStation-Anmeldung abgelaufen' : 'PlayStation nicht erreichbar'}</b><small>${err.code === 'expired' ? 'Unter Daten neu verbinden' : 'Später nochmal versuchen'}</small></div>`); }
+        render();
+      });
+      $('#tSteam') && ($('#tSteam').onclick = async () => {
+        const b = $('#tSteam'); b.disabled = true; b.textContent = 'Lade…';
+        try {
+          const game = g();
+          const hit = game.steamAppId ? { appid: game.steamAppId } : await Steam.find(game.title);
+          if (!hit) toast(`<div><b>Auf Steam nicht gefunden</b><small>Prüfe den Titel des Spiels</small></div>`);
+          else {
+            const res = await Steam.achievementsFor(hit.appid);
+            if (!res.achievements.length) toast(`<div><b>Keine Steam-Erfolge</b><small>Dieses Spiel hat auf Steam keine Erfolge</small></div>`);
+            else {
+              Store.update(game.id, Steam.patchFor(game, hit.appid, res));
+              const t = Store.get(game.id).trophies;
+              toast(`<div><b>Erfolge geladen</b><small>${t.filter(x => x.done).length} von ${t.length} verdient${res.playerError === 'profile_private' ? ' · Profil privat' : ''}</small></div>`);
+            }
+          }
+        } catch (err) { toast(`<div><b>${err.code === 'key_rejected' ? 'Steam lehnt den Schlüssel ab' : 'Steam nicht erreichbar'}</b><small>${err.code === 'key_rejected' ? 'Unter Daten neu verbinden' : 'Später nochmal versuchen'}</small></div>`); }
         render();
       });
       $('#tGen').onclick = () => (g().trophies?.length ? trophyGenerate(g()) : trophyGenerate(g()));
@@ -2224,6 +2265,7 @@
       <div class="panel" id="appPanel"></div>
       <div class="panel" id="aiPanel"></div>
       <div class="panel" id="psnPanel"></div>
+      <div class="panel" id="steamPanel"></div>
       <div class="panel"><h3>Automatische Infos</h3><p>Beim Hinzufügen werden Cover, Erscheinungsdatum und Genre automatisch gesucht. Serien und Spiele funktionieren ohne Schlüssel. Für Filme brauchst du einen kostenlosen TMDB-Schlüssel. Er bleibt nur in diesem Browser gespeichert.</p>
         <div class="form">
           <div class="field"><label>Serien · TVmaze</label><div class="key-ok">Aktiv, kein Schlüssel nötig</div></div>
@@ -2258,6 +2300,7 @@
     $('#impMerge').onchange = doImport('merge');
     $('#impReplace').onchange = doImport('replace');
     renderPsnPanel();
+    renderSteamPanel();
     renderAiPanel();
     renderSyncPanel();
     renderAppPanel();
@@ -2314,6 +2357,74 @@
       }
     });
   }
+
+  function renderSteamPanel() {
+    const el = $('#steamPanel'); if (!el) return;
+    const on = Steam.connected();
+    el.innerHTML = `<h3>Steam</h3>
+      ${on ? `<p>Verbunden${Steam.profile() ? ` als <b>${esc(Steam.profile())}</b>` : ''}. Beim Hinzufügen von Steam-Spielen werden die Erfolge automatisch geladen${Steam.hasProfile() ? ', schon freigeschaltete werden abgehakt' : ''}.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${Steam.hasProfile() ? `<button class="btn btn-primary" data-steamsync>${I.refresh} Steam-Spiele synchronisieren</button>` : ''}<button class="btn btn-ghost btn-danger" id="steamOff">Trennen</button></div>`
+      : `<p>Lade die echten Steam-Erfolge deiner Spiele, mit Seltenheit. Die Stufe richtet sich danach, wie selten ein Erfolg ist.</p>
+        <ol class="steps">
+          <li>Melde dich auf <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener">steamcommunity.com/dev/apikey</a> an und erstelle einen Schlüssel. Als Domain kannst du z. B. <code>nightshelf</code> eintragen.</li>
+          <li>Füge den Schlüssel hier ein. Optional dein Steam-Profil-Link, dann werden freigeschaltete Erfolge abgehakt.</li>
+          <li>Für freigeschaltete Erfolge muss in Steam unter Profil → Privatsphäre „Spieldetails: Öffentlich“ eingestellt sein.</li>
+        </ol>
+        <div class="field"><label>Steam-API-Schlüssel</label><input class="input" id="steamKey" type="password" placeholder="32 Zeichen" autocomplete="off" spellcheck="false"></div>
+        <div class="field" style="margin-top:10px"><label>Steam-Profil <span class="tiny">(optional: Link, Name oder ID)</span></label><div class="key-row"><input class="input" id="steamProfile" placeholder="steamcommunity.com/id/…" autocomplete="off" spellcheck="false"><button class="btn btn-primary" id="steamOn">Verbinden</button></div>
+          <div class="tiny">Der Schlüssel wird nur auf deinem eigenen Server gespeichert, geschützt durch deinen Sync-Schlüssel.</div><div class="field-error" id="steamErr"></div></div>`}`;
+    $('#steamOff') && ($('#steamOff').onclick = async () => { await Steam.disconnect(); renderSteamPanel(); toast('<div><b>Steam getrennt</b></div>'); });
+    $('#steamOn') && ($('#steamOn').onclick = async () => {
+      const b = $('#steamOn'), err = $('#steamErr');
+      const key = $('#steamKey').value.trim(), prof = $('#steamProfile').value.trim();
+      err.textContent = '';
+      if (!/^[0-9A-Fa-f]{32}$/.test(key)) { err.textContent = 'Der Schlüssel hat 32 Zeichen (Ziffern und A–F).'; return; }
+      if (!Sync.enabled()) { err.textContent = 'Verbinde dieses Gerät zuerst oben unter „Sync zwischen Geräten“.'; return; }
+      b.disabled = true; b.textContent = 'Verbinde…';
+      try {
+        const r = await Steam.connect(key, prof);
+        renderSteamPanel();
+        toast(`<div><b>Mit Steam verbunden</b>${r.name ? `<small>${esc(r.name)}</small>` : ''}</div>`);
+      } catch (e) {
+        b.disabled = false; b.textContent = 'Verbinden';
+        err.textContent = { key_invalid: 'Der Schlüssel hat nicht das richtige Format.', key_rejected: 'Steam akzeptiert den Schlüssel nicht. Kopiere ihn nochmal von der Steam-Seite.', profile_not_found: 'Dieses Steam-Profil wurde nicht gefunden. Nimm den Link zu deinem Profil.', key_required: 'Verbinde dieses Gerät zuerst unter „Sync zwischen Geräten“.' }[e.code] || 'Steam ist gerade nicht erreichbar. Versuch es gleich nochmal.';
+      }
+    });
+  }
+
+  let steamSyncing = false;
+  function runSteamSync() {
+    if (steamSyncing) return;
+    steamSyncing = true;
+    openModal({
+      title: 'Steam synchronisieren',
+      body: `<div id="ssBody"><p class="muted" style="margin:0 0 12px">Lade deine Steam-Bibliothek…</p><div class="bar"><i id="ssBar" style="width:2%"></i></div><p class="tiny" id="ssName" style="margin-top:10px">&nbsp;</p></div>`,
+      foot: `<button class="btn" data-close>Im Hintergrund</button>`,
+      onMount: () => {
+        Steam.syncAll({
+          onProgress: (i, total, name) => {
+            const bar = $('#ssBar'), nm = $('#ssName'), p = $('#ssBody p');
+            if (bar) bar.style.width = Math.round(i / total * 100) + '%';
+            if (nm) nm.textContent = `${i} von ${total}: ${name}`;
+            if (p) p.textContent = 'Lade Erfolge…';
+          },
+        }).then(r => {
+          steamSyncing = false;
+          const msg = `${r.added} neue Spiele, ${r.updated} aktualisiert, ${r.earned} neu verdiente Erfolge${r.failed ? `, ${r.failed} konnten nicht geladen werden` : ''}.`;
+          const body = $('#ssBody');
+          if (body) body.innerHTML = `<div class="hint-box">${I.check}<div><b style="color:var(--text)">Fertig</b><br>${msg}</div></div>`;
+          else toast(`<div><b>Steam synchronisiert</b><small>${msg}</small></div>`);
+          render();
+        }).catch(e => {
+          steamSyncing = false;
+          const body = $('#ssBody');
+          const msg = e.code === 'profile_private' ? 'Dein Steam-Profil ist privat. Stelle unter Profil → Privatsphäre „Spieldetails: Öffentlich“ ein.' : 'Steam ist gerade nicht erreichbar. Versuch es später nochmal.';
+          if (body) body.innerHTML = `<div class="hint-box quota">${I.info}<div>${msg}</div></div>`;
+        });
+      },
+    });
+  }
+  document.addEventListener('click', e => { if (e.target.closest('[data-steamsync]')) { e.preventDefault(); runSteamSync(); } });
 
   let syncing = false;
   function runPsnSync() {
@@ -2396,5 +2507,6 @@
   render();
   animate = false;
   Sync.syncNow().finally(() => { setTimeout(autoMangaCheck, 1500); setTimeout(autoAirCheck, 3000); });
+  if (Sync.enabled()) Steam.refresh().then(() => { if (/^#\/(settings|games)/.test(location.hash)) render(); });
   Pwa.init({ toast, render });
 })();

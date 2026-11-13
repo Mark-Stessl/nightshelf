@@ -20,6 +20,7 @@ Persönliches Regal für Spiele, Serien und Filme – mit Trophäen-System im Pl
 - **Neue Folgen automatisch:** Laufende Anime (AniList) und Serien (TVmaze) werden alle 3 Stunden beim Öffnen geprüft. Erschienene Folgen, neue und angekündigte Staffeln werden eingetragen, ungesehene Folgen als „+N“ markiert.
 - **Demnächst:** Kalender mit kommenden Folgen (mit Uhrzeit), Staffelstarts, Filmstarts und Spiele-Releases aus dem eigenen Regal, dazu „Neu für dich“.
 - **Als App installierbar (PWA):** auf Android, iPhone/iPad (Zum Home-Bildschirm), Windows, macOS und Linux (Chrome/Edge: Installieren-Symbol in der Adressleiste). Läuft offline, zeigt ungesehene Neuigkeiten als Zahl am App-Symbol.
+- **Steam-Erfolge:** Mit eigenem Steam-Web-API-Schlüssel (nur auf dem eigenen Worker gespeichert) lädt die App beim Hinzufügen eines Steam-Spiels die Erfolge mit Seltenheit. Stufe nach Seltenheit (≤ 5 % Gold, ≤ 20 % Silber, sonst Bronze), Platin für alle Erfolge. Mit öffentlichem Profil werden freigeschaltete Erfolge abgehakt; optional Steam-Sync für die ganze Bibliothek.
 - **Push-Benachrichtigungen:** Der Worker prüft per Cron alle 30 Minuten neue Anime-Folgen, Serienfolgen und Manga-Kapitel und schickt Web-Push-Nachrichten an die eingeschalteten Geräte (VAPID-Schlüssel erzeugt der Worker selbst und speichert ihn in KV).
 
 ## Daten
