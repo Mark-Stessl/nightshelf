@@ -371,7 +371,8 @@
           <div class="field"><label>Status</label><select class="input" name="status">${Object.entries(st).map(([k, v]) => `<option value="${k}" ${k === d.status ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
           <div class="field"><label>Jahr</label>
             <div class="year-wrap"><input class="input" name="year" type="number" min="1950" max="2100" value="${d.year || ''}" placeholder="2024">
-              <span class="year-cal" title="Genaues Datum wählen (optional)">${I.calendar}<input type="date" id="relDate" aria-label="Genaues Datum wählen" value="${esc((d.released || '').slice(0, 10))}"></span></div>
+              <button type="button" class="year-cal" id="relBtn" title="Genaues Datum wählen (optional)" aria-label="Genaues Datum wählen">${I.calendar}</button>
+              <div class="calpop" id="calPop" hidden></div></div>
             <div class="rel-chip" id="relChip"></div></div>
         </div>
         ${seriesFields}${animeFields}${mangaFields}
@@ -394,14 +395,59 @@
         let customCover = null;
         // Genaues Datum (optional): Jahr reicht, Tag und Monat nur über das Kalender-Symbol
         let released = /^\d{4}-\d{2}-\d{2}/.test(d.released || '') ? d.released.slice(0, 10) : null;
-        const relInput = $('#relDate', m), relChip = $('#relChip', m);
+        const relChip = $('#relChip', m), pop = $('#calPop', m);
         const renderRel = () => {
           relChip.innerHTML = released ? `${I.calendar}<span>${new Date(released + 'T00:00:00').toLocaleDateString('de-AT', { day: 'numeric', month: 'long', year: 'numeric' })}</span><button type="button" id="relClear" title="Datum entfernen">${I.x}</button>` : '';
-          relInput.value = released || '';
           $('#relClear', m) && ($('#relClear', m).onclick = () => { released = null; renderRel(); });
         };
-        relInput.onclick = () => { try { relInput.showPicker(); } catch {} };
-        relInput.onchange = () => { if (relInput.value) { released = relInput.value; form.elements.year.value = released.slice(0, 4); } renderRel(); };
+        // Eigener Kalender im App-Stil
+        const MONTHS = ['Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+        const ymd = (y, mo, da) => `${y}-${String(mo + 1).padStart(2, '0')}-${String(da).padStart(2, '0')}`;
+        const todayStr = (() => { const t = new Date(); return ymd(t.getFullYear(), t.getMonth(), t.getDate()); })();
+        let view = { y: 0, m: 0, mode: 'days' };
+        const drawCal = () => {
+          const { y, m: mo, mode } = view;
+          if (mode === 'months') {
+            pop.innerHTML = `<div class="cal-head"><button type="button" class="cal-nav" data-cal="py">‹</button><button type="button" class="cal-title" data-cal="days">${y}</button><button type="button" class="cal-nav" data-cal="ny">›</button></div>
+              <div class="cal-months">${MONTHS.map((n, i) => `<button type="button" class="cal-month ${released && +released.slice(0, 4) === y && +released.slice(5, 7) === i + 1 ? 'sel' : ''}" data-mo="${i}">${n.slice(0, 3)}</button>`).join('')}</div>`;
+          } else {
+            const startDay = (new Date(y, mo, 1).getDay() + 6) % 7;
+            const cells = [];
+            for (let i = 0; i < 42; i++) {
+              const dt = new Date(y, mo, 1 - startDay + i), str = ymd(dt.getFullYear(), dt.getMonth(), dt.getDate());
+              cells.push(`<button type="button" class="cal-day ${dt.getMonth() !== mo ? 'out' : ''} ${str === todayStr ? 'today' : ''} ${str === released ? 'sel' : ''}" data-d="${str}">${dt.getDate()}</button>`);
+            }
+            pop.innerHTML = `<div class="cal-head"><button type="button" class="cal-nav" data-cal="pm">‹</button><button type="button" class="cal-title" data-cal="months">${MONTHS[mo]} ${y}</button><button type="button" class="cal-nav" data-cal="nm">›</button></div>
+              <div class="cal-grid">${['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(w => `<span class="cal-wd">${w}</span>`).join('')}${cells.join('')}</div>
+              <div class="cal-foot"><button type="button" class="cal-link" data-cal="today">Heute</button>${released ? '<button type="button" class="cal-link danger" data-cal="clear">Entfernen</button>' : ''}</div>`;
+          }
+        };
+        const closeCal = () => { pop.hidden = true; document.removeEventListener('pointerdown', outside, true); };
+        const outside = e => { if (!pop.contains(e.target) && !e.target.closest('#relBtn')) closeCal(); };
+        const pickDate = str => { released = str; form.elements.year.value = str.slice(0, 4); renderRel(); closeCal(); };
+        $('#relBtn', m).onclick = () => {
+          if (!pop.hidden) { closeCal(); return; }
+          const base = released ? new Date(released + 'T00:00:00') : form.elements.year.value ? new Date(+form.elements.year.value, new Date().getMonth(), 1) : new Date();
+          view = { y: base.getFullYear(), m: base.getMonth(), mode: 'days' };
+          drawCal(); pop.hidden = false;
+          setTimeout(() => document.addEventListener('pointerdown', outside, true), 0);
+          pop.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        };
+        pop.onclick = e => {
+          const b = e.target.closest('button'); if (!b) return;
+          e.preventDefault();
+          if (b.dataset.d) return pickDate(b.dataset.d);
+          if (b.dataset.mo) { view.m = +b.dataset.mo; view.mode = 'days'; return drawCal(); }
+          const a = b.dataset.cal;
+          if (a === 'pm') { view.m--; if (view.m < 0) { view.m = 11; view.y--; } }
+          else if (a === 'nm') { view.m++; if (view.m > 11) { view.m = 0; view.y++; } }
+          else if (a === 'py') view.y--;
+          else if (a === 'ny') view.y++;
+          else if (a === 'months' || a === 'days') view.mode = a;
+          else if (a === 'today') return pickDate(todayStr);
+          else if (a === 'clear') { released = null; renderRel(); return closeCal(); }
+          drawCal();
+        };
         form.elements.year.addEventListener('input', () => { if (released && form.elements.year.value !== released.slice(0, 4)) { released = null; renderRel(); } });
         renderRel();
         $('#coverFile', m).onchange = async e => {
