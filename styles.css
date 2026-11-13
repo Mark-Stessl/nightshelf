@@ -776,30 +776,30 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .cover .cover-img-wrap, .card .cover img, .card .cover .cover-gen { transition: filter .3s var(--ease), opacity .3s var(--ease); }
 
 /* Fertig: cyan Haken, leichter Rahmen */
-.card.st-done .cover { box-shadow: 0 0 0 1.5px rgba(34, 211, 238, .45); }
-.card.st-done .cover-state { background: var(--cyan); border-color: var(--cyan); color: #0E0B16; box-shadow: 0 0 12px rgba(34, 211, 238, .55); }
-.card.st-done:has(.cover-plat) .cover { box-shadow: 0 0 0 1.5px var(--platinum), 0 0 22px -4px rgba(34, 211, 238, .7); }
+.card.cs-done .cover { box-shadow: 0 0 0 1.5px rgba(34, 211, 238, .45); }
+.card.cs-done .cover-state { background: var(--cyan); border-color: var(--cyan); color: #0E0B16; box-shadow: 0 0 12px rgba(34, 211, 238, .55); }
+.card.cs-done:has(.cover-plat) .cover { box-shadow: 0 0 0 1.5px var(--platinum), 0 0 22px -4px rgba(34, 211, 238, .7); }
 
 /* Läuft: violetter Punkt + Fortschritt */
-.card.st-active .cover-state { background: var(--violet); border-color: var(--violet); color: #fff; box-shadow: 0 0 12px rgba(139, 92, 246, .6); }
-.card.st-active .cover-state svg { fill: currentColor; stroke-width: 1.5; width: 11px; height: 11px; margin-left: 2px; }
-.card.st-active .cover-state, .card.st-paused .cover-state { bottom: 12px; }
+.card.cs-active .cover-state { background: var(--violet); border-color: var(--violet); color: #fff; box-shadow: 0 0 12px rgba(139, 92, 246, .6); }
+.card.cs-active .cover-state svg { fill: currentColor; stroke-width: 1.5; width: 11px; height: 11px; margin-left: 2px; }
+.card.cs-active .cover-state, .card.cs-paused .cover-state { bottom: 12px; }
 
 /* Pausiert: leicht abgedunkelt */
-.card.st-paused .cover img, .card.st-paused .cover .cover-gen { filter: brightness(.72); }
-.card.st-paused .cover-state { color: var(--lilac); }
+.card.cs-paused .cover img, .card.cs-paused .cover .cover-gen { filter: brightness(.72); }
+.card.cs-paused .cover-state { color: var(--lilac); }
 
 /* Merkliste: Lesezeichen */
-.card.st-planned .cover-state { color: var(--lilac); border-color: rgba(196, 181, 253, .35); }
+.card.cs-planned .cover-state { color: var(--lilac); border-color: rgba(196, 181, 253, .35); }
 
 /* Abgebrochen: grau und blass */
-.card.st-dropped .cover img, .card.st-dropped .cover .cover-gen { filter: grayscale(1) brightness(.6); }
-.card.st-dropped .cover-state { color: var(--danger); border-color: rgba(248, 113, 113, .4); }
-.card.st-dropped .card-title { color: var(--text-3); }
+.card.cs-dropped .cover img, .card.cs-dropped .cover .cover-gen { filter: grayscale(1) brightness(.6); }
+.card.cs-dropped .cover-state { color: var(--danger); border-color: rgba(248, 113, 113, .4); }
+.card.cs-dropped .card-title { color: var(--text-3); }
 
 /* Noch nicht erschienen: entsättigt, gestrichelter Rahmen, Datum unten */
-.card.st-upcoming .cover { outline: 1.5px dashed rgba(196, 181, 253, .45); outline-offset: -1.5px; }
-.card.st-upcoming .cover img, .card.st-upcoming .cover .cover-gen { filter: saturate(.35) brightness(.62); }
+.card.cs-upcoming .cover { outline: 1.5px dashed rgba(196, 181, 253, .45); outline-offset: -1.5px; }
+.card.cs-upcoming .cover img, .card.cs-upcoming .cover .cover-gen { filter: saturate(.35) brightness(.62); }
 .cover-release { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 8px; border-radius: 10px; background: rgba(14, 11, 22, .82); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid rgba(196, 181, 253, .3); font-size: 12px; font-weight: 600; color: var(--lilac); white-space: nowrap; overflow: hidden; }
 .cover-release svg { width: 13px; height: 13px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .cover-release span { overflow: hidden; text-overflow: ellipsis; }
@@ -810,7 +810,7 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 @media (max-width: 820px) {
   .cover-state { width: 22px; height: 22px; left: 6px; bottom: 8px; }
   .cover-state svg { width: 11px; height: 11px; }
-  .card.st-active .cover-state, .card.st-paused .cover-state { bottom: 9px; }
+  .card.cs-active .cover-state, .card.cs-paused .cover-state { bottom: 9px; }
   .cover-release { left: 5px; right: 5px; bottom: 5px; padding: 4px 5px; font-size: 10.5px; border-radius: 8px; gap: 4px; }
   .cover-release svg { width: 11px; height: 11px; }
   .cover-plat, .cover-new { top: 6px; right: 6px; }

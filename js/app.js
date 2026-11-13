@@ -892,7 +892,7 @@
         if (pr != null) extra += `<div class="cover-progress"><i style="width:${Math.round(Math.min(1, pr) * 100)}%"></i></div>`;
       }
     }
-    return `<a class="card st-${state} ${A()}" href="#/item/${item.id}">
+    return `<a class="card cs-${state} ${A()}" href="#/item/${item.id}">
       <div class="cover">${coverHTML(item)}${item.type === 'game' && item.platform ? `<span class="cover-tag">${esc(item.platform)}</span>` : ''}${extra}</div>
       <div><div class="card-title">${esc(item.title)}</div>
       <div class="card-meta">${meta.join('<span class="dot"></span>')}${item.rating ? `${meta.length ? '<span class="dot"></span>' : ''}<span class="stars-mini">${'★'.repeat(item.rating)}</span>` : ''}</div></div>
