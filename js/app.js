@@ -76,10 +76,47 @@
     const w = (title || '?').replace(/[^\p{L}\p{N} ]/gu, ' ').split(' ').filter(Boolean);
     return (w.length > 1 ? w[0][0] + w[1][0] : (w[0] || '?').slice(0, 2)).toUpperCase();
   }
+  /* Cover im Querformat: ganz zeigen (unscharfer Hintergrund) und für Spiele einmalig ein Hochformat-Cover suchen */
+  const coverQueue = [];
+  let coverBusy = false;
+  const coverNorm = t => (t || '').toLowerCase().replace(/[-–]?\s*troph(ä|ae)en$/i, '').replace(/[™®©]/g, '').replace(/[^a-z0-9]+/g, '');
+  window.__nsCover = img => {
+    const box = img.parentElement;
+    if (!box || !img.naturalWidth) return;
+    if (img.naturalWidth / img.naturalHeight <= 0.85) return;
+    box.classList.add('cover-wide');
+    box.style.setProperty('--cover-bg', `url("${img.currentSrc || img.src}")`);
+    const id = img.dataset.id, it = id && Store.get(id);
+    if (it && it.type === 'game' && !it.coverTried && !coverQueue.includes(id)) { coverQueue.push(id); runCoverQueue(); }
+  };
+  const imgRatio = src => new Promise(res => { const i = new Image(); i.onload = () => res(i.naturalWidth / i.naturalHeight); i.onerror = () => res(null); i.src = src; });
+  async function runCoverQueue() {
+    if (coverBusy) return;
+    coverBusy = true;
+    let changed = false;
+    while (coverQueue.length) {
+      const id = coverQueue.shift(), it = Store.get(id);
+      if (!it || it.coverTried) continue;
+      let better = null;
+      try {
+        const q = it.title.replace(/[-–]?\s*Troph(ä|ae)en$/i, '').replace(/[™®©]/g, '').trim();
+        const want = coverNorm(q), wantShort = coverNorm(q.split(':')[0]);
+        const hits = await Lookup.search('game', q);
+        const hit = hits.find(h => h.cover && coverNorm(h.title) === want) || hits.find(h => h.cover && coverNorm(h.title.split(':')[0]) === wantShort && wantShort.length >= 4);
+        if (hit) { const r = await imgRatio(hit.cover); if (r && r < 0.85) better = hit.cover; }
+      } catch {}
+      Store.update(id, better ? { cover: better, coverTried: true } : { coverTried: true });
+      if (better) changed = true;
+      await new Promise(r => setTimeout(r, 400));
+    }
+    coverBusy = false;
+    if (changed) render();
+  }
+
   function coverHTML(item, opts = {}) {
     let inner;
     if (item.cover) {
-      inner = `<img src="${esc(item.cover)}" alt="" loading="lazy" onerror="this.remove()">`;
+      inner = `<img src="${esc(item.cover)}" alt="" loading="lazy" data-id="${esc(item.id || '')}" onload="window.__nsCover && window.__nsCover(this)" onerror="this.remove()">`;
     }
     const h = hash(item.title);
     const hue = 248 + (h % 46);
