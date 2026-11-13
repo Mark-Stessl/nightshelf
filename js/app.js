@@ -595,6 +595,8 @@
             } catch {}
           }
           const created = Store.add(data);
+          // Neues Spiel: sofort nach einem Hochformat-Cover suchen (Steam-Bibliothek zuerst, dann Wikipedia)
+          if (type === 'game' && (created.coverV || 0) < COVER_V) queueCover(created.id);
           close();
           if (['anime', 'series'].includes(type)) setTimeout(() => EpisodeWatch.check({ force: true, ids: [created.id] }).then(() => render()), 400);
           location.hash = `#/item/${created.id}`;
