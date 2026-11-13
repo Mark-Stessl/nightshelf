@@ -369,7 +369,10 @@
         ${gameFields}
         <div class="grid-2">
           <div class="field"><label>Status</label><select class="input" name="status">${Object.entries(st).map(([k, v]) => `<option value="${k}" ${k === d.status ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-          <div class="field"><label>Jahr</label><input class="input" name="year" type="number" min="1950" max="2100" value="${d.year || ''}" placeholder="2024"></div>
+          <div class="field"><label>Jahr</label>
+            <div class="year-wrap"><input class="input" name="year" type="number" min="1950" max="2100" value="${d.year || ''}" placeholder="2024">
+              <span class="year-cal" title="Genaues Datum wählen (optional)">${I.calendar}<input type="date" id="relDate" aria-label="Genaues Datum wählen" value="${esc((d.released || '').slice(0, 10))}"></span></div>
+            <div class="rel-chip" id="relChip"></div></div>
         </div>
         ${seriesFields}${animeFields}${mangaFields}
         <div class="field"><label>Bewertung</label>${starsInput(d.rating)}</div>
@@ -389,6 +392,18 @@
         bindStars(m);
         const form = $('#itemForm', m);
         let customCover = null;
+        // Genaues Datum (optional): Jahr reicht, Tag und Monat nur über das Kalender-Symbol
+        let released = /^\d{4}-\d{2}-\d{2}/.test(d.released || '') ? d.released.slice(0, 10) : null;
+        const relInput = $('#relDate', m), relChip = $('#relChip', m);
+        const renderRel = () => {
+          relChip.innerHTML = released ? `${I.calendar}<span>${new Date(released + 'T00:00:00').toLocaleDateString('de-AT', { day: 'numeric', month: 'long', year: 'numeric' })}</span><button type="button" id="relClear" title="Datum entfernen">${I.x}</button>` : '';
+          relInput.value = released || '';
+          $('#relClear', m) && ($('#relClear', m).onclick = () => { released = null; renderRel(); });
+        };
+        relInput.onclick = () => { try { relInput.showPicker(); } catch {} };
+        relInput.onchange = () => { if (relInput.value) { released = relInput.value; form.elements.year.value = released.slice(0, 4); } renderRel(); };
+        form.elements.year.addEventListener('input', () => { if (released && form.elements.year.value !== released.slice(0, 4)) { released = null; renderRel(); } });
+        renderRel();
         $('#coverFile', m).onchange = async e => {
           const f = e.target.files[0]; if (!f) return;
           $('#coverErr', m).textContent = '';
@@ -459,6 +474,7 @@
             const dt = await Lookup.detail(type, h);
             fetched = dt;
             if (dt.year) F.year.value = dt.year;
+            released = /^\d{4}-\d{2}-\d{2}/.test(dt.released || '') ? dt.released.slice(0, 10) : null; renderRel();
             if (dt.cover) F.cover.value = dt.cover;
             if (type === 'series' && dt.seasons) F.seasons.value = dt.seasons;
             if (type === 'anime' && dt.episodes) F.episodes.value = dt.episodes;
@@ -508,6 +524,7 @@
           };
           if (type === 'game') { data.platform = form.elements.platform.value; data.genre = form.elements.genre.value; }
           if (customCover) Object.assign(data, { cover: customCover, coverCustom: true, coverV: COVER_V, coverTried: true });
+          data.released = released || null; // nur was im Formular steht (Jahr allein = kein genaues Datum)
           // „Fertig am“ setzt die App selbst: beim Status „Fertig“ das heutige Datum, beim Bearbeiten bleibt das alte
           if (!isEdit) data.finishedAt = data.status === 'done' ? new Date().toISOString() : null;
           if (type === 'manga') {
@@ -519,7 +536,7 @@
           if (type === 'anime' && form.elements.episodes) { data.episodes = form.elements.episodes.value ? +form.elements.episodes.value : null; data.episodesSeen = form.elements.episodesSeen.value ? +form.elements.episodesSeen.value : null; }
           if (type === 'series' && form.elements.seasons) { data.seasons = form.elements.seasons.value ? +form.elements.seasons.value : null; data.seasonSeen = form.elements.seasonSeen.value ? +form.elements.seasonSeen.value : null; }
           if (fetched) {
-            ['genres', 'released', 'runtime', 'summary', 'external', 'anilistId', 'mangadexId', 'mdStatus', 'lastUpload', 'kind', 'authors'].forEach(k => { if (fetched[k] != null && fetched[k] !== '') data[k] = fetched[k]; });
+            ['genres', 'runtime', 'summary', 'external', 'anilistId', 'mangadexId', 'mdStatus', 'lastUpload', 'kind', 'authors'].forEach(k => { if (fetched[k] != null && fetched[k] !== '') data[k] = fetched[k]; });
           }
 
           if (isEdit) {

@@ -832,3 +832,20 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .cover-pick { cursor: pointer; }
 .cover-pick .add-pick-icon { overflow: hidden; }
 .cover-pick .add-pick-icon img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Jahr mit optionalem genauem Datum */
+.year-wrap { position: relative; }
+.year-wrap .input { padding-right: 44px; width: 100%; }
+.year-wrap input[type="number"]::-webkit-inner-spin-button, .year-wrap input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.year-wrap input[type="number"] { -moz-appearance: textfield; }
+.year-cal { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--lilac); cursor: pointer; transition: background .2s var(--ease); }
+.year-cal:hover { background: rgba(139, 92, 246, .14); }
+.year-cal svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.year-cal input[type="date"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; margin: 0; font-size: 16px; }
+.year-cal input[type="date"]::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.rel-chip:empty { display: none; }
+.rel-chip { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; margin-top: 2px; padding: 3px 4px 3px 9px; border-radius: 999px; font-size: 12px; color: var(--lilac); background: rgba(139, 92, 246, .12); border: 1px solid rgba(139, 92, 246, .3); }
+.rel-chip svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; }
+.rel-chip button { width: 20px; height: 20px; border-radius: 50%; border: 0; background: transparent; color: var(--text-2); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.rel-chip button:hover { background: rgba(255, 255, 255, .08); color: var(--text); }
+.rel-chip button svg { width: 11px; height: 11px; }
