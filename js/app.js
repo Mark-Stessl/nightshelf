@@ -378,9 +378,8 @@
           <div class="form-more-body">
             <div class="field" id="finField"><label>Fertig am <span class="tiny">(optional, für die Statistik)</span></label><input class="input" name="finishedAt" type="date" value="${(d.finishedAt || (!isEdit && d.status === 'done' ? new Date().toISOString() : '')).slice(0, 10)}" max="${new Date().toISOString().slice(0, 10)}"></div>
             <div class="field"><label>Notizen</label><textarea class="input" name="notes" placeholder="Was hat dir gefallen?">${esc(d.notes || '')}</textarea></div>
-            <div class="field"><label>Cover-Bild (Link, optional)</label><input class="input" name="cover" value="${esc(d.cover || '')}" placeholder="https://…/cover.jpg"></div>
-            <div class="field"><label>Oder eigenes Bild</label>
-              <label class="add-pick-btn cover-pick" for="coverFile"><span class="add-pick-icon" id="coverPickIcon">${I.upload}</span><span class="add-pick-text"><b id="coverPickTitle">Bild auswählen</b><small id="coverPickSub">Vom Handy oder PC, wird aufs Hochformat zugeschnitten</small></span></label>
+            <div class="field"><label>Cover-Bild (Link, optional)</label><input class="input" name="cover" value="${esc(d.cover || '')}" placeholder="https://…/cover.jpg">
+              <label class="add-pick-btn cover-pick" for="coverFile" style="margin-top:4px"><span class="add-pick-icon" id="coverPickIcon">${I.upload}</span><span class="add-pick-text"><b id="coverPickTitle">Bild auswählen</b><small id="coverPickSub">Vom Handy oder PC, wird aufs Hochformat zugeschnitten</small></span></label>
               <input type="file" id="coverFile" accept="image/*" hidden><div class="field-error" id="coverErr"></div></div>
           </div>
         </details>
