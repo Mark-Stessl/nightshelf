@@ -860,7 +860,7 @@
     $('#syncSetup').onclick = async () => {
       const b = $('#syncSetup'); b.disabled = true; b.textContent = 'Richte ein…'; err('');
       try { await Sync.setup(); renderSyncPanel(); $('#syncKey').type = 'text'; toast('<div><b>Sync eingerichtet</b><small>Notiere dir deinen Schlüssel</small></div>'); render(); }
-      catch (e) { b.disabled = false; b.textContent = 'Sync einrichten'; err(e.code === 'already_claimed' ? 'Auf deinem Server ist schon ein Schlüssel eingerichtet. Gib ihn bei „Weiteres Gerät“ ein.' : e.code === 'network' ? 'Server nicht erreichbar. Versuch es gleich nochmal.' : 'Einrichten hat nicht geklappt.'); }
+      catch (e) { b.disabled = false; b.textContent = 'Sync einrichten'; err(e.code === 'already_claimed' ? 'Dieser Server gehört schon jemandem. Ist es deiner, gib deinen Schlüssel bei „Weiteres Gerät“ ein. Sonst brauchst du für Sync einen eigenen Server (Adresse unter PlayStation → Server-Adresse). Ohne Sync funktioniert die App ganz normal, deine Daten bleiben in diesem Browser.' : e.code === 'network' ? 'Server nicht erreichbar. Versuch es gleich nochmal.' : 'Einrichten hat nicht geklappt.'); }
     };
     $('#syncJoin').onclick = async () => {
       const v = $('#syncIn').value.trim();
