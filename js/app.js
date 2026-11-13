@@ -1074,6 +1074,10 @@
   }
 
   const libState = { game: { q: '', status: 'all', fam: 'all', platform: 'all', sort: 'added' }, series: { q: '', status: 'all', sort: 'added' }, movie: { q: '', status: 'all', sort: 'added' }, anime: { q: '', status: 'all', sort: 'added' }, manga: { q: '', status: 'all', sort: 'added' } };
+  // Sortierung und Filter merken (auch nach Neuladen); die Suche startet immer leer
+  const LIB_KEY = 'nightshelf.libState';
+  try { const saved = JSON.parse(localStorage.getItem(LIB_KEY) || '{}'); Object.keys(libState).forEach(t => { if (saved[t]) Object.assign(libState[t], saved[t], { q: '' }); }); } catch {}
+  const saveLib = () => { try { localStorage.setItem(LIB_KEY, JSON.stringify(Object.fromEntries(Object.entries(libState).map(([t, v]) => [t, { ...v, q: '' }])))); } catch {} };
 
   function viewLibrary(type) {
     const s = libState[type];
@@ -1126,10 +1130,10 @@
     };
     drawGrid();
     $('#q').oninput = e => { s.q = e.target.value; drawGrid(); };
-    $$('#statusChips .chip').forEach(c => c.onclick = () => { s.status = c.dataset.s; $$('#statusChips .chip').forEach(x => x.classList.toggle('on', x === c)); drawGrid(); });
-    $('#sort').onchange = e => { s.sort = e.target.value; drawGrid(); };
-    $('#plat') && ($('#plat').onchange = e => { s.platform = e.target.value; drawGrid(); });
-    $('#fam') && ($('#fam').onchange = e => { s.fam = e.target.value; s.platform = 'all'; render(); });
+    $$('#statusChips .chip').forEach(c => c.onclick = () => { s.status = c.dataset.s; saveLib(); $$('#statusChips .chip').forEach(x => x.classList.toggle('on', x === c)); drawGrid(); });
+    $('#sort').onchange = e => { s.sort = e.target.value; saveLib(); drawGrid(); };
+    $('#plat') && ($('#plat').onchange = e => { s.platform = e.target.value; saveLib(); drawGrid(); });
+    $('#fam') && ($('#fam').onchange = e => { s.fam = e.target.value; s.platform = 'all'; saveLib(); render(); });
   }
 
   function trophyRow(t, game) {
@@ -1301,7 +1305,7 @@
           renderPreview();
           go.onclick = () => {
             const r = applyImport(rows);
-            Object.assign(libState.anime, { q: '', status: 'all', sort: 'added' });
+            Object.assign(libState.anime, { q: '', status: 'all' }); saveLib();
             close();
             if (!location.hash.startsWith('#/anime')) location.hash = '#/anime'; else render();
             toast(`<div><b>LiveChart-Liste übernommen</b><small>${r.added} neue Anime hinzugefügt</small></div>`);
