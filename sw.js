@@ -1,5 +1,5 @@
 /* Nightshelf – Service Worker: App offline verfügbar machen und Benachrichtigungen anzeigen */
-const VERSION = '68';
+const VERSION = '69';
 const SHELL = `nightshelf-shell-${VERSION}`;
 const IMAGES = 'nightshelf-img';
 const FONTS = 'nightshelf-fonts';
@@ -36,7 +36,7 @@ self.addEventListener('fetch', e => {
   if (req.mode === 'navigate') {
     e.respondWith((async () => {
       try {
-        const res = await Promise.race([fetch(req), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 4000))]);
+        const res = await Promise.race([fetch(new URL('index.html', self.registration.scope).href, { cache: 'reload' }), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 4000))]);
         if (res.ok) (await caches.open(SHELL)).put('./', res.clone());
         return res;
       } catch {

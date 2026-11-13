@@ -21,10 +21,10 @@ const Pwa = (() => {
   const myVersion = (document.querySelector('script[src*="js/app.js"]')?.getAttribute('src').match(/v=(\d+)/) || [])[1];
   let lastUpdateCheck = 0;
   async function checkUpdate() {
-    if (!myVersion || Date.now() - lastUpdateCheck < 5 * 60 * 1000) return;
+    if (!myVersion || Date.now() - lastUpdateCheck < 60 * 1000) return;
     lastUpdateCheck = Date.now();
     try {
-      const html = await fetch(`./?check=${Date.now()}`, { cache: 'no-store' }).then(r => r.ok ? r.text() : '');
+      const html = await fetch(`index.html?check=${Date.now()}`, { cache: 'reload' }).then(r => r.ok ? r.text() : '');
       const v = (html.match(/js\/app\.js\?v=(\d+)/) || [])[1];
       if (v && v !== myVersion && !document.documentElement.classList.contains('modal-open')) location.reload();
     } catch {}
