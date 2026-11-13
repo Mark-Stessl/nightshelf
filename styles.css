@@ -818,6 +818,8 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 }
 
 /* Querformat-Cover: ganz zeigen, Rest mit unscharfem Bild füllen */
-.cover.cover-wide::before, .thumb.cover-wide::before { content: ''; position: absolute; inset: -14px; z-index: 1; background-image: var(--cover-bg); background-size: cover; background-position: center; filter: blur(16px) brightness(.55) saturate(1.2); }
+.cover.cover-wide::before, .thumb.cover-wide::before { content: ''; position: absolute; inset: -14px; z-index: 1; background-color: #120E1C; background-image: var(--cover-bg); background-size: cover; background-position: center; filter: blur(16px) brightness(.55) saturate(1.2); }
 .cover.cover-wide img, .thumb.cover-wide img { object-fit: contain; z-index: 1; }
 .cover.cover-wide, .thumb.cover-wide { overflow: hidden; }
+
+.cover.cover-wide .cover-gen .initials, .cover.cover-wide .cover-gen .ctitle { display: none; }
