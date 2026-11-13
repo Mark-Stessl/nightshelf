@@ -2887,6 +2887,21 @@
   document.addEventListener('click', e => { if (e.target.closest('[data-psnsync]')) { e.preventDefault(); runPsnSync(); } });
 
   /* ---------- Router ---------- */
+  // Regal am Desktop zuklappbar
+  (() => {
+    const KEY = 'nightshelf.shelfFold';
+    const nav = document.getElementById('nav'), btn = document.getElementById('shelfFold');
+    if (!nav || !btn) return;
+    const apply = c => { nav.classList.toggle('shelf-folded', c); btn.setAttribute('aria-expanded', String(!c)); };
+    let folded = false; try { folded = localStorage.getItem(KEY) === '1'; } catch {}
+    apply(folded);
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      folded = !nav.classList.contains('shelf-folded'); apply(folded);
+      try { localStorage.setItem(KEY, folded ? '1' : '0'); } catch {}
+    });
+  })();
+
   function render() {
     const hash = location.hash.replace(/^#\/?/, '');
     const [route, param] = hash.split('/');

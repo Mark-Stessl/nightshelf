@@ -1009,3 +1009,14 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   .cal-whead { border-bottom: 0; border-right: 1px solid var(--line); justify-content: center; }
   .cal-none { text-align: left; padding: 8px; }
 }
+
+/* Regal zuklappbar (Desktop) */
+.nav a#navShelf { position: relative; }
+.shelf-fold { margin-left: auto; width: 26px; height: 26px; border: 0; border-radius: 7px; background: transparent; color: var(--text-3); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background .15s var(--ease), color .15s var(--ease); }
+.shelf-fold:hover { background: rgba(139, 92, 246, .16); color: var(--text); }
+.nav a .shelf-fold svg { width: 16px; height: 16px; transition: transform .2s var(--ease); }
+.nav.shelf-folded .shelf-fold svg { transform: rotate(-90deg); }
+.nav.shelf-folded a.nav-sub { display: none; }
+@media (min-width: 821px) {
+  .nav.shelf-folded a#navShelf.active { box-shadow: inset 2px 0 0 var(--lilac); background: rgba(139, 92, 246, .1); color: var(--text); }
+}
