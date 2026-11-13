@@ -136,11 +136,11 @@
     openModal({
       title: 'Spielzeit',
       body: `<div class="form"><div class="field"><label>Gespielte Stunden</label>
-        <div class="unit-wrap"><input class="input" id="playIn" type="number" inputmode="decimal" min="0" step="0.5" value="${cur != null ? Math.round(cur * 10) / 10 : ''}" placeholder="z. B. 35"><span>Stunden</span></div>
+        <div class="unit-wrap"><input class="input" id="playIn" type="text" inputmode="decimal" autocomplete="off" value="${cur != null ? Math.round(cur * 10) / 10 : ''}" placeholder="z. B. 35"><span>Stunden</span></div>
         <div class="tiny">${it.playMin != null ? `Automatisch (${PLAY_SRC[it.playSrc] || ''}): ${fmtHours(it.playMin / 60)}. Was du hier einträgst, gilt stattdessen und wird nicht überschrieben.` : 'Bei Steam- und PlayStation-Spielen kommt die Zeit automatisch. Deine Angabe wird nie überschrieben.'}</div></div></div>`,
       foot: `${it.playH != null ? '<button class="btn btn-ghost btn-danger" id="playClear">Entfernen</button>' : ''}<button class="btn btn-ghost" data-close>Abbrechen</button><button class="btn btn-primary" id="playSave">Speichern</button>`,
       onMount: (m, close) => {
-        const save = () => { const v = $('#playIn', m).value.trim(); Store.update(it.id, { playH: v === '' ? null : Math.max(0, Math.round(+v.replace(',', '.') * 10) / 10) }); close(); render(); };
+        const save = () => { const v = parseHours($('#playIn', m).value); if (v === undefined) { $('#playIn', m).focus(); return; } Store.update(it.id, { playH: v }); close(); render(); };
         $('#playSave', m).onclick = save;
         $('#playIn', m).onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); save(); } };
         $('#playClear', m) && ($('#playClear', m).onclick = () => { Store.update(it.id, { playH: null }); close(); render(); });
@@ -401,7 +401,7 @@
           <summary>Weitere Angaben <span class="tiny">${type === 'game' ? 'Notizen, Spielzeit, Cover' : 'Notizen, Cover'}</span></summary>
           <div class="form-more-body">
             <div class="field"><label>Notizen</label><textarea class="input" name="notes" placeholder="Was hat dir gefallen?">${esc(d.notes || '')}</textarea></div>
-            ${type === 'game' ? `<div class="field"><label>Spielzeit <span class="tiny">(optional)</span></label><div class="unit-wrap"><input class="input" name="playH" type="number" inputmode="decimal" min="0" step="0.5" value="${d.playH != null ? d.playH : ''}" placeholder="${d.playMin != null ? `automatisch: ${Math.round(d.playMin / 60)}` : 'z. B. 35'}"><span>Stunden</span></div></div>` : ''}
+            ${type === 'game' ? `<div class="field"><label>Spielzeit <span class="tiny">(optional)</span></label><div class="unit-wrap"><input class="input" name="playH" type="text" inputmode="decimal" autocomplete="off" value="${d.playH != null ? d.playH : ''}" placeholder="${d.playMin != null ? `automatisch: ${Math.round(d.playMin / 60)}` : 'z. B. 35'}"><span>Stunden</span></div></div>` : ''}
             <div class="field"><label>Cover-Bild (Link, optional)</label><input class="input" name="cover" value="${esc(d.cover || '')}" placeholder="https://…/cover.jpg">
               <label class="add-pick-btn cover-pick" for="coverFile" style="margin-top:4px"><span class="add-pick-icon" id="coverPickIcon">${I.upload}</span><span class="add-pick-text"><b id="coverPickTitle">Bild auswählen</b><small id="coverPickSub">Vom Handy oder PC, wird aufs Hochformat zugeschnitten</small></span></label>
               <input type="file" id="coverFile" accept="image/*" hidden><div class="field-error" id="coverErr"></div></div>
@@ -591,8 +591,8 @@
           };
           if (type === 'game') {
             data.platform = form.elements.platform.value; data.genre = form.elements.genre.value;
-            const ph = form.elements.playH.value.trim();
-            data.playH = ph === '' ? null : Math.max(0, Math.round(+ph.replace(',', '.') * 10) / 10);
+            const ph = parseHours(form.elements.playH.value);
+            data.playH = ph === undefined ? (isEdit ? item.playH ?? null : null) : ph;
           }
           if (customCover) Object.assign(data, { cover: customCover, coverCustom: true, coverV: COVER_V, coverTried: true });
           data.released = released || null; // nur was im Formular steht (Jahr allein = kein genaues Datum)
@@ -1028,6 +1028,8 @@
   const hoursOf = it => it.playH != null ? it.playH : it.playMin != null ? it.playMin / 60 : null;
   const fmtHours = h => h == null ? '' : h > 0 && h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : `${Math.round(h).toLocaleString('de-AT')} h`;
   const PLAY_SRC = { steam: 'Steam', psn: 'PlayStation' };
+  // „12,5“, „12.5“, „12 h“ → 12.5; leer → null (keine Angabe); Unsinn → undefined
+  const parseHours = v => { const t = String(v || '').trim().replace(/\s*(h|std\.?|stunden)$/i, '').replace(',', '.'); if (!t) return null; const n = +t; return Number.isFinite(n) && n >= 0 ? Math.round(n * 10) / 10 : undefined; };
 
   /* Zustand einer Karte: noch nicht erschienen hat Vorrang, sonst der Status */
   function releaseInfo(item) {
@@ -1088,8 +1090,8 @@
     const rel = releaseInfo(item);
     const state = rel ? 'upcoming' : item.status;
     if (rel) extra += `<div class="cover-release">${I.calendar}<span>${esc(releaseLabel(rel))}</span></div>`;
-    else if (item.type === 'game' && hoursOf(item) > 0) extra += `<div class="cover-hrs" title="Spielzeit">${I.clock}${fmtHours(hoursOf(item))}</div>`;
     else {
+      if (item.type === 'game' && hoursOf(item) > 0) extra += `<div class="cover-hrs" title="Spielzeit">${I.clock}${fmtHours(hoursOf(item))}</div>`;
       const b = STATE_BADGE[item.status];
       if (b) extra += `<div class="cover-state" title="${esc(statusLabel(item))}">${I[b[0]]}</div>`;
       if (item.type !== 'game' && ['active', 'paused'].includes(item.status)) {
@@ -2143,7 +2145,7 @@
         } catch (err) { toast(`<div><b>${err.code === 'key_rejected' ? 'Steam lehnt den Schlüssel ab' : 'Steam nicht erreichbar'}</b><small>${err.code === 'key_rejected' ? 'Unter Daten neu verbinden' : 'Später nochmal versuchen'}</small></div>`); }
         render();
       });
-      $('#playPlus') && ($('#playPlus').onclick = () => { const it = g(); Store.update(it.id, { playH: Math.round((hoursOf(it) || 0)) + 1 }); render(); });
+      $('#playPlus') && ($('#playPlus').onclick = () => { const it = g(); const base = it.playH != null ? it.playH : Math.round(hoursOf(it) || 0); Store.update(it.id, { playH: Math.round((base + 1) * 10) / 10 }); render(); });
       $('#playAuto') && ($('#playAuto').onclick = () => { Store.update(g().id, { playH: null }); render(); });
       $('#playEdit') && ($('#playEdit').onclick = () => playtimeEditor(g()));
       $('#tGen').onclick = () => (g().trophies?.length ? trophyGenerate(g()) : trophyGenerate(g()));
@@ -2383,7 +2385,7 @@
     // Kacheln
     const games = Store.all('game'), hrs = games.reduce((a, g) => a + (hoursOf(g) || 0), 0);
     const by = t => st.finished.filter(i => i.type === t).length;
-    const tiles = [
+    let tiles = [
       ['Platin', st.tierCount.platinum, '#22D3EE'],
       ['Trophäen', st.trophies.length, '#E9BE58'],
       ['Spiele fertig', by('game'), '#F4F1FA'],
@@ -2393,23 +2395,38 @@
       ['Manga-Kapitel', Math.round(st.chapters), '#F4F1FA'],
       ...(st.all && hrs ? [['Stunden gespielt', Math.round(hrs), '#C4B5FD']] : []),
     ].filter(t => t[1] > 0).slice(0, 6);
-    const tw = (W - 160 - 30) / 2, th = 210;
-    tiles.forEach(([label, val, col], i) => {
-      const tx = 80 + (i % 2) * (tw + 30), ty = 450 + Math.floor(i / 2) * (th + 30);
-      rr(x, tx, ty, tw, th, 36); x.fillStyle = i === 0 ? 'rgba(34,211,238,.10)' : 'rgba(26,21,38,.85)'; x.fill();
-      x.strokeStyle = i === 0 ? 'rgba(34,211,238,.45)' : 'rgba(255,255,255,.08)'; x.lineWidth = 2; x.stroke();
-      x.fillStyle = col; x.font = `700 92px ${display}`; x.fillText(val.toLocaleString('de-AT'), tx + 40, ty + 120);
-      x.fillStyle = '#B8AECD'; x.font = `500 32px ${body}`; x.fillText(label, tx + 42, ty + 172);
-    });
-    let y = 450 + Math.ceil(Math.max(tiles.length, 1) / 2) * (th + 30) + 40;
-    // Highlights mit Covern
+    const tw = (W - 160 - 30) / 2, th = 190;
     const hi = st.rated.slice(0, 3);
+    const cw = (W - 160 - 2 * 30) / 3, ch = cw * 1.4;
+    let plat = st.plats[0];
+    // Inhalt vertikal mittig zwischen Kopf und Fuß; wird es zu voll, fällt erst die Platin-Box, dann zwei Kacheln weg
+    const top = 440, bottom = H - 170;
+    const heights = () => [Math.ceil(tiles.length / 2) * (th + 30), hi.length ? 40 + ch + 130 : 0, plat ? 160 : 0];
+    for (let guard = 0; guard < 3; guard++) {
+      const [a, b, cc] = heights();
+      if (a + b + cc <= bottom - top) break;
+      if (plat) plat = null; else if (tiles.length > 4) tiles = tiles.slice(0, 4); else break;
+    }
+    const [tilesH, hiH, platH] = heights();
+    let y = top + Math.max(0, (bottom - top - (tilesH + hiH + platH)) / 2);
+    tiles.forEach(([label, val, col], i) => {
+      const full = i === tiles.length - 1 && tiles.length % 2 === 1;
+      const tx = 80 + (full ? 0 : (i % 2) * (tw + 30)), ty = y + Math.floor(i / 2) * (th + 30), w = full ? W - 160 : tw;
+      const isPlat = label === 'Platin';
+      rr(x, tx, ty, w, th, 36); x.fillStyle = isPlat ? 'rgba(34,211,238,.10)' : 'rgba(26,21,38,.85)'; x.fill();
+      x.strokeStyle = isPlat ? 'rgba(34,211,238,.45)' : 'rgba(255,255,255,.08)'; x.lineWidth = 2; x.stroke();
+      x.fillStyle = col; x.font = `700 84px ${display}`; x.fillText(val.toLocaleString('de-AT'), tx + 40, ty + 108);
+      x.fillStyle = '#B8AECD'; x.font = `500 31px ${body}`; x.fillText(label, tx + 42, ty + 158);
+    });
+    y += tilesH + (tiles.length ? 10 : 0);
+    // Highlights mit Covern (mittig, wenn weniger als drei)
     if (hi.length) {
+      y += 30;
       x.fillStyle = '#F4F1FA'; x.font = `700 48px ${display}`; x.fillText(st.all ? 'Meine Favoriten' : 'Highlights', 80, y); y += 40;
-      const cw = (W - 160 - 2 * 30) / 3, ch = cw * 1.5;
+      const rowW = hi.length * cw + (hi.length - 1) * 30, ox = 80 + (W - 160 - rowW) / 2;
       const imgs = await Promise.all(hi.map(i => loadImg(i.cover)));
       hi.forEach((it, i) => {
-        const cx = 80 + i * (cw + 30);
+        const cx = ox + i * (cw + 30);
         x.save(); rr(x, cx, y, cw, ch, 28); x.clip();
         const g = x.createLinearGradient(cx, y, cx + cw, y + ch); g.addColorStop(0, '#4c2c8a'); g.addColorStop(1, '#140c22'); x.fillStyle = g; x.fillRect(cx, y, cw, ch);
         const im = imgs[i];
@@ -2420,11 +2437,10 @@
         x.fillStyle = '#F4F1FA'; x.font = `600 30px ${body}`; x.fillText(fitText(x, it.title, cw), cx, y + ch + 46);
         x.fillStyle = '#C4B5FD'; x.font = `500 28px ${body}`; x.fillText('★'.repeat(it.rating || 0), cx, y + ch + 86);
       });
-      y += ch + 130;
+      y += ch + 120;
     }
     // Letzte Platin
-    const plat = st.plats[0];
-    if (plat && y < H - 260) {
+    if (plat) {
       rr(x, 80, y, W - 160, 130, 32); x.fillStyle = 'rgba(26,21,38,.85)'; x.fill(); x.strokeStyle = 'rgba(34,211,238,.35)'; x.lineWidth = 2; x.stroke();
       x.fillStyle = '#22D3EE'; x.font = `600 28px ${body}`; x.fillText(st.all ? 'Letzte Platin' : `Platin #${plat.n}`, 120, y + 52);
       x.fillStyle = '#F4F1FA'; x.font = `600 38px ${body}`; x.fillText(fitText(x, plat.g.title, W - 240), 120, y + 100);

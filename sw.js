@@ -1,5 +1,5 @@
 /* Nightshelf – Service Worker: App offline verfügbar machen und Benachrichtigungen anzeigen */
-const VERSION = '70';
+const VERSION = '71';
 const SHELL = `nightshelf-shell-${VERSION}`;
 const IMAGES = 'nightshelf-img';
 const FONTS = 'nightshelf-fonts';
