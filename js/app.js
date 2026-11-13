@@ -1718,9 +1718,7 @@
   }
   const newItems = () => Store.all().filter(showsNew).sort((a, b) => (b.newEpisodeAt || b.newChapterAt || b.updatedAt || '').localeCompare(a.newEpisodeAt || a.newChapterAt || a.updatedAt || ''));
 
-  function viewUpcoming() {
-    const entries = upcomingEntries();
-    const fresh = newItems();
+  function upcomingListHTML(entries, fresh) {
     const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const dayLabel = t => {
@@ -1737,15 +1735,122 @@
     const months = [];
     later.forEach(u => { const k = new Date(u.t).toLocaleDateString('de-AT', { month: 'long', year: 'numeric' }); const g = months[months.length - 1]; if (g && g.k === k) g.list.push(u); else months.push({ k, list: [u] }); });
     const hasSeasons = Store.all().some(it => ['anime', 'series'].includes(it.type) && it.seasonList?.some(x => x.anilistId || x.tvmazeId));
-    view.innerHTML = `<div class="${A()}" style="max-width:900px">
-      <div class="page-head"><div><h1 class="page-title">Demnächst</h1><p class="page-sub">Neue Folgen, Staffeln, Filme und Spiele aus deinem Regal</p></div>
-        <button class="btn" data-aircheck>${I.refresh} Jetzt prüfen</button></div>
-      ${fresh.length ? `<section class="section" style="margin-top:0"><h2 class="section-title">Neu für dich</h2><div class="list-card">${fresh.map(newRow).join('')}</div></section>` : ''}
+    return `${fresh.length ? `<section class="section" style="margin-top:0"><h2 class="section-title">Neu für dich</h2><div class="list-card">${fresh.map(newRow).join('')}</div></section>` : ''}
       ${groups.length ? groups.map(g => `<section class="section up-day"><h2 class="section-title">${esc(g.label)}<span class="tiny" style="font-weight:400">${g.list.length} ${g.list.length === 1 ? 'Termin' : 'Termine'}</span></h2><div class="list-card">${g.list.map(upcomingRow).join('')}</div></section>`).join('') : ''}
       ${months.length ? `<section class="section"><h2 class="section-title">Später</h2>${months.map(g => `<div class="season-row-label">${esc(g.k)}</div><div class="list-card" style="margin-bottom:14px">${g.list.map(u => upcomingRow({ ...u, dateOnly: true, season: u.season }).replace('<div class="grow">', `<div class="up-date">${new Date(u.t).getDate()}.</div><div class="grow">`)).join('')}</div>`).join('')}</section>` : ''}
       ${!entries.length ? `<div class="empty"><div class="empty-icon">${I.calendar}</div><h3>Gerade nichts angekündigt</h3><p>${hasSeasons ? 'Sobald zu deinen Serien, Anime, Filmen oder Spielen ein Termin bekannt ist, steht er hier.' : 'Lade bei deinen Serien und Anime die Staffeln (Button „Von TVmaze laden“ bzw. „Von AniList laden“), dann erscheinen hier die nächsten Folgen.'}</p></div>` : ''}
     </div>`;
   }
+  /* ---------- Demnächst als Kalender ---------- */
+  const calState = (() => { const t = new Date(); let mode = 'month'; try { mode = localStorage.getItem('nightshelf.calMode') || 'month'; } catch {} return { y: t.getFullYear(), m: t.getMonth(), sel: null, mode, weekStart: null }; })();
+  const CAL_COLOR = { anime: 'var(--violet)', series: 'var(--cyan)', game: '#E9BE58', movie: '#F472B6', manga: 'var(--lilac)' };
+  const ymdOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const MONTH_NAMES = ['Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
+  function calEvent(u) {
+    return `<a class="cal-ev" href="#/item/${u.it.id}" style="--c:${CAL_COLOR[u.it.type] || 'var(--lilac)'}" title="${esc(u.it.title)} · ${esc(upcomingText(u).replace(/<[^>]+>/g, ''))}"><span class="cal-ev-thumb">${coverHTML(u.it, { noTitle: true })}</span><b>${esc(u.it.title)}</b></a>`;
+  }
+
+  function viewUpcoming() {
+    const entries = upcomingEntries();
+    const fresh = newItems();
+    const todayStr = ymdOf(new Date());
+    const byDay = new Map();
+    entries.forEach(u => { const k = ymdOf(new Date(u.t)); if (!byDay.has(k)) byDay.set(k, []); byDay.get(k).push(u); });
+    const mode = calState.mode;
+    if (!calState.sel) calState.sel = byDay.has(todayStr) ? todayStr : todayStr;
+
+    const segBtn = (k, l) => `<button class="${mode === k ? 'on' : ''}" data-calmode="${k}">${l}</button>`;
+    const titleTxt = mode === 'week' ? (() => { const s = new Date(calState.weekStart || weekStartOf(new Date())); const e = new Date(s); e.setDate(e.getDate() + 6); return `${s.getDate()}. ${MONTH_NAMES[s.getMonth()].slice(0, 3)} – ${e.getDate()}. ${MONTH_NAMES[e.getMonth()].slice(0, 3)} ${e.getFullYear()}`; })() : `${MONTH_NAMES[calState.m]} ${calState.y}`;
+    const head = `<div class="page-head"><div><h1 class="page-title">Demnächst</h1><p class="page-sub">Neue Folgen, Staffeln, Filme und Spiele aus deinem Regal</p></div>
+        <button class="btn" data-aircheck>${I.refresh} Jetzt prüfen</button></div>
+      <div class="cal-bar">
+        ${mode !== 'list' ? `<div class="uc-nav"><button class="cal-navbtn" data-calnav="-1" aria-label="Zurück">‹</button><button class="cal-navbtn" data-calnav="1" aria-label="Weiter">›</button></div>
+        <h2 class="uc-title">${titleTxt}</h2><button class="btn btn-sm" data-calnav="0">Heute</button>` : '<h2 class="uc-title">Alle Termine</h2>'}
+        <div class="cal-seg">${segBtn('month', 'Monat')}${segBtn('week', 'Woche')}${segBtn('list', 'Liste')}</div>
+      </div>`;
+
+    if (mode === 'list') {
+      view.innerHTML = `<div class="${A()}" style="max-width:900px">${head}${upcomingListHTML(entries, fresh)}</div>`;
+      bindCal();
+      return;
+    }
+
+    const dayPanel = () => {
+      const list = byDay.get(calState.sel) || [];
+      const d = new Date(calState.sel + 'T00:00:00');
+      const label = calState.sel === todayStr ? 'Heute' : d.toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long' });
+      return `<div class="cal-day-head"><h3>${esc(label)}</h3><span class="tiny">${list.length ? `${list.length} ${list.length === 1 ? 'Termin' : 'Termine'}` : 'Nichts geplant'}</span></div>
+        ${list.length ? `<div class="list-card">${list.map(upcomingRow).join('')}</div>` : `<div class="list-empty" style="padding:14px 4px">An diesem Tag kommt nichts aus deinem Regal.</div>`}`;
+    };
+
+    let grid;
+    if (mode === 'month') {
+      const first = new Date(calState.y, calState.m, 1);
+      const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7));
+      const weeks = Math.ceil((((first.getDay() + 6) % 7) + new Date(calState.y, calState.m + 1, 0).getDate()) / 7);
+      const cells = [];
+      for (let i = 0; i < weeks * 7; i++) {
+        const d = new Date(start); d.setDate(start.getDate() + i);
+        const k = ymdOf(d), list = byDay.get(k) || [];
+        const cls = ['cal-cell', d.getMonth() !== calState.m ? 'out' : '', k === todayStr ? 'today' : '', k === calState.sel ? 'sel' : '', list.length ? 'has' : ''].join(' ');
+        cells.push(`<div class="${cls}" data-day="${k}" role="button" tabindex="0" aria-label="${d.toLocaleDateString('de-AT', { day: 'numeric', month: 'long' })}${list.length ? `, ${list.length} Termine` : ''}">
+          <span class="cal-n">${d.getDate()}</span>
+          <div class="cal-evs">${list.slice(0, 3).map(calEvent).join('')}${list.length > 3 ? `<span class="cal-more">+${list.length - 3} weitere</span>` : ''}</div>
+          <div class="cal-dots">${list.slice(0, 4).map(u => `<i style="background:${CAL_COLOR[u.it.type] || 'var(--lilac)'}"></i>`).join('')}</div>
+        </div>`);
+      }
+      grid = `<div class="uc-month"><div class="cal-wds">${['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(w => `<span>${w}</span>`).join('')}</div><div class="uc-grid">${cells.join('')}</div></div>`;
+    } else {
+      const s = new Date(calState.weekStart || weekStartOf(new Date()));
+      const cols = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(s); d.setDate(s.getDate() + i);
+        const k = ymdOf(d), list = byDay.get(k) || [];
+        cols.push(`<div class="cal-wcol ${k === todayStr ? 'today' : ''} ${k === calState.sel ? 'sel' : ''}" data-day="${k}">
+          <div class="cal-whead"><span>${d.toLocaleDateString('de-AT', { weekday: 'short' })}</span><b>${d.getDate()}</b></div>
+          <div class="cal-wlist">${list.length ? list.map(u => `${calEvent(u)}${u.dateOnly ? '' : `<span class="cal-time">${new Date(u.t).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' })}</span>`}`).join('') : '<span class="cal-none">–</span>'}</div>
+        </div>`);
+      }
+      grid = `<div class="cal-week">${cols.join('')}</div>`;
+    }
+
+    const legend = `<div class="cal-legend">${[['anime', 'Anime'], ['series', 'Serien'], ['game', 'Spiele'], ['movie', 'Filme']].map(([t, l]) => `<span><i style="background:${CAL_COLOR[t]}"></i>${l}</span>`).join('')}</div>`;
+    const hasAny = entries.length > 0;
+    view.innerHTML = `<div class="${A()}">${head}
+      <div class="cal-layout">
+        <div>${legend}${grid}${hasAny ? '' : `<p class="tiny" style="margin-top:10px">Noch keine Termine bekannt. Lade bei Serien und Anime die Staffeln („Von TVmaze/AniList laden“), dann erscheinen hier die nächsten Folgen.</p>`}</div>
+        <aside class="cal-side">
+          <div id="calDay">${dayPanel()}</div>
+          ${fresh.length ? `<div class="cal-new"><h3>Neu für dich</h3><div class="list-card">${fresh.slice(0, 8).map(newRow).join('')}</div></div>` : ''}
+        </aside>
+      </div></div>`;
+    bindCal();
+  }
+  const weekStartOf = d => { const s = new Date(d); s.setHours(0, 0, 0, 0); s.setDate(s.getDate() - ((s.getDay() + 6) % 7)); return s.getTime(); };
+  function bindCal() {
+    $$('[data-calmode]').forEach(b => b.onclick = () => { calState.mode = b.dataset.calmode; try { localStorage.setItem('nightshelf.calMode', calState.mode); } catch {} if (calState.mode === 'week' && !calState.weekStart) calState.weekStart = weekStartOf(calState.sel ? new Date(calState.sel + 'T00:00:00') : new Date()); render(); });
+    $$('[data-calnav]').forEach(b => b.onclick = () => {
+      const dir = +b.dataset.calnav, now = new Date();
+      if (dir === 0) { calState.y = now.getFullYear(); calState.m = now.getMonth(); calState.sel = ymdOf(now); calState.weekStart = weekStartOf(now); }
+      else if (calState.mode === 'week') { const s = new Date(calState.weekStart || weekStartOf(now)); s.setDate(s.getDate() + 7 * dir); calState.weekStart = s.getTime(); }
+      else { calState.m += dir; if (calState.m < 0) { calState.m = 11; calState.y--; } if (calState.m > 11) { calState.m = 0; calState.y++; } }
+      render();
+    });
+    $$('[data-day]').forEach(c => {
+      const pick = e => {
+        if (e.target.closest('a')) return; // Klick auf einen Eintrag öffnet ihn
+        calState.sel = c.dataset.day;
+        const d = new Date(c.dataset.day + 'T00:00:00');
+        if (d.getMonth() !== calState.m && calState.mode === 'month') { calState.y = d.getFullYear(); calState.m = d.getMonth(); }
+        render();
+        if (window.matchMedia('(max-width: 820px)').matches) setTimeout(() => $('#calDay')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+      };
+      c.onclick = pick;
+      c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e); } };
+    });
+  }
+
 
   /* ---------- Staffeln (Anime und Serien) ---------- */
   const seasonTab = {};
