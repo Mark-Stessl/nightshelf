@@ -2624,11 +2624,9 @@
             <div class="grow"><div class="title">${esc(g.title)}</div><div class="sub">${esc(t.name)} · ${fmtDate(t.doneAt)}</div></div></a>`).join('')
           : '<div class="list-empty">Keine Platin-Trophäe in diesem Zeitraum.</div>'}${st.plats.length > PLAT_SHOW ? `<button type="button" class="plat-more" onclick="const c=this.closest('.plat-chron');const o=c.classList.toggle('open');this.textContent=o?'Weniger anzeigen':'Alle ${st.plats.length} anzeigen'">Alle ${st.plats.length} anzeigen</button>` : ''}</div></div>
         <div>
-          <h2 class="section-title">Seltenste Trophäen</h2><div class="list-card" style="margin-bottom:26px">${st.rare.length ? st.rare.map(({ t, g }) => `
+          <h2 class="section-title">Seltenste Trophäen</h2><div class="list-card">${st.rare.length ? st.rare.map(({ t, g }) => `
             <a class="list-row" href="#/item/${g.id}"><div class="tbadge">${Trophies.icon(t.tier, 22)}</div><div class="grow"><div class="title">${esc(t.name)}</div><div class="sub">${esc(g.title)}</div></div><b class="rare-pct">${String(t.rarity).replace('.', ',')} %</b></a>`).join('')
             : '<div class="list-empty">Seltenheit gibt es nur für Trophäen von PlayStation oder eingefügte Listen.</div>'}</div>
-          <h2 class="section-title">${st.all ? 'Bestbewertet' : 'Highlights des Jahres'}</h2><div class="list-card">${st.rated.length ? st.rated.map(i => listRow(i, `${TYPES[i.type].label} · <span class="stars-mini">${'★'.repeat(i.rating)}</span>`)).join('')
-            : '<div class="list-empty">Bewerte, was du abgeschlossen hast, dann erscheint es hier.</div>'}</div>
         </div>
       </div>
 
@@ -2651,7 +2649,9 @@
       <section class="section"><h2 class="section-title">Folgen ${st.all ? 'pro Jahr' : 'pro Monat'}</h2>
         <div class="panel chart-panel">${st.episodes ? simpleChart(st, 'episodes', 'Folgen') : '<div class="list-empty">Gezählt wird ab jetzt: Jede Folge, die du bei Serien und Anime mit + abhakst, landet hier.</div>'}</div></section>
 
-      <section class="section"><h2 class="section-title">Abgeschlossen ${period}</h2><div class="list-card">${st.finished.length ? st.finished.slice(0, 30).map(i => listRow(i, `${TYPES[i.type].label} · ${fmtDate(i.finishedAt)}`)).join('')
+      <section class="section"><h2 class="section-title">Abgeschlossen ${period}</h2><div class="list-card">${st.finished.length ? st.finished.slice(0, 30).map(i => `<a class="list-row fin-row" href="#/item/${i.id}"><div class="thumb">${coverHTML(i, { noTitle: true })}</div>
+          <div class="grow"><div class="title">${esc(i.title)}</div><div class="sub">${TYPES[i.type].label} · ${fmtDate(i.finishedAt)}</div>${i.notes ? `<div class="fin-note">${esc(i.notes)}</div>` : ''}</div>
+          ${i.rating ? `<span class="fin-stars" title="${i.rating} von 5">${'★'.repeat(i.rating)}<i>${'★'.repeat(5 - i.rating)}</i></span>` : ''}</a>`).join('')
         : '<div class="list-empty">Noch nichts mit Datum. Wenn du etwas auf „Durchgespielt“, „Fertig geschaut“ oder „Gesehen“ setzt, wird das Datum gespeichert.</div>'}</div>
         ${st.undatedFinished ? `<p class="tiny" style="margin-top:8px">${st.undatedFinished} abgeschlossene Einträge haben kein Datum und fehlen deshalb in den Jahren.</p>` : ''}</section>
     </div>`;

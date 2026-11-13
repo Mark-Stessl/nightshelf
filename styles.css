@@ -1026,3 +1026,9 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .plat-chron.open .plat-extra { display: flex; }
 .plat-more { display: block; width: calc(100% + 12px); margin: 6px -6px -6px; padding: 12px; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--lilac); font: 600 13px var(--font, inherit); cursor: pointer; transition: background .15s var(--ease); }
 .plat-more:hover { background: rgba(139, 92, 246, .08); }
+
+/* Abgeschlossen: Bewertung und Notiz */
+.fin-row .grow { min-width: 0; }
+.fin-note { margin-top: 3px; font-size: 12.5px; color: var(--text-2); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-stars { flex-shrink: 0; color: var(--gold, #F5C451); font-size: 13px; letter-spacing: 1px; }
+.fin-stars i { font-style: normal; color: var(--text-3); opacity: .35; }
