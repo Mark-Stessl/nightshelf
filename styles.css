@@ -827,3 +827,10 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 /* Logos im Querformat (durchsichtig): auf dem Farbverlauf, mit hellem Schein, damit dunkle Schrift sichtbar bleibt */
 .cover.cover-logo img, .thumb.cover-logo img { object-fit: contain; padding: 14% 10%; filter: drop-shadow(0 0 1px rgba(255, 255, 255, .7)) drop-shadow(0 2px 10px rgba(255, 255, 255, .25)); }
 .cover.cover-logo .cover-gen .initials, .cover.cover-logo .cover-gen .ctitle { display: none; }
+
+/* Cover ändern (Detailseite) */
+.hero .cover { position: relative; }
+.cover-edit { position: absolute; right: 8px; bottom: 8px; z-index: 3; width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255, 255, 255, .16); background: rgba(14, 11, 22, .75); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: var(--text); cursor: pointer; opacity: .85; transition: opacity .2s var(--ease), transform .15s var(--ease); }
+.cover-edit:hover { opacity: 1; transform: scale(1.05); }
+.cover-edit svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 820px) { .cover-edit { width: 28px; height: 28px; right: 5px; bottom: 5px; border-radius: 8px; } .cover-edit svg { width: 14px; height: 14px; } }

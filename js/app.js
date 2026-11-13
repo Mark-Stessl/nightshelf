@@ -54,6 +54,7 @@
     trophy: '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"/></svg>',
     game: '<svg viewBox="0 0 24 24"><path d="M6 8h12a4 4 0 0 1 4 4v1a4 4 0 0 1-7 2.6L14 15h-4l-1 .6A4 4 0 0 1 2 13v-1a4 4 0 0 1 4-4zM7 11v3M5.5 12.5h3M16 12h.01M18 14h.01"/></svg>',
     tv: '<svg viewBox="0 0 24 24"><path d="M3 7h18v12H3zM8 3l4 4 4-4"/></svg>',
+    image: '<svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5"/><circle cx="15.5" cy="9" r="1.5"/></svg>',
     pause: '<svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg>',
     play: '<svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>',
     bookmark: '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
@@ -81,7 +82,7 @@
   let coverBusy = false;
   const coverNorm = t => (t || '').toLowerCase().replace(/[-–]?\s*troph(ä|ae)en$/i, '').replace(/[™®©]/g, '').replace(/[^a-z0-9]+/g, '');
   const COVER_V = 2; // Version der Cover-Suche: alte Einträge werden mit der neuen Suche einmal nachgeholt
-  const queueCover = id => { const it = Store.get(id); if (it && it.type === 'game' && (it.coverV || 0) < COVER_V && !coverQueue.includes(id)) { coverQueue.push(id); runCoverQueue(); } };
+  const queueCover = id => { const it = Store.get(id); if (it && it.type === 'game' && !it.coverCustom && (it.coverV || 0) < COVER_V && !coverQueue.includes(id)) { coverQueue.push(id); runCoverQueue(); } };
   window.__nsCover = img => {
     const box = img.parentElement;
     if (!box || !img.naturalWidth) return;
@@ -125,6 +126,65 @@
     }
     coverBusy = false;
     if (changed) render();
+  }
+
+  /* Eigenes Cover: Bild vom Gerät (automatisch aufs Hochformat 2:3 zugeschnitten) oder Link */
+  function cropToCover(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const W = 400, H = 600, c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        const ctx = c.getContext('2d');
+        const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+        const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+        ctx.fillStyle = '#0E0B16'; ctx.fillRect(0, 0, W, H);
+        ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+        URL.revokeObjectURL(url);
+        let q = 0.85, data = c.toDataURL('image/jpeg', q);
+        while (data.length > 160000 && q > 0.5) { q -= 0.1; data = c.toDataURL('image/jpeg', q); }
+        resolve(data);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image')); };
+      img.src = url;
+    });
+  }
+  function coverEditor(id) {
+    const it = Store.get(id); if (!it) return;
+    const setCover = (cover, custom) => { Store.update(id, { cover, coverV: COVER_V, coverTried: true, coverCustom: custom }); render(); };
+    openModal({
+      title: 'Cover ändern',
+      body: `<div class="form">
+        <label class="add-pick-btn" for="coverFile" style="cursor:pointer"><span class="add-pick-icon">${I.upload}</span><span class="add-pick-text"><b>Bild auswählen</b><small>Vom Handy oder PC, wird aufs Hochformat zugeschnitten</small></span></label>
+        <input type="file" id="coverFile" accept="image/*" hidden>
+        <div class="field"><label>Oder Bild-Link einfügen</label><div class="key-row"><input class="input" id="coverUrl" placeholder="https://…" autocomplete="off" spellcheck="false"><button class="btn btn-primary" id="coverUrlSave">Übernehmen</button></div></div>
+        <div class="field-error" id="coverErr"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${it.type === 'game' ? `<button class="btn" id="coverAuto">${I.refresh} Automatisch suchen</button>` : ''}
+          ${it.cover ? `<button class="btn btn-ghost btn-danger" id="coverDel">${I.trash} Cover entfernen</button>` : ''}
+        </div>
+      </div>`,
+      onMount: (m, close) => {
+        const err = $('#coverErr', m);
+        $('#coverFile', m).onchange = async e => {
+          const f = e.target.files[0]; if (!f) return;
+          err.textContent = 'Bild wird vorbereitet…';
+          try { setCover(await cropToCover(f), true); close(); toast('<div><b>Cover geändert</b></div>'); }
+          catch { err.textContent = 'Dieses Bild konnte nicht gelesen werden. Versuch ein JPG oder PNG.'; }
+        };
+        $('#coverUrlSave', m).onclick = async () => {
+          const u = $('#coverUrl', m).value.trim();
+          if (!/^https?:\/\//.test(u)) { err.textContent = 'Der Link muss mit https:// beginnen.'; return; }
+          err.textContent = 'Prüfe Bild…';
+          const ok = await new Promise(res => { const i = new Image(); i.onload = () => res(true); i.onerror = () => res(false); i.src = u; });
+          if (!ok) { err.textContent = 'Unter diesem Link wurde kein Bild gefunden. Nimm „Bildadresse kopieren“.'; return; }
+          setCover(u, true); close(); toast('<div><b>Cover geändert</b></div>');
+        };
+        $('#coverAuto', m) && ($('#coverAuto', m).onclick = () => { Store.update(id, { coverV: 0, coverCustom: false }); close(); queueCover(id); toast('<div><b>Suche Cover…</b><small>Steam und Wikipedia</small></div>'); });
+        $('#coverDel', m) && ($('#coverDel', m).onclick = () => { setCover('', true); close(); });
+      },
+    });
   }
 
   function coverHTML(item, opts = {}) {
@@ -1915,7 +1975,7 @@
       <a class="back" href="#/${T.route}">${I.back} ${T.plural}</a>
       <div class="hero">
         <div class="hero-bg">${item.cover ? `<img src="${esc(item.cover)}" alt="" onerror="this.remove()">` : coverHTML(item, { noTitle: true })}</div>
-        <div class="cover">${coverHTML(item)}</div>
+        <div class="cover">${coverHTML(item)}<button type="button" class="cover-edit" id="coverEdit" title="Cover ändern" aria-label="Cover ändern">${I.image}</button></div>
         <div class="hero-info">
           <div class="hero-head">
             ${statusPill(item)}${(() => { const r = releaseInfo(item); return r ? `<span class="status-pill st-upcoming">${I.calendar} ${r.date && !r.year ? `Erscheint am ${new Date(r.date + 'T00:00:00').toLocaleDateString('de-AT', { day: 'numeric', month: 'long', year: 'numeric' })}` : esc(releaseLabel(r))}</span>` : ''; })()}
@@ -1952,6 +2012,7 @@
     $('[data-stars="heroRating"]').addEventListener('change', e => { Store.update(item.id, { rating: e.detail }); });
     $('#quickStatus').onchange = e => { Store.update(item.id, { status: e.target.value }); render(); };
     $('#editBtn').onclick = () => itemForm(item.type, item);
+    $('#coverEdit') && ($('#coverEdit').onclick = () => coverEditor(item.id));
     $('#delBtn').onclick = () => confirmDialog(`„${esc(item.title)}“ wird mit allen Trophäen gelöscht.`, 'Löschen', () => { Store.remove(item.id); location.hash = `#/${T.route}`; });
 
     if (item.type === 'game') {
