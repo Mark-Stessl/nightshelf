@@ -150,43 +150,6 @@
       img.src = url;
     });
   }
-  function coverEditor(id) {
-    const it = Store.get(id); if (!it) return;
-    const setCover = (cover, custom) => { Store.update(id, { cover, coverV: COVER_V, coverTried: true, coverCustom: custom }); render(); };
-    openModal({
-      title: 'Cover ändern',
-      body: `<div class="form">
-        <label class="add-pick-btn" for="coverFile" style="cursor:pointer"><span class="add-pick-icon">${I.upload}</span><span class="add-pick-text"><b>Bild auswählen</b><small>Vom Handy oder PC, wird aufs Hochformat zugeschnitten</small></span></label>
-        <input type="file" id="coverFile" accept="image/*" hidden>
-        <div class="field"><label>Oder Bild-Link einfügen</label><div class="key-row"><input class="input" id="coverUrl" placeholder="https://…" autocomplete="off" spellcheck="false"><button class="btn btn-primary" id="coverUrlSave">Übernehmen</button></div></div>
-        <div class="field-error" id="coverErr"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${it.type === 'game' ? `<button class="btn" id="coverAuto">${I.refresh} Automatisch suchen</button>` : ''}
-          ${it.cover ? `<button class="btn btn-ghost btn-danger" id="coverDel">${I.trash} Cover entfernen</button>` : ''}
-        </div>
-      </div>`,
-      onMount: (m, close) => {
-        const err = $('#coverErr', m);
-        $('#coverFile', m).onchange = async e => {
-          const f = e.target.files[0]; if (!f) return;
-          err.textContent = 'Bild wird vorbereitet…';
-          try { setCover(await cropToCover(f), true); close(); toast('<div><b>Cover geändert</b></div>'); }
-          catch { err.textContent = 'Dieses Bild konnte nicht gelesen werden. Versuch ein JPG oder PNG.'; }
-        };
-        $('#coverUrlSave', m).onclick = async () => {
-          const u = $('#coverUrl', m).value.trim();
-          if (!/^https?:\/\//.test(u)) { err.textContent = 'Der Link muss mit https:// beginnen.'; return; }
-          err.textContent = 'Prüfe Bild…';
-          const ok = await new Promise(res => { const i = new Image(); i.onload = () => res(true); i.onerror = () => res(false); i.src = u; });
-          if (!ok) { err.textContent = 'Unter diesem Link wurde kein Bild gefunden. Nimm „Bildadresse kopieren“.'; return; }
-          setCover(u, true); close(); toast('<div><b>Cover geändert</b></div>');
-        };
-        $('#coverAuto', m) && ($('#coverAuto', m).onclick = () => { Store.update(id, { coverV: 0, coverCustom: false }); close(); queueCover(id); toast('<div><b>Suche Cover…</b><small>Steam und Wikipedia</small></div>'); });
-        $('#coverDel', m) && ($('#coverDel', m).onclick = () => { setCover('', true); close(); });
-      },
-    });
-  }
-
   function coverHTML(item, opts = {}) {
     let inner;
     if (item.cover) {
@@ -410,6 +373,9 @@
         </div>
         ${seriesFields}${animeFields}${mangaFields}
         <div class="field"><label>Bewertung</label>${starsInput(d.rating)}</div>
+        <div class="field"><label>Eigenes Cover <span class="tiny">(optional)</span></label>
+          <label class="add-pick-btn cover-pick" for="coverFile"><span class="add-pick-icon" id="coverPickIcon">${I.upload}</span><span class="add-pick-text"><b id="coverPickTitle">Bild auswählen</b><small id="coverPickSub">Vom Handy oder PC, wird aufs Hochformat zugeschnitten</small></span></label>
+          <input type="file" id="coverFile" accept="image/*" hidden><div class="field-error" id="coverErr"></div></div>
         <details class="form-more" ${(isEdit && (d.notes || d.finishedAt)) || window.matchMedia('(min-width: 821px)').matches ? 'open' : ''}>
           <summary>Weitere Angaben <span class="tiny">Fertig am, Notizen, Cover-Link</span></summary>
           <div class="form-more-body">
@@ -424,6 +390,17 @@
       onMount: (m, close) => {
         bindStars(m);
         const form = $('#itemForm', m);
+        let customCover = null;
+        $('#coverFile', m).onchange = async e => {
+          const f = e.target.files[0]; if (!f) return;
+          $('#coverErr', m).textContent = '';
+          try {
+            customCover = await cropToCover(f);
+            $('#coverPickIcon', m).innerHTML = `<img src="${customCover}" alt="">`;
+            $('#coverPickTitle', m).textContent = 'Bild ausgewählt';
+            $('#coverPickSub', m).textContent = 'Tippen, um ein anderes zu nehmen';
+          } catch { $('#coverErr', m).textContent = 'Dieses Bild konnte nicht gelesen werden. Versuch ein JPG oder PNG.'; }
+        };
         let parsed = [];
 
         function renderTMode() {
@@ -532,6 +509,7 @@
             notes: form.elements.notes.value.trim(),
           };
           if (type === 'game') { data.platform = form.elements.platform.value; data.genre = form.elements.genre.value; }
+          if (customCover) Object.assign(data, { cover: customCover, coverCustom: true, coverV: COVER_V, coverTried: true });
           const fin = form.elements.finishedAt.value;
           data.finishedAt = fin ? (isEdit && item.finishedAt?.slice(0, 10) === fin ? item.finishedAt : new Date(fin + 'T12:00:00').toISOString()) : null;
           if (type === 'manga') {
@@ -1975,7 +1953,7 @@
       <a class="back" href="#/${T.route}">${I.back} ${T.plural}</a>
       <div class="hero">
         <div class="hero-bg">${item.cover ? `<img src="${esc(item.cover)}" alt="" onerror="this.remove()">` : coverHTML(item, { noTitle: true })}</div>
-        <div class="cover">${coverHTML(item)}<button type="button" class="cover-edit" id="coverEdit" title="Cover ändern" aria-label="Cover ändern">${I.image}</button></div>
+        <div class="cover">${coverHTML(item)}</div>
         <div class="hero-info">
           <div class="hero-head">
             ${statusPill(item)}${(() => { const r = releaseInfo(item); return r ? `<span class="status-pill st-upcoming">${I.calendar} ${r.date && !r.year ? `Erscheint am ${new Date(r.date + 'T00:00:00').toLocaleDateString('de-AT', { day: 'numeric', month: 'long', year: 'numeric' })}` : esc(releaseLabel(r))}</span>` : ''; })()}
@@ -2012,7 +1990,6 @@
     $('[data-stars="heroRating"]').addEventListener('change', e => { Store.update(item.id, { rating: e.detail }); });
     $('#quickStatus').onchange = e => { Store.update(item.id, { status: e.target.value }); render(); };
     $('#editBtn').onclick = () => itemForm(item.type, item);
-    $('#coverEdit') && ($('#coverEdit').onclick = () => coverEditor(item.id));
     $('#delBtn').onclick = () => confirmDialog(`„${esc(item.title)}“ wird mit allen Trophäen gelöscht.`, 'Löschen', () => { Store.remove(item.id); location.hash = `#/${T.route}`; });
 
     if (item.type === 'game') {
