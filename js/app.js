@@ -28,7 +28,8 @@
     ['PlayStation', ['PS5', 'PS4', 'PS3', 'PS2', 'PS1', 'PS Vita', 'PSP']],
     ['Nintendo', ['Switch 2', 'Switch', 'Wii U', 'Wii', 'GameCube', '3DS', 'DS', 'N64']],
     ['Xbox', ['Xbox Series', 'Xbox One', 'Xbox 360', 'Xbox']],
-    ['PC & Steam', ['Steam', 'PC', 'Steam Deck']],
+    ['Steam', ['Steam', 'Steam Deck']],
+    ['PC', ['PC']],
     ['Sonstige', ['Mobile', 'Andere']],
   ];
   const PLATFORMS = PLATFORM_GROUPS.flatMap(([, list]) => list);
@@ -843,7 +844,7 @@
     </a>`;
   }
 
-  const libState = { game: { q: '', status: 'all', platform: 'all', sort: 'added' }, series: { q: '', status: 'all', sort: 'added' }, movie: { q: '', status: 'all', sort: 'added' }, anime: { q: '', status: 'all', sort: 'added' }, manga: { q: '', status: 'all', sort: 'added' } };
+  const libState = { game: { q: '', status: 'all', fam: 'all', platform: 'all', sort: 'added' }, series: { q: '', status: 'all', sort: 'added' }, movie: { q: '', status: 'all', sort: 'added' }, anime: { q: '', status: 'all', sort: 'added' }, manga: { q: '', status: 'all', sort: 'added' } };
 
   function viewLibrary(type) {
     const s = libState[type];
@@ -861,11 +862,16 @@
           ${Object.entries(STATUS[type]).map(([k, v]) => `<button class="chip ${s.status === k ? 'on' : ''}" data-s="${k}">${v}</button>`).join('')}
         </div>
         ${platforms.length > 1 ? (() => {
+          // Stufe 1: Hersteller, Stufe 2 (nur wenn sinnvoll): einzelne Konsole
           const fams = PLATFORM_GROUPS.map(([g]) => g).filter(g => platforms.some(p => familyOf(p) === g));
-          const sorted = [...platforms].sort((a, b) => (PLATFORMS.indexOf(a) + 1 || 999) - (PLATFORMS.indexOf(b) + 1 || 999));
-          return `<select class="input" id="plat" style="width:auto"><option value="all">Alle Plattformen</option>
-            ${fams.length > 1 ? `<optgroup label="Hersteller">${fams.map(g => `<option value="fam:${g}" ${s.platform === 'fam:' + g ? 'selected' : ''}>${g === 'PC & Steam' ? 'PC & Steam' : `Alle ${g}`}</option>`).join('')}</optgroup>` : ''}
-            <optgroup label="Konsole">${sorted.map(p => `<option value="${esc(p)}" ${p === s.platform ? 'selected' : ''}>${esc(p)}</option>`).join('')}</optgroup></select>`;
+          if (!fams.includes(s.fam)) { s.fam = 'all'; s.platform = 'all'; }
+          const consoles = s.fam === 'all' ? [] : platforms.filter(p => familyOf(p) === s.fam).sort((a, b) => PLATFORMS.indexOf(a) - PLATFORMS.indexOf(b));
+          if (!consoles.includes(s.platform)) s.platform = 'all';
+          const famSel = fams.length > 1 ? `<select class="input" id="fam" style="width:auto"><option value="all">Alle Plattformen</option>${fams.map(g => `<option value="${esc(g)}" ${s.fam === g ? 'selected' : ''}>${esc(g)}</option>`).join('')}</select>` : '';
+          const conSel = consoles.length > 1 ? `<select class="input" id="plat" style="width:auto"><option value="all">Alle ${esc(s.fam)}</option>${consoles.map(p => `<option value="${esc(p)}" ${p === s.platform ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>` : '';
+          // Nur ein Hersteller vorhanden: direkt die Konsolen anbieten
+          const onlyCon = fams.length === 1 ? `<select class="input" id="plat" style="width:auto"><option value="all">Alle Plattformen</option>${platforms.sort((a, b) => PLATFORMS.indexOf(a) - PLATFORMS.indexOf(b)).map(p => `<option value="${esc(p)}" ${p === s.platform ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>` : '';
+          return famSel + conSel + onlyCon;
         })() : ''}
         <select class="input" id="sort" style="width:auto">
           <option value="added" ${s.sort === 'added' ? 'selected' : ''}>Zuletzt hinzugefügt</option>
@@ -878,7 +884,7 @@
 
     const drawGrid = () => {
       let list = items.filter(i => (s.status === 'all' || i.status === s.status)
-        && (s.platform === 'all' || type !== 'game' || (s.platform.startsWith('fam:') ? familyOf(i.platform) === s.platform.slice(4) : i.platform === s.platform))
+        && (type !== 'game' || ((s.fam === 'all' || familyOf(i.platform) === s.fam) && (s.platform === 'all' || i.platform === s.platform)))
         && (!s.q || i.title.toLowerCase().includes(s.q.toLowerCase())));
       const prog = i => { const p = Trophies.progress(i.trophies); return p.total ? p.done / p.total : -1; };
       list.sort({
@@ -894,6 +900,7 @@
     $$('#statusChips .chip').forEach(c => c.onclick = () => { s.status = c.dataset.s; $$('#statusChips .chip').forEach(x => x.classList.toggle('on', x === c)); drawGrid(); });
     $('#sort').onchange = e => { s.sort = e.target.value; drawGrid(); };
     $('#plat') && ($('#plat').onchange = e => { s.platform = e.target.value; drawGrid(); });
+    $('#fam') && ($('#fam').onchange = e => { s.fam = e.target.value; s.platform = 'all'; render(); });
   }
 
   function trophyRow(t, game) {
