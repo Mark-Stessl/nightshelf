@@ -373,10 +373,9 @@
         </div>
         ${seriesFields}${animeFields}${mangaFields}
         <div class="field"><label>Bewertung</label>${starsInput(d.rating)}</div>
-        <details class="form-more" ${(isEdit && (d.notes || d.finishedAt)) || window.matchMedia('(min-width: 821px)').matches ? 'open' : ''}>
-          <summary>Weitere Angaben <span class="tiny">Fertig am, Notizen, Cover</span></summary>
+        <details class="form-more" ${(isEdit && d.notes) || window.matchMedia('(min-width: 821px)').matches ? 'open' : ''}>
+          <summary>Weitere Angaben <span class="tiny">Notizen, Cover</span></summary>
           <div class="form-more-body">
-            <div class="field" id="finField"><label>Fertig am <span class="tiny">(optional, für die Statistik)</span></label><input class="input" name="finishedAt" type="date" value="${(d.finishedAt || (!isEdit && d.status === 'done' ? new Date().toISOString() : '')).slice(0, 10)}" max="${new Date().toISOString().slice(0, 10)}"></div>
             <div class="field"><label>Notizen</label><textarea class="input" name="notes" placeholder="Was hat dir gefallen?">${esc(d.notes || '')}</textarea></div>
             <div class="field"><label>Cover-Bild (Link, optional)</label><input class="input" name="cover" value="${esc(d.cover || '')}" placeholder="https://…/cover.jpg">
               <label class="add-pick-btn cover-pick" for="coverFile" style="margin-top:4px"><span class="add-pick-icon" id="coverPickIcon">${I.upload}</span><span class="add-pick-text"><b id="coverPickTitle">Bild auswählen</b><small id="coverPickSub">Vom Handy oder PC, wird aufs Hochformat zugeschnitten</small></span></label>
@@ -509,8 +508,8 @@
           };
           if (type === 'game') { data.platform = form.elements.platform.value; data.genre = form.elements.genre.value; }
           if (customCover) Object.assign(data, { cover: customCover, coverCustom: true, coverV: COVER_V, coverTried: true });
-          const fin = form.elements.finishedAt.value;
-          data.finishedAt = fin ? (isEdit && item.finishedAt?.slice(0, 10) === fin ? item.finishedAt : new Date(fin + 'T12:00:00').toISOString()) : null;
+          // „Fertig am“ setzt die App selbst: beim Status „Fertig“ das heutige Datum, beim Bearbeiten bleibt das alte
+          if (!isEdit) data.finishedAt = data.status === 'done' ? new Date().toISOString() : null;
           if (type === 'manga') {
             data.chapters = form.elements.chapters.value !== '' ? +form.elements.chapters.value : null;
             data.chaptersRead = form.elements.chaptersRead.value !== '' ? +form.elements.chaptersRead.value : 0;
