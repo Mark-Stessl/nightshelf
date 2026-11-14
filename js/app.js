@@ -1106,20 +1106,11 @@
     </a>`;
   }
 
-  const libState = { game: { q: '', status: 'all', fam: 'all', platform: 'all', play: 'all', sort: 'added' }, series: { q: '', status: 'all', sort: 'added' }, movie: { q: '', status: 'all', sort: 'added' }, anime: { q: '', status: 'all', sort: 'added' }, manga: { q: '', status: 'all', sort: 'added' } };
+  const libState = { game: { q: '', status: 'all', fam: 'all', platform: 'all', sort: 'added' }, series: { q: '', status: 'all', sort: 'added' }, movie: { q: '', status: 'all', sort: 'added' }, anime: { q: '', status: 'all', sort: 'added' }, manga: { q: '', status: 'all', sort: 'added' } };
   // Sortierung und Filter merken (auch nach Neuladen); die Suche startet immer leer
   const LIB_KEY = 'nightshelf.libState';
   try { const saved = JSON.parse(localStorage.getItem(LIB_KEY) || '{}'); Object.keys(libState).forEach(t => { if (saved[t]) Object.assign(libState[t], saved[t], { q: '' }); }); } catch {}
   const saveLib = () => { try { localStorage.setItem(LIB_KEY, JSON.stringify(Object.fromEntries(Object.entries(libState).map(([t, v]) => [t, { ...v, q: '' }])))); } catch {} };
-
-  const PLAY_RANGES = [['all', 'Jede Spielzeit'], ['u10', 'Unter 10 h'], ['10-50', '10 – 50 h'], ['50-100', '50 – 100 h'], ['o100', 'Über 100 h'], ['none', 'Ohne Spielzeit']];
-  function inPlayRange(i, r) {
-    if (!r || r === 'all') return true;
-    const h = hoursOf(i) > 0 ? hoursOf(i) : null;
-    if (r === 'none') return h == null;
-    if (h == null) return false;
-    return r === 'u10' ? h < 10 : r === '10-50' ? h >= 10 && h < 50 : r === '50-100' ? h >= 50 && h < 100 : h >= 100;
-  }
 
   function viewLibrary(type) {
     const s = libState[type];
@@ -1150,7 +1141,6 @@
           const onlyCon = fams.length === 1 ? `<select class="input" id="plat" style="width:auto"><option value="all">Alle Plattformen</option>${platforms.sort((a, b) => PLATFORMS.indexOf(a) - PLATFORMS.indexOf(b)).map(p => `<option value="${esc(p)}" ${p === s.platform ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>` : '';
           return famSel + conSel + onlyCon;
         })() : ''}
-        ${type === 'game' && items.some(i => hoursOf(i) > 0) ? `<select class="input" id="play" style="width:auto" aria-label="Spielzeit">${PLAY_RANGES.map(([k, l]) => `<option value="${k}" ${s.play === k ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}
         <select class="input" id="sort" style="width:auto">
           <option value="added" ${s.sort === 'added' ? 'selected' : ''}>Zuletzt hinzugefügt</option>
           <option value="title" ${s.sort === 'title' ? 'selected' : ''}>Titel A–Z</option>
@@ -1165,7 +1155,6 @@
     const drawGrid = () => {
       let list = items.filter(i => (s.status === 'all' || i.status === s.status)
         && (type !== 'game' || ((s.fam === 'all' || familyOf(i.platform) === s.fam) && (s.platform === 'all' || i.platform === s.platform)))
-        && (type !== 'game' || inPlayRange(i, s.play))
         && (!s.q || i.title.toLowerCase().includes(s.q.toLowerCase())));
       const hrs = i => hoursOf(i) > 0 ? hoursOf(i) : null;
       const prog = i => { const p = Trophies.progress(i.trophies); return p.total ? p.done / p.total : -1; };
@@ -1184,7 +1173,6 @@
     $('#q').oninput = e => { s.q = e.target.value; drawGrid(); };
     $$('#statusChips .chip').forEach(c => c.onclick = () => { s.status = c.dataset.s; saveLib(); $$('#statusChips .chip').forEach(x => x.classList.toggle('on', x === c)); drawGrid(); });
     $('#sort').onchange = e => { s.sort = e.target.value; saveLib(); drawGrid(); };
-    $('#play') && ($('#play').onchange = e => { s.play = e.target.value; saveLib(); drawGrid(); });
     $('#plat') && ($('#plat').onchange = e => { s.platform = e.target.value; saveLib(); drawGrid(); });
     $('#fam') && ($('#fam').onchange = e => { s.fam = e.target.value; s.platform = 'all'; saveLib(); render(); });
   }
