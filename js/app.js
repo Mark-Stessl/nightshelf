@@ -536,6 +536,8 @@
           const h = hits[i]; if (!h) return;
           hideSug();
           F.title.value = h.title;
+          // Am Handy die Tastatur schließen, sobald etwas ausgewählt wurde
+          if (window.matchMedia('(pointer: coarse)').matches) F.title.blur();
           info.innerHTML = `<div class="tiny" style="margin-top:4px">Lade Infos…</div>`;
           try {
             const dt = await Lookup.detail(type, h);
