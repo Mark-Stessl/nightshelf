@@ -2315,7 +2315,7 @@
     view.innerHTML = `<div class="${A()}">
       <div class="page-head"><div><h1 class="page-title">${greet}</h1><p class="page-sub">${total} Einträge in deinem Regal</p></div>
         <div class="head-actions" style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="#/upcoming">${I.calendar} Demnächst</a><a class="btn" href="#/stats">${I.chart} Statistik</a><button class="btn btn-primary" data-addpick>${I.plus} Hinzufügen</button></div></div>
-      <div class="stats">
+      <div class="stats home-stats">
         <a class="stat feature" href="#/trophies"><div class="stat-label">${I.trophy} Trophäen-Level</div><div class="stat-value">${s.level.level}</div><div class="bar" style="margin-top:8px"><i style="width:${s.level.pct}%"></i></div><div class="stat-hint" style="margin-top:6px">${s.earned} von ${s.total} Trophäen</div></a>
         <a class="stat" href="#/trophies"><div class="stat-label">${Trophies.icon('platinum', 16)} Platin</div><div class="stat-value" style="color:var(--platinum)">${platCount}</div><div class="stat-hint">${games.filter(g => g.status === 'done').length} Spiele durchgespielt</div></a>
         <a class="stat" href="#/games"><div class="stat-label">${I.game} Spiele</div><div class="stat-value">${games.length}</div><div class="stat-hint">${games.filter(g => g.status === 'active').length} am Spielen</div></a>

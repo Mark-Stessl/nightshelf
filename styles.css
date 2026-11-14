@@ -1032,3 +1032,16 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .fin-note { margin-top: 3px; font-size: 12.5px; color: var(--text-2); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fin-stars { flex-shrink: 0; color: var(--gold, #F5C451); font-size: 13px; letter-spacing: 1px; }
 .fin-stars i { font-style: normal; color: var(--text-3); opacity: .35; }
+
+/* Übersicht: oben Trophäen (Level + Platin), darunter die 5 Medien in einer Reihe */
+@media (min-width: 821px) {
+  .home-stats { grid-template-columns: repeat(10, 1fr); }
+  .home-stats > .stat { grid-column: span 2; }
+  .home-stats > .stat:nth-child(-n+2) { grid-column: span 5; }
+}
+/* Schmaler Desktop: 3 + 2 statt 5 in einer Reihe */
+@media (min-width: 821px) and (max-width: 1180px) {
+  .home-stats { grid-template-columns: repeat(6, 1fr); }
+  .home-stats > .stat { grid-column: span 2; }
+  .home-stats > .stat:nth-child(-n+2), .home-stats > .stat:nth-child(n+6) { grid-column: span 3; }
+}
