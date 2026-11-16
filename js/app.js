@@ -2302,11 +2302,12 @@
     const total = games.length + series.length + movies.length + animes.length + mangas.length;
     const hour = new Date().getHours();
     const greet = hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Hallo' : 'Guten Abend';
+    const greetName = `${greet} Mark`;
     const active = [...mangas, ...series, ...animes].filter(i => i.status === 'active' && newCount(i) > 0).concat([...games, ...series, ...animes, ...mangas].filter(i => i.status === 'active' && !(newCount(i) > 0))).slice(0, 6);
     const recent = recentTrophies();
 
     if (!total) {
-      view.innerHTML = `<div class="${A()}"><div class="page-head"><div><h1 class="page-title">${greet}</h1><p class="page-sub">Dein Regal ist noch leer. Womit fangen wir an?</p></div></div>
+      view.innerHTML = `<div class="${A()}"><div class="page-head"><div><h1 class="page-title">${greetName}</h1><p class="page-sub">Dein Regal ist noch leer. Womit fangen wir an?</p></div></div>
         <div class="stats">${ORDER_TYPES.map(t => `<button class="stat" data-add="${t}" style="text-align:left;cursor:pointer;color:inherit">
           <div class="stat-label">${typeIcon(t).replace('<svg', '<svg style="width:18px;height:18px"')} ${TYPES[t].plural}</div>
           <div class="stat-value" style="font-size:20px;margin-top:10px">${TYPES[t].label} hinzufügen</div><div class="stat-hint">${t === 'game' ? 'Mit Trophäen zum Abhaken' : t === 'series' ? 'Mit Staffel-Fortschritt' : t === 'manga' ? 'Kapitel zählen sich selbst hoch' : t === 'anime' ? 'Mit allen Staffeln' : 'Mit Bewertung'}</div></button>`).join('')}</div></div>`;
@@ -2315,7 +2316,7 @@
 
     const platCount = s.counts.platinum;
     view.innerHTML = `<div class="${A()}">
-      <div class="page-head"><div><h1 class="page-title">${greet}</h1><p class="page-sub">${total} Einträge in deinem Regal</p></div>
+      <div class="page-head"><div><h1 class="page-title">${greetName}</h1><p class="page-sub">${total} Einträge in deinem Regal</p></div>
         <div class="head-actions" style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="#/upcoming">${I.calendar} Demnächst</a><a class="btn" href="#/stats">${I.chart} Statistik</a><button class="btn btn-primary" data-addpick>${I.plus} Hinzufügen</button></div></div>
       <div class="stats home-stats">
         <a class="stat feature" href="#/trophies"><div class="stat-label">${I.trophy} Trophäen-Level</div><div class="stat-value">${s.level.level}</div><div class="bar" style="margin-top:8px"><i style="width:${s.level.pct}%"></i></div><div class="stat-hint" style="margin-top:6px">${s.earned} von ${s.total} Trophäen</div></a>
