@@ -1,5 +1,5 @@
 /* Nightshelf – Service Worker: App offline verfügbar machen und Benachrichtigungen anzeigen */
-const VERSION = '84';
+const VERSION = '85';
 const SHELL = `nightshelf-shell-${VERSION}`;
 const IMAGES = 'nightshelf-img';
 const FONTS = 'nightshelf-fonts';
@@ -100,7 +100,7 @@ self.addEventListener('push', e => {
       renotify: !!data.tag,
       data: { url: data.url || './#/upcoming' },
     });
-    if (typeof data.count === 'number' && self.navigator.setAppBadge) self.navigator.setAppBadge(data.count).catch(() => {});
+    if (self.navigator.clearAppBadge) self.navigator.clearAppBadge().catch(() => {});
   })());
 });
 

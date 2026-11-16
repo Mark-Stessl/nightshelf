@@ -2945,7 +2945,7 @@
     else viewHome();
 
     renderSidebarLevel();
-    Pwa.badge(Store.all().filter(showsNew).length);
+    Pwa.badge(0); // kein Zähler am App-Symbol, neue Folgen stehen unter Demnächst
     renderInstallSlot();
   }
 
