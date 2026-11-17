@@ -1128,6 +1128,19 @@
   try { const saved = JSON.parse(localStorage.getItem(LIB_KEY) || '{}'); Object.keys(libState).forEach(t => { if (saved[t]) Object.assign(libState[t], saved[t], { q: '' }); }); } catch {}
   const saveLib = () => { try { localStorage.setItem(LIB_KEY, JSON.stringify(Object.fromEntries(Object.entries(libState).map(([t, v]) => [t, { ...v, q: '' }])))); } catch {} };
 
+  // Regal-Tabs am Handy: Scrollposition beim Wechseln behalten
+  let shelfTabsX = 0;
+  function keepTabs() {
+    const row = view.querySelector('.shelf-tabs'); if (!row) return;
+    row.scrollLeft = shelfTabsX;
+    const on = row.querySelector('.shelf-tab.on');
+    if (on) {
+      const r = row.getBoundingClientRect(), o = on.getBoundingClientRect();
+      if (o.left < r.left + 14 || o.right > r.right - 14) row.scrollTo({ left: row.scrollLeft + (o.left - r.left) - (r.width - o.width) / 2, behavior: 'smooth' });
+    }
+    row.addEventListener('scroll', () => { shelfTabsX = row.scrollLeft; }, { passive: true });
+  }
+
   function viewLibrary(type) {
     const s = libState[type];
     const items = Store.all(type);
@@ -1135,7 +1148,7 @@
     const shelfTabs = `<div class="shelf-tabs" role="tablist">${ORDER_TYPES.map(t => `<a role="tab" href="#/${TYPES[t].route}" class="shelf-tab ${t === type ? 'on' : ''}" aria-selected="${t === type}">${TYPES[t].plural}<span>${Store.all(t).length}</span></a>`).join('')}</div>`;
     const head = shelfTabs + `<div class="page-head"><div><h1 class="page-title">${TYPES[type].plural}</h1><p class="page-sub">${items.length} ${items.length === 1 ? 'Eintrag' : 'Einträge'}</p></div>
       <div class="head-actions" style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}${type === 'game' && Steam.connected() && Steam.hasProfile() ? `<button class="btn" data-steamsync>${I.refresh} Steam sync</button>` : ''}${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}${type === 'manga' && items.length ? `<button class="btn" data-mangacheck>${I.refresh} Neue Kapitel prüfen</button>` : ''}${['anime', 'series'].includes(type) && items.length ? `<button class="btn" data-aircheck>${I.refresh} Neue Folgen prüfen</button>` : ''}<button class="btn btn-primary fab" data-add="${type}" aria-label="${TYPES[type].label} hinzufügen">${I.plus}<span>${TYPES[type].label} hinzufügen</span></button></div></div>`;
-    if (!items.length) { view.innerHTML = head + emptyState(type); return; }
+    if (!items.length) { view.innerHTML = head + emptyState(type); keepTabs(); return; }
 
     const platforms = type === 'game' ? [...new Set(items.map(i => i.platform).filter(Boolean))] : [];
     view.innerHTML = head + `
@@ -1167,6 +1180,7 @@
         </select>
       </div>
       <div class="grid" id="grid"></div>`;
+    keepTabs();
 
     const drawGrid = () => {
       let list = items.filter(i => (s.status === 'all' || i.status === s.status)
