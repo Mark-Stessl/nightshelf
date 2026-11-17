@@ -518,7 +518,13 @@
         // Am Handy: Liste so hoch wie der freie Platz über der Tastatur
         const fitSug = () => {
           if (sug.hidden || !window.matchMedia('(pointer: coarse)').matches) return;
-          const vv = window.visualViewport, bottom = vv ? vv.offsetTop + vv.height : innerHeight;
+          const vv = window.visualViewport;
+          let bottom = vv ? vv.offsetTop + vv.height : innerHeight;
+          // nicht über den scrollbaren Bereich des Fensters hinaus (sonst wird die Liste abgeschnitten)
+          for (let el = sug.parentElement; el && el !== document.body; el = el.parentElement) {
+            const oy = getComputedStyle(el).overflowY;
+            if (oy === 'auto' || oy === 'scroll' || oy === 'hidden') { bottom = Math.min(bottom, el.getBoundingClientRect().bottom); break; }
+          }
           const top = F.title.getBoundingClientRect().bottom + 6;
           sug.style.maxHeight = Math.max(150, bottom - top - 10) + 'px';
         };

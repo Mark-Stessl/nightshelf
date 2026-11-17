@@ -1054,3 +1054,7 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   .suggest-thumb { width: 30px; height: 42px; border-radius: 5px; }
   .suggest-text b { font-size: 14.5px; }
 }
+
+/* neues Logo: Regal */
+.brand-mark { gap: 0; }
+.brand-mark svg { width: 26px; height: 26px; display: block; }
