@@ -515,7 +515,15 @@
         if (!Lookup.hasKey(type)) info.innerHTML = `<div class="tiny" style="margin-top:4px">Tipp: Mit einem kostenlosen ${keyHint}-Schlüssel unter <a href="#/settings" data-close style="color:var(--lilac)">Daten</a> werden Cover und Infos automatisch ausgefüllt.</div>`;
         let timer, seq = 0, hits = [], activeIdx = -1;
         const hideSug = () => { sug.hidden = true; activeIdx = -1; };
-        const showSug = html => { sug.innerHTML = html; sug.hidden = false; };
+        // Am Handy: Liste so hoch wie der freie Platz über der Tastatur
+        const fitSug = () => {
+          if (sug.hidden || !window.matchMedia('(pointer: coarse)').matches) return;
+          const vv = window.visualViewport, bottom = vv ? vv.offsetTop + vv.height : innerHeight;
+          const top = F.title.getBoundingClientRect().bottom + 6;
+          sug.style.maxHeight = Math.max(150, bottom - top - 10) + 'px';
+        };
+        window.visualViewport?.addEventListener('resize', fitSug);
+        const showSug = html => { sug.innerHTML = html; sug.hidden = false; sug.scrollTop = 0; fitSug(); };
         async function runSearch(q) {
           const my = ++seq;
           showSug('<div class="suggest-msg">Suche…</div>');

@@ -1045,3 +1045,12 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   .home-stats > .stat { grid-column: span 2; }
   .home-stats > .stat:nth-child(-n+2), .home-stats > .stat:nth-child(n+6) { grid-column: span 3; }
 }
+
+/* Vorschlagsliste am Handy: kompakter, eigenes Scrollen */
+.suggest { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+@media (max-width: 820px) {
+  .suggest { padding: 4px; }
+  .suggest-item { padding: 6px; gap: 10px; min-height: 48px; }
+  .suggest-thumb { width: 30px; height: 42px; border-radius: 5px; }
+  .suggest-text b { font-size: 14.5px; }
+}
