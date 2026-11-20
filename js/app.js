@@ -1116,7 +1116,7 @@
       }
     }
     return `<a class="card cs-${state} ${A()}" href="#/item/${item.id}">
-      <div class="cover${caseClass(item)}">${coverHTML(item)}${item.type === 'game' && item.platform ? (caseClass(item) ? `<span class="case-band"><b>${esc(item.platform)}</b></span>` : `<span class="cover-tag">${esc(item.platform)}</span>`) : ''}${extra}</div>
+      <div class="cover">${coverHTML(item)}${item.type === 'game' && item.platform ? `<span class="cover-tag">${esc(item.platform)}</span>` : ''}${extra}</div>
       <div><div class="card-title">${esc(item.title)}</div>
       <div class="card-meta">${meta.join('<span class="dot"></span>')}${item.rating ? `${meta.length ? '<span class="dot"></span>' : ''}<span class="stars-mini">${'★'.repeat(item.rating)}</span>` : ''}</div></div>
     </a>`;
@@ -1143,9 +1143,31 @@
 
 
   /* ---------- Konsolen-Hüllen, Regal-Ansicht ---------- */
-  const CASE_OF = { PlayStation: 'ps', Nintendo: 'nin', Xbox: 'xb', Steam: 'steam' };
-  const caseKey = item => item.type === 'game' && item.platform ? CASE_OF[familyOf(item.platform)] || '' : '';
-  const caseClass = item => { const k = caseKey(item); return k ? ` case case-${k}` : ''; };
+  // Aussehen der echten Hüllen: Streifen oben (band), Schrift, Farbe der Plastikhülle (frame)
+  const CASES = {
+    'PS5':         { band: 'linear-gradient(90deg,#0047AB,#0070D1)', text: '#fff', label: 'PS5', sheen: 1 },
+    'PS4':         { band: 'linear-gradient(90deg,#00246B,#003791)', text: '#fff', label: 'PS4' },
+    'PS3':         { band: 'linear-gradient(90deg,#111,#3A3A3A)', text: '#E8E8E8', label: 'PS3', frame: '#1A1A1A' },
+    'PS2':         { band: 'linear-gradient(90deg,#0B0B12,#1D1D2B)', text: '#9FB4FF', label: 'PS2', frame: '#0C0C10' },
+    'PS1':         { band: 'linear-gradient(90deg,#141414,#2B2B2B)', text: '#F2C230', label: 'PS', frame: '#151515' },
+    'PS Vita':     { band: 'linear-gradient(90deg,#00439C,#1E6FD9)', text: '#fff', label: 'VITA' },
+    'PSP':         { band: 'linear-gradient(90deg,#1A1A1A,#444)', text: '#fff', label: 'PSP', frame: '#D9DCE2' },
+    'Switch 2':    { band: 'linear-gradient(90deg,#C8001A,#E60023)', text: '#fff', label: 'SWITCH 2', frame: '#E60023' },
+    'Switch':      { band: 'linear-gradient(90deg,#D10016,#F0283C)', text: '#fff', label: 'SWITCH', frame: '#E2001A' },
+    'Wii U':       { band: 'linear-gradient(90deg,#0089BF,#22B5E8)', text: '#fff', label: 'WII U', frame: '#1FA9DC' },
+    'Wii':         { band: 'linear-gradient(90deg,#E9ECF1,#FFFFFF)', text: '#1B9AD8', label: 'Wii', frame: '#F1F3F6' },
+    'GameCube':    { band: 'linear-gradient(90deg,#2B2152,#4B3C8C)', text: '#fff', label: 'GCN', frame: '#111' },
+    '3DS':         { band: 'linear-gradient(90deg,#B70016,#D9001E)', text: '#fff', label: '3DS', frame: '#E9EAEE' },
+    'DS':          { band: 'linear-gradient(90deg,#6B6F78,#9CA1AB)', text: '#fff', label: 'DS', frame: '#1A1A1A' },
+    'N64':         { band: 'linear-gradient(90deg,#0B2A6F,#C3112B)', text: '#fff', label: 'N64' },
+    'Xbox Series': { band: 'linear-gradient(90deg,#0E6B12,#19A11E)', text: '#fff', label: 'XBOX', frame: '#107C10' },
+    'Xbox One':    { band: 'linear-gradient(90deg,#0E6B12,#2CA243)', text: '#fff', label: 'XB1', frame: '#107C10' },
+    'Xbox 360':    { band: 'linear-gradient(90deg,#4E9A0E,#86C440)', text: '#fff', label: '360', frame: '#5DAE1B' },
+    'Xbox':        { band: 'linear-gradient(90deg,#1B5E20,#4CAF50)', text: '#fff', label: 'XBOX', frame: '#2E7D32' },
+    'Steam':       { band: 'linear-gradient(90deg,#121A2A,#2A3F5F)', text: '#9FD3FF', label: 'STEAM' },
+  };
+  const caseOf = item => item.type === 'game' && item.platform ? CASES[item.platform] || (familyOf(item.platform) === 'Steam' ? CASES.Steam : null) : null;
+  const caseVars = c => c ? `--cap:${c.band};--capText:${c.text};${c.frame ? `--frame:${c.frame};` : ''}` : '';
 
   const SPINE = { game: [176, 34], movie: [184, 40], series: [178, 38], anime: [170, 32], manga: [150, 28] };
   function spineHTML(item, idx = 0) {
@@ -1156,7 +1178,7 @@
     const state = rel ? 'upcoming' : item.status;
     const plat = item.type === 'game' && item.trophies?.some(t => t.tier === 'platinum' && t.done);
     const hue = 248 + (h % 46);
-    const ck = caseKey(item);
+    const cs = caseOf(item);
     const meta = [];
     if (item.type === 'game' && item.platform) meta.push(esc(item.platform));
     if (item.type === 'game' && hoursOf(item) > 0) meta.push(fmtHours(hoursOf(item)));
@@ -1164,11 +1186,11 @@
     if (item.type !== 'game' && item.year) meta.push(item.year);
     if (rel) meta.push(esc(releaseLabel(rel)));
     const img = item.cover ? `<img src="${esc(item.cover)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : '';
-    return `<a class="spine sp-${state}${plat ? ' sp-plat' : ''}${ck ? ' spc-' + ck : ''}" href="#/item/${item.id}" style="--h:${height}px;--w:${width}px;--hue:${hue};--i:${Math.min(idx, 36)}" aria-label="${esc(item.title)}">
-      <span class="sp-body">${img}<span class="sp-shade"></span>${ck ? '<span class="sp-cap"></span>' : ''}
+    return `<a class="spine sp-${state}${plat ? ' sp-plat' : ''}${cs ? ' has-case' : ''}${cs?.frame ? ' has-frame' : ''}${cs?.sheen ? ' has-sheen' : ''}" href="#/item/${item.id}" style="--h:${height}px;--w:${width}px;--hue:${hue};--i:${Math.min(idx, 36)};${caseVars(cs)}" aria-label="${esc(item.title)}">
+      <span class="sp-body">${img}<span class="sp-shade"></span>${cs ? `<span class="sp-cap"><em>${cs.label}</em></span>` : ''}
         <span class="sp-title">${esc(item.title)}</span>
         ${plat ? `<span class="sp-foot">${Trophies.icon('platinum', 13)}</span>` : item.rating ? `<span class="sp-foot sp-rate">${item.rating}★</span>` : ''}</span>
-      <span class="sp-pop" aria-hidden="true"><span class="sp-pop-cover${ck ? ' case case-' + ck : ''}">${coverHTML(item, { noTitle: true })}${ck ? `<span class="case-band"><b>${esc(item.platform)}</b></span>` : ''}</span>
+      <span class="sp-pop" aria-hidden="true"><span class="sp-pop-cover${cs ? ' case' : ''}">${coverHTML(item, { noTitle: true })}${cs ? `<span class="case-band"><b>${cs.label === 'PS' ? 'PlayStation' : esc(item.platform)}</b></span>` : ''}</span>
         <span class="sp-pop-info"><b>${esc(item.title)}</b>${meta.length ? `<i>${meta.join(' · ')}</i>` : ''}</span></span>
     </a>`;
   }
@@ -2465,12 +2487,12 @@
     return `<svg class="vt-svg" viewBox="0 0 64 80" aria-hidden="true"><defs>
       <linearGradient id="m${id}" x1="0" x2="1"><stop offset="0" stop-color="#7DA6C9"/><stop offset=".28" stop-color="#F2F8FF"/><stop offset=".5" stop-color="#A9C4DD"/><stop offset=".78" stop-color="#E4F6FF"/><stop offset="1" stop-color="#6E8FB0"/></linearGradient>
       <linearGradient id="b${id}" x1="0" x2="1"><stop offset="0" stop-color="#2A2140"/><stop offset=".5" stop-color="#4A3B70"/><stop offset="1" stop-color="#231B37"/></linearGradient></defs>
-      <path d="M14 10h36v14a18 18 0 0 1 -36 0z" fill="url(#m${id})"/>
-      <path d="M14 13H7a7 7 0 0 0 9 11M50 13h7a7 7 0 0 1 -9 11" fill="none" stroke="url(#m${id})" stroke-width="3.2" stroke-linecap="round"/>
-      <path d="M28 41h8l2 11h-12z" fill="url(#m${id})"/>
-      <rect x="18" y="52" width="28" height="7" rx="2.5" fill="url(#m${id})"/>
-      <rect x="13" y="59" width="38" height="17" rx="3.5" fill="url(#b${id})"/>
-      <path d="M19 12h6v12a10 10 0 0 0 3 7" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2" stroke-linecap="round"/>
+      <path d="M15 4h34v12a17 17 0 0 1 -34 0z" fill="url(#m${id})"/>
+      <path d="M15 7H8a6.5 6.5 0 0 0 8.5 10.5M49 7h7a6.5 6.5 0 0 1 -8.5 10.5" fill="none" stroke="url(#m${id})" stroke-width="3" stroke-linecap="round"/>
+      <path d="M28.5 32h7l2 9h-11z" fill="url(#m${id})"/>
+      <rect x="18" y="41" width="28" height="6" rx="2.5" fill="url(#m${id})"/>
+      <rect x="8" y="48" width="48" height="31" rx="4" fill="url(#b${id})"/>
+      <path d="M20 6h5v10a9 9 0 0 0 3 6.5" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2" stroke-linecap="round"/>
     </svg>`;
   }
   function vitrineHTML() {
@@ -2909,9 +2931,6 @@
             <div class="play-bars">${top.map(g => `<a class="play-bar" href="#/item/${g.id}"><span class="n">${esc(g.title)}</span><i style="width:${Math.max(4, hoursOf(g) / max * 100)}%"></i><span class="v">${fmtHours(hoursOf(g))}</span></a>`).join('')}</div>
           </div></section>`;
       })()}
-
-      <section class="section"><h2 class="section-title">Folgen ${st.all ? 'pro Jahr' : 'pro Monat'}</h2>
-        <div class="panel chart-panel">${st.episodes ? simpleChart(st, 'episodes', 'Folgen') : '<div class="list-empty">Gezählt wird ab jetzt: Jede Folge, die du bei Serien und Anime mit + abhakst, landet hier.</div>'}</div></section>
 
       <section class="section"><h2 class="section-title">Abgeschlossen ${period}</h2><div class="list-card">${st.finished.length ? st.finished.slice(0, 30).map(i => `<a class="list-row fin-row" href="#/item/${i.id}"><div class="thumb">${coverHTML(i, { noTitle: true })}</div>
           <div class="grow"><div class="title">${esc(i.title)}</div><div class="sub">${TYPES[i.type].label} · ${fmtDate(i.finishedAt)}</div>${i.notes ? `<div class="fin-note">${esc(i.notes)}</div>` : ''}</div>
