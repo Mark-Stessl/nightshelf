@@ -22,59 +22,13 @@
   <link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash/iphone-1206x2622.png" />
   <link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash/iphone-1320x2868.png" />
   <link rel="apple-touch-startup-image" media="(device-width: 420px) and (device-height: 912px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash/iphone-1260x2736.png" />
-  <!-- Start-Intro am Handy (installierte App) -->
-  <style>
-    #intro { position: fixed; inset: 0; z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
-      background: radial-gradient(circle at 50% 46%, rgba(139,92,246,.30), rgba(139,92,246,.08) 38%, transparent 62%), #0E0B16; transition: opacity .38s ease, visibility .38s; }
-    html.intro #intro { display: flex; }
-    #intro .ii { width: 30vw; max-width: 150px; aspect-ratio: 1; animation: introPop .7s cubic-bezier(.2,.9,.25,1.15) both; filter: drop-shadow(0 0 28px rgba(139,92,246,.55)); }
-    #intro .ii svg { width: 100%; height: 100%; display: block; }
-    #intro .in { font: 700 clamp(26px, 7.5vw, 34px) 'Space Grotesk', Inter, system-ui, sans-serif; letter-spacing: -.02em; color: #EDE9FE; animation: introUp .6s .18s ease both; }
-    #intro .bk { transform-box: fill-box; }
-    #intro .bk { transform-origin: 50% 100%; animation: introBook .5s cubic-bezier(.2,.9,.3,1.2) both; }
-    #intro .bk:nth-child(2) { animation-delay: .22s } #intro .bk:nth-child(3) { animation-delay: .3s }
-    #intro.out { opacity: 0; visibility: hidden; }
-    @keyframes introPop { from { opacity: 0; transform: scale(.82); } to { opacity: 1; transform: none; } }
-    @keyframes introUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-    @keyframes introBook { from { transform: scaleY(0); } to { transform: none; } }
-    @media (prefers-reduced-motion: reduce) { #intro * { animation: none !important; } }
-  </style>
-  <script>
-    (function () {
-      try {
-        var standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-        var phone = matchMedia('(max-width: 820px)').matches;
-        if (standalone && phone && !sessionStorage.getItem('nightshelf.intro')) {
-          sessionStorage.setItem('nightshelf.intro', '1');
-          document.documentElement.classList.add('intro');
-        }
-      } catch (e) {}
-    })();
-  </script>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Nightshelf" />
-  <link rel="stylesheet" href="styles.css?v=89" />
+  <link rel="stylesheet" href="styles.css?v=90" />
 </head>
 <body>
-  <div id="intro" aria-hidden="true"><div class="ii"><svg viewBox="0 0 512 512" aria-hidden="true"><defs>
-<linearGradient id="ibg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2A1B4E"/><stop offset="1" stop-color="#0E0B16"/></linearGradient>
-<linearGradient id="iv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A78BFA"/><stop offset="1" stop-color="#7C3AED"/></linearGradient>
-<radialGradient id="igl"><stop offset="0" stop-color="#8B5CF6" stop-opacity=".6"/><stop offset="1" stop-color="#8B5CF6" stop-opacity="0"/></radialGradient></defs>
-<rect width="512" height="512" rx="116" fill="url(#ibg)"/><g transform="translate(256 256) scale(1.0) translate(-256 -256)"><circle cx="256" cy="270" r="190" fill="url(#igl)" opacity=".35"/><g transform="translate(16 -8)">
-<g class="bk"><rect x="130" y="196" width="54" height="180" rx="14" fill="url(#iv)"/></g><g class="bk"><rect x="200" y="160" width="54" height="216" rx="14" fill="#A78BFA"/></g>
-<g class="bk"><rect x="276" y="214" width="54" height="162" rx="14" fill="#7C3AED" transform="rotate(12 303 376)"/></g></g>
-<rect x="112" y="376" width="288" height="22" rx="11" fill="#5B4A86"/></g></svg></div><div class="in">Nightshelf</div></div>
-  <script>
-    (function () {
-      if (!document.documentElement.classList.contains('intro')) return;
-      var el = document.getElementById('intro'), done = false;
-      function hide() { if (done) return; done = true; el.classList.add('out'); setTimeout(function () { document.documentElement.classList.remove('intro'); }, 420); }
-      el.addEventListener('click', hide);
-      setTimeout(hide, 1300);
-    })();
-  </script>
   <div class="app">
     <aside class="sidebar">
       <a class="brand" href="#/">
@@ -103,14 +57,14 @@
   <div class="modal-root" id="modalRoot"></div>
   <div class="toast-root" id="toastRoot"></div>
 
-  <script src="js/store.js?v=89"></script>
-  <script src="js/trophies.js?v=89"></script>
-  <script src="js/lookup.js?v=89"></script>
-  <script src="js/airing.js?v=89"></script>
-  <script src="js/psn.js?v=89"></script>
-  <script src="js/steam.js?v=89"></script>
-  <script src="js/sync.js?v=89"></script>
-  <script src="js/pwa.js?v=89"></script>
-  <script src="js/app.js?v=89"></script>
+  <script src="js/store.js?v=90"></script>
+  <script src="js/trophies.js?v=90"></script>
+  <script src="js/lookup.js?v=90"></script>
+  <script src="js/airing.js?v=90"></script>
+  <script src="js/psn.js?v=90"></script>
+  <script src="js/steam.js?v=90"></script>
+  <script src="js/sync.js?v=90"></script>
+  <script src="js/pwa.js?v=90"></script>
+  <script src="js/app.js?v=90"></script>
 </body>
 </html>
