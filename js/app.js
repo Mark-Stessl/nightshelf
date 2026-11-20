@@ -2826,101 +2826,6 @@
 
   const PLAT_SHOW = 5;
 
-  /* ---------- Sternenhimmel: jeder abgeschlossene Titel ein Stern ---------- */
-  const SKY_TYPES = ['game', 'series', 'anime', 'movie', 'manga'];
-  const SKY_Y = { game: .3, series: .62, anime: .44, movie: .76, manga: .18 };
-  function skyHTML(st, year) {
-    const items = st.finished.filter(i => i.finishedAt);
-    if (!items.length) return '';
-    const narrow = window.matchMedia('(max-width: 820px)').matches;
-    const W = narrow ? 600 : 1000, H = narrow ? 440 : 340, PAD = narrow ? 22 : 34, SZ = narrow ? 1.45 : 1;
-    let t0, t1, ticks;
-    if (st.all) {
-      const ts = items.map(i => new Date(i.finishedAt).getTime());
-      t0 = Math.min(...ts); t1 = Math.max(...ts); if (t1 - t0 < 864e5 * 30) { t0 -= 864e5 * 15; t1 += 864e5 * 15; }
-      const y0 = new Date(t0).getFullYear(), y1 = new Date(t1).getFullYear();
-      ticks = []; for (let y = y0; y <= y1; y++) { const t = new Date(y, 0, 1).getTime(); if (t >= t0) ticks.push([t, String(y)]); }
-      if (!ticks.length) ticks.push([t0, String(y0)]);
-    } else {
-      t0 = new Date(+year, 0, 1).getTime(); t1 = new Date(+year + 1, 0, 1).getTime();
-      ticks = MONTHS.map((m, k) => [new Date(+year, k, 1).getTime(), m]);
-    }
-    const X = t => PAD + (t - t0) / Math.max(1, t1 - t0) * (W - PAD * 2);
-    // Hintergrund-Staub, immer gleich verteilt
-    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    const dust = Array.from({ length: 140 }, () => `<circle cx="${(rnd() * W).toFixed(1)}" cy="${(rnd() * H).toFixed(1)}" r="${(rnd() * .9 + .3).toFixed(2)}" opacity="${(rnd() * .5 + .15).toFixed(2)}"/>`).join('');
-    const pts = items.map(i => {
-      const h = hash(i.id + i.title);
-      const x = Math.max(PAD, Math.min(W - PAD, X(new Date(i.finishedAt).getTime()) + ((h % 9) - 4)));
-      const y = Math.max(22, Math.min(H - 44, (SKY_Y[i.type] ?? .5) * (H - 40) + (((h >> 5) % 101) - 50) * .9));
-      const r = (2.3 + (i.rating || 1.5) * .75) * SZ;
-      return { i, x, y, r, c: CAL_COLOR[i.type] || 'var(--lilac)', d: (h % 40) / 10 };
-    });
-    // Sternbilder: pro Typ zeitlich verbinden
-    const lines = SKY_TYPES.map(type => {
-      const p = pts.filter(q => q.i.type === type).sort((a, b) => a.x - b.x);
-      if (p.length < 2) return '';
-      const d = p.map((q, k) => `${k ? 'L' : 'M'}${q.x.toFixed(1)} ${q.y.toFixed(1)}`).join(' ');
-      return `<path class="sky-line" data-type="${type}" d="${d}" stroke="${CAL_COLOR[type]}" pathLength="1"/>`;
-    }).join('');
-    const stars = pts.map((q, k) => `<g class="sky-star" data-type="${q.i.type}" data-k="${k}" style="--d:${q.d}s;--c:${q.c}">
-      <circle class="sky-halo" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${(q.r * 4.2).toFixed(1)}" fill="url(#skyG-${q.i.type})"/>
-      ${(q.i.rating || 0) >= 4 ? `<path class="sky-spike" d="M${(q.x - q.r * 3.4).toFixed(1)} ${q.y.toFixed(1)}H${(q.x + q.r * 3.4).toFixed(1)}M${q.x.toFixed(1)} ${(q.y - q.r * 3.4).toFixed(1)}V${(q.y + q.r * 3.4).toFixed(1)}" stroke="${q.c}"/>` : ''}
-      <circle class="sky-core" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${q.r.toFixed(1)}" fill="${q.c}"/>
-      <circle class="sky-hit" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${narrow ? 20 : 14}"/></g>`).join('');
-    const tickSvg = ticks.map(([t, l]) => `<text x="${X(t).toFixed(1)}" y="${H - 12}">${l}</text>`).join('');
-    const counts = SKY_TYPES.map(t => [t, items.filter(i => i.type === t).length]).filter(([, n]) => n);
-    window.__skyPts = pts.map(q => ({ id: q.i.id, x: q.x / W, y: q.y / H, type: q.i.type }));
-    return `<section class="section"><h2 class="section-title">Dein Sternenhimmel<span class="tiny" style="font-family:var(--font)">${items.length} ${items.length === 1 ? 'Stern' : 'Sterne'} · jeder ist etwas, das du abgeschlossen hast</span></h2>
-      <div class="sky" id="sky">
-        <svg viewBox="0 0 ${W} ${H}" class="${narrow ? 'sky-narrow' : ''}" role="img" aria-label="Sternenhimmel deiner abgeschlossenen Titel">
-          <defs><radialGradient id="skyNeb" cx=".7" cy=".2" r=".8"><stop offset="0" stop-color="#8B5CF6" stop-opacity=".22"/><stop offset="1" stop-color="#8B5CF6" stop-opacity="0"/></radialGradient>
-          ${SKY_TYPES.map(t => `<radialGradient id="skyG-${t}"><stop offset="0" stop-color="${CAL_COLOR[t]}" stop-opacity=".75"/><stop offset=".35" stop-color="${CAL_COLOR[t]}" stop-opacity=".22"/><stop offset="1" stop-color="${CAL_COLOR[t]}" stop-opacity="0"/></radialGradient>`).join('')}
-          <radialGradient id="skyNeb2" cx=".15" cy=".9" r=".7"><stop offset="0" stop-color="#22D3EE" stop-opacity=".10"/><stop offset="1" stop-color="#22D3EE" stop-opacity="0"/></radialGradient></defs>
-          <rect width="${W}" height="${H}" fill="url(#skyNeb)"/><rect width="${W}" height="${H}" fill="url(#skyNeb2)"/>
-          <g class="sky-dust" fill="#EDE9FE">${dust}</g>
-          <g class="sky-ticks">${tickSvg}</g>
-          <g class="sky-lines">${lines}</g>${stars}
-        </svg>
-        <div class="sky-tip" hidden></div>
-      </div>
-      <div class="sky-legend">${counts.map(([t, n]) => `<button class="sky-key" data-type="${t}"><i style="background:${CAL_COLOR[t]}"></i>${TYPES[t].plural || TYPES[t].label} <b>${n}</b></button>`).join('')}</div>
-    </section>`;
-  }
-  function bindSky() {
-    const sky = $('#sky'); if (!sky) return;
-    const tip = sky.querySelector('.sky-tip'), svg = sky.querySelector('svg');
-    const pts = window.__skyPts || [];
-    let cur = null;
-    const show = g => {
-      const p = pts[+g.dataset.k]; const item = p && Store.get(p.id); if (!item) return;
-      sky.querySelectorAll('.sky-star.on').forEach(x => x.classList.remove('on')); g.classList.add('on'); cur = g;
-      tip.innerHTML = `<a href="#/item/${item.id}"><span class="thumb">${coverHTML(item, { noTitle: true })}</span><span class="sky-tip-t"><b>${esc(item.title)}</b>
-        <i>${TYPES[item.type].label} · ${fmtDate(item.finishedAt)}</i>${item.rating ? `<em>${'★'.repeat(item.rating)}</em>` : ''}</span></a>`;
-      tip.hidden = false;
-      const b = sky.getBoundingClientRect(), sb = svg.getBoundingClientRect();
-      const x = sb.left - b.left + p.x * sb.width, y = sb.top - b.top + p.y * sb.height;
-      const tw = tip.offsetWidth, th = tip.offsetHeight;
-      tip.style.left = Math.max(8, Math.min(b.width - tw - 8, x - tw / 2)) + 'px';
-      tip.style.top = (y - th - 16 < 6 ? y + 18 : y - th - 16) + 'px';
-    };
-    const hide = () => { tip.hidden = true; cur?.classList.remove('on'); cur = null; };
-    const touch = () => window.matchMedia('(hover: none)').matches;
-    sky.addEventListener('mouseover', e => { const g = e.target.closest('.sky-star'); if (g && !touch()) show(g); });
-    sky.addEventListener('mouseleave', () => { if (!touch()) hide(); });
-    sky.addEventListener('click', e => {
-      const g = e.target.closest('.sky-star');
-      if (g) { const p = pts[+g.dataset.k]; if (!touch() && p) { location.hash = `#/item/${p.id}`; return; } show(g); return; }
-      if (!e.target.closest('.sky-tip')) hide();
-    });
-    $$('.sky-key').forEach(k => k.onclick = () => {
-      const on = !k.classList.contains('on');
-      $$('.sky-key').forEach(x => x.classList.toggle('on', on && x === k));
-      sky.dataset.focus = on ? k.dataset.type : '';
-      hide();
-    });
-  }
-
   function viewStats() {
     const st = collectStats(statsState.year);
     if (!st.all && !st.years.includes(statsState.year)) statsState.year = st.years[0];
@@ -2938,7 +2843,6 @@
         <div class="stat"><div class="stat-label">${I.tv} Folgen gesehen</div><div class="stat-value">${st.episodes.toLocaleString('de-AT')}</div><div class="stat-hint">Serien und Anime${st.chapters ? ` · ${Math.round(st.chapters).toLocaleString('de-AT')} Manga-Kapitel gelesen` : ''}</div></div>
       </div>
 
-      ${skyHTML(st, statsState.year)}
       <section class="section"><h2 class="section-title">Trophäen ${st.all ? 'pro Jahr' : 'pro Monat'}${st.busiest.b ? `<span class="tiny" style="font-family:var(--font)">Stärkster ${st.all ? 'Jahrgang' : 'Monat'}: ${esc(st.busiest.b.long)} mit ${st.busiest.n}</span>` : ''}</h2>
         <div class="panel chart-panel">${st.trophies.length ? stackedChart(st) : '<div class="list-empty">In diesem Zeitraum hast du noch keine Trophäen mit Datum.</div>'}</div></section>
 
@@ -2977,7 +2881,6 @@
         ${st.undatedFinished ? `<p class="tiny" style="margin-top:8px">${st.undatedFinished} abgeschlossene Einträge haben kein Datum und fehlen deshalb in den Jahren.</p>` : ''}</section>
     </div>`;
 
-    bindSky();
     $$('#yearChips .chip').forEach(c => c.onclick = () => { statsState.year = c.dataset.y; animate = true; render(); animate = false; });
     $('#shareYear').onclick = () => shareYear(st, statsState.year);
     bindChartTips();
