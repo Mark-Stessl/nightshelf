@@ -1116,7 +1116,7 @@
       }
     }
     return `<a class="card cs-${state} ${A()}" href="#/item/${item.id}">
-      <div class="cover">${coverHTML(item)}${item.type === 'game' && item.platform ? `<span class="cover-tag">${esc(item.platform)}</span>` : ''}${extra}</div>
+      <div class="cover${caseClass(item)}">${coverHTML(item)}${item.type === 'game' && item.platform ? (caseClass(item) ? `<span class="case-band"><b>${esc(item.platform)}</b></span>` : `<span class="cover-tag">${esc(item.platform)}</span>`) : ''}${extra}</div>
       <div><div class="card-title">${esc(item.title)}</div>
       <div class="card-meta">${meta.join('<span class="dot"></span>')}${item.rating ? `${meta.length ? '<span class="dot"></span>' : ''}<span class="stars-mini">${'★'.repeat(item.rating)}</span>` : ''}</div></div>
     </a>`;
@@ -1140,6 +1140,69 @@
     }
     row.addEventListener('scroll', () => { shelfTabsX = row.scrollLeft; }, { passive: true });
   }
+
+
+  /* ---------- Konsolen-Hüllen, Regal-Ansicht ---------- */
+  const CASE_OF = { PlayStation: 'ps', Nintendo: 'nin', Xbox: 'xb', Steam: 'steam' };
+  const caseKey = item => item.type === 'game' && item.platform ? CASE_OF[familyOf(item.platform)] || '' : '';
+  const caseClass = item => { const k = caseKey(item); return k ? ` case case-${k}` : ''; };
+
+  const SPINE = { game: [176, 34], movie: [184, 40], series: [178, 38], anime: [170, 32], manga: [150, 28] };
+  function spineHTML(item, idx = 0) {
+    const h = hash(item.title + item.id);
+    const [bh, bw] = SPINE[item.type] || [172, 34];
+    const height = bh + (h % 5) * 6, width = bw + ((h >> 4) % 4) * 3;
+    const rel = releaseInfo(item);
+    const state = rel ? 'upcoming' : item.status;
+    const plat = item.type === 'game' && item.trophies?.some(t => t.tier === 'platinum' && t.done);
+    const hue = 248 + (h % 46);
+    const ck = caseKey(item);
+    const meta = [];
+    if (item.type === 'game' && item.platform) meta.push(esc(item.platform));
+    if (item.type === 'game' && hoursOf(item) > 0) meta.push(fmtHours(hoursOf(item)));
+    if (item.type === 'game' && item.trophies?.length) { const p = Trophies.progress(item.trophies); meta.push(`${Math.round(p.done / p.total * 100)} %`); }
+    if (item.type !== 'game' && item.year) meta.push(item.year);
+    if (rel) meta.push(esc(releaseLabel(rel)));
+    const img = item.cover ? `<img src="${esc(item.cover)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : '';
+    return `<a class="spine sp-${state}${plat ? ' sp-plat' : ''}${ck ? ' spc-' + ck : ''}" href="#/item/${item.id}" style="--h:${height}px;--w:${width}px;--hue:${hue};--i:${Math.min(idx, 36)}" aria-label="${esc(item.title)}">
+      <span class="sp-body">${img}<span class="sp-shade"></span>${ck ? '<span class="sp-cap"></span>' : ''}
+        <span class="sp-title">${esc(item.title)}</span>
+        ${plat ? `<span class="sp-foot">${Trophies.icon('platinum', 13)}</span>` : item.rating ? `<span class="sp-foot sp-rate">${item.rating}★</span>` : ''}</span>
+      <span class="sp-pop" aria-hidden="true"><span class="sp-pop-cover${ck ? ' case case-' + ck : ''}">${coverHTML(item, { noTitle: true })}${ck ? `<span class="case-band"><b>${esc(item.platform)}</b></span>` : ''}</span>
+        <span class="sp-pop-info"><b>${esc(item.title)}</b>${meta.length ? `<i>${meta.join(' · ')}</i>` : ''}</span></span>
+    </a>`;
+  }
+  // Rückt das herausgezogene Cover so, dass es nicht aus dem Bild ragt
+  function placePop(sp) {
+    const pop = sp.querySelector('.sp-pop'); if (!pop) return;
+    const wall = sp.closest('.shelf-wall').getBoundingClientRect(), r = sp.getBoundingClientRect();
+    const w = pop.offsetWidth || 140, cx = r.left + r.width / 2;
+    let dx = 0;
+    if (cx - w / 2 < wall.left + 4) dx = wall.left + 4 - (cx - w / 2);
+    if (cx + w / 2 > wall.right - 4) dx = wall.right - 4 - (cx + w / 2);
+    sp.style.setProperty('--dx', dx + 'px');
+  }
+  function bindShelfWall(wall) {
+    if (wall.dataset.bound) return; wall.dataset.bound = '1';
+    const touch = () => window.matchMedia('(hover: none)').matches;
+    wall.addEventListener('mouseover', e => { const sp = e.target.closest('.spine'); if (sp && !touch()) placePop(sp); });
+    wall.addEventListener('focusin', e => { const sp = e.target.closest('.spine'); if (sp) placePop(sp); });
+    // Handy: erstes Antippen zieht heraus, zweites öffnet
+    wall.addEventListener('click', e => {
+      const sp = e.target.closest('.spine'); if (!sp || !touch()) return;
+      if (!sp.classList.contains('pulled')) {
+        e.preventDefault();
+        wall.querySelectorAll('.spine.pulled').forEach(x => x.classList.remove('pulled'));
+        placePop(sp); sp.classList.add('pulled');
+        try { navigator.vibrate?.(8); } catch {}
+      }
+    });
+    document.addEventListener('click', e => { if (!e.target.closest('.shelf-wall')) wall.querySelectorAll('.spine.pulled').forEach(x => x.classList.remove('pulled')); });
+  }
+  const VIEW_ICONS = {
+    grid: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>',
+    shelf: '<svg viewBox="0 0 24 24"><path d="M5 5v13M9 7v11M13 4v14M17.5 7.5l2.5 10"/><path d="M3 20h18"/></svg>',
+  };
 
   function viewLibrary(type) {
     const s = libState[type];
@@ -1178,6 +1241,7 @@
           <option value="playMost" ${s.sort === 'playMost' ? 'selected' : ''}>Meiste Spielzeit</option>
           <option value="playLeast" ${s.sort === 'playLeast' ? 'selected' : ''}>Wenigste Spielzeit</option>` : ''}
         </select>
+        <div class="view-seg" role="group" aria-label="Ansicht">${['grid', 'shelf'].map(v => `<button class="${(s.view || 'grid') === v ? 'on' : ''}" data-view="${v}" title="${v === 'grid' ? 'Cover-Raster' : 'Regal'}" aria-label="${v === 'grid' ? 'Cover-Raster' : 'Regal'}">${VIEW_ICONS[v]}</button>`).join('')}</div>
       </div>
       <div class="grid" id="grid"></div>`;
     keepTabs();
@@ -1197,12 +1261,21 @@
         playMost: (a, b) => (hrs(a) == null) - (hrs(b) == null) || (hrs(b) || 0) - (hrs(a) || 0),
         playLeast: (a, b) => (hrs(a) == null) - (hrs(b) == null) || (hrs(a) || 0) - (hrs(b) || 0),
       }[s.sort] || ((a, b) => (b.addedAt || '').localeCompare(a.addedAt || '')));
-      $('#grid').innerHTML = list.length ? list.map(cardHTML).join('') : `<div class="list-empty" style="grid-column:1/-1">Keine Treffer</div>`;
+      const grid = $('#grid'), shelf = s.view === 'shelf';
+      grid.className = shelf ? 'shelf-wall' : 'grid';
+      if (!list.length) { grid.innerHTML = `<div class="list-empty" style="grid-column:1/-1">Keine Treffer</div>`; return; }
+      grid.innerHTML = shelf ? list.map(spineHTML).join('') : list.map(cardHTML).join('');
+      if (shelf) bindShelfWall(grid);
     };
     drawGrid();
     $('#q').oninput = e => { s.q = e.target.value; drawGrid(); };
     $$('#statusChips .chip').forEach(c => c.onclick = () => { s.status = c.dataset.s; saveLib(); $$('#statusChips .chip').forEach(x => x.classList.toggle('on', x === c)); drawGrid(); });
     $('#sort').onchange = e => { s.sort = e.target.value; saveLib(); drawGrid(); };
+    $$('.view-seg button').forEach(b => b.onclick = () => {
+      s.view = b.dataset.view; saveLib();
+      $$('.view-seg button').forEach(x => x.classList.toggle('on', x === b));
+      drawGrid();
+    });
     $('#plat') && ($('#plat').onchange = e => { s.platform = e.target.value; saveLib(); drawGrid(); });
     $('#fam') && ($('#fam').onchange = e => { s.fam = e.target.value; s.platform = 'all'; saveLib(); render(); });
   }
@@ -2385,6 +2458,61 @@
     </div>`;
   }
 
+
+  /* ---------- Trophäen-Vitrine ---------- */
+  const VIT_ROWS = 2;
+  function cupSVG(id) {
+    return `<svg class="vt-svg" viewBox="0 0 64 80" aria-hidden="true"><defs>
+      <linearGradient id="m${id}" x1="0" x2="1"><stop offset="0" stop-color="#7DA6C9"/><stop offset=".28" stop-color="#F2F8FF"/><stop offset=".5" stop-color="#A9C4DD"/><stop offset=".78" stop-color="#E4F6FF"/><stop offset="1" stop-color="#6E8FB0"/></linearGradient>
+      <linearGradient id="b${id}" x1="0" x2="1"><stop offset="0" stop-color="#2A2140"/><stop offset=".5" stop-color="#4A3B70"/><stop offset="1" stop-color="#231B37"/></linearGradient></defs>
+      <path d="M14 10h36v14a18 18 0 0 1 -36 0z" fill="url(#m${id})"/>
+      <path d="M14 13H7a7 7 0 0 0 9 11M50 13h7a7 7 0 0 1 -9 11" fill="none" stroke="url(#m${id})" stroke-width="3.2" stroke-linecap="round"/>
+      <path d="M28 41h8l2 11h-12z" fill="url(#m${id})"/>
+      <rect x="18" y="52" width="28" height="7" rx="2.5" fill="url(#m${id})"/>
+      <rect x="13" y="59" width="38" height="17" rx="3.5" fill="url(#b${id})"/>
+      <path d="M19 12h6v12a10 10 0 0 0 3 7" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2" stroke-linecap="round"/>
+    </svg>`;
+  }
+  function vitrineHTML() {
+    const plats = Store.all('game').flatMap(g => (g.trophies || []).filter(t => t.tier === 'platinum' && t.done).map(t => ({ t, g })))
+      .sort((a, b) => (b.t.doneAt || '').localeCompare(a.t.doneAt || ''));
+    if (!plats.length) return '';
+    const fresh = Date.now() - 14 * 864e5;
+    return `<section class="section"><h2 class="section-title">Vitrine<span class="tiny" style="font-family:var(--font)">${plats.length} Platin</span></h2>
+      <div class="vitrine" id="vitrine"><div class="vt-glass"></div><div class="vt-plaque" id="vtPlaque">${window.matchMedia('(hover: none)').matches ? 'Tippe auf eine Trophäe' : 'Fahr über eine Trophäe'}</div><div class="vt-items">${plats.map(({ t, g }, i) => `
+        <a class="vt${t.doneAt && new Date(t.doneAt).getTime() > fresh ? ' fresh' : ''}" href="#/item/${g.id}" style="--i:${Math.min(i, 30)}" data-t="${esc(g.title)}" data-d="${t.doneAt ? fmtDate(t.doneAt) : ''}" aria-label="${esc(g.title)}">
+          <span class="vt-spot"></span><span class="vt-cup">${cupSVG(i)}<span class="vt-medal">${coverHTML(g, { noTitle: true })}</span></span>
+          <span class="vt-tip"><b>${esc(g.title)}</b>${t.doneAt ? `<i>${fmtDate(t.doneAt)}</i>` : ''}</span>
+        </a>`).join('')}</div>
+        <button type="button" class="vt-more" hidden>Ganze Vitrine zeigen</button></div></section>`;
+  }
+  function bindVitrine() {
+    const v = $('#vitrine'); if (!v) return;
+    const items = v.querySelector('.vt-items'), more = v.querySelector('.vt-more');
+    const fit = () => {
+      const first = items.querySelector('.vt'); if (!first) return;
+      const rowH = first.offsetHeight + parseFloat(getComputedStyle(items).rowGap || 0);
+      const rows = new Set([...items.children].map(x => x.offsetTop)).size;
+      const many = rows > VIT_ROWS;
+      more.hidden = !many;
+      v.classList.toggle('clamped', many && !v.classList.contains('open'));
+      items.style.setProperty('--clamp', (VIT_ROWS * rowH) + 'px');
+      more.textContent = v.classList.contains('open') ? 'Weniger zeigen' : `Ganze Vitrine zeigen (${items.children.length})`;
+    };
+    more.onclick = () => { v.classList.toggle('open'); fit(); if (!v.classList.contains('open')) v.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+    fit(); setTimeout(fit, 300);
+    const touch = () => window.matchMedia('(hover: none)').matches;
+    const plaque = $('#vtPlaque'), idle = plaque.innerHTML;
+    const say = a => { if (!a) { plaque.classList.remove('on'); plaque.innerHTML = idle; return; } plaque.classList.add('on'); plaque.innerHTML = `<b>${esc(a.dataset.t)}</b>${a.dataset.d ? `<i>Platin am ${esc(a.dataset.d)}</i>` : ''}`; };
+    items.addEventListener('mouseover', e => { if (!touch()) say(e.target.closest('.vt')); });
+    items.addEventListener('mouseleave', () => { if (!touch()) say(null); });
+    items.addEventListener('focusin', e => say(e.target.closest('.vt')));
+    items.addEventListener('click', e => {
+      const a = e.target.closest('.vt'); if (!a || !touch()) return;
+      if (!a.classList.contains('lit')) { e.preventDefault(); items.querySelectorAll('.vt.lit').forEach(x => x.classList.remove('lit')); a.classList.add('lit'); say(a); try { navigator.vibrate?.(8); } catch {} }
+    });
+  }
+
   function viewTrophies() {
     const s = allTrophyStats();
     const games = Store.all('game').filter(g => g.trophies?.length);
@@ -2395,6 +2523,7 @@
         <div class="stat feature"><div class="stat-label">${I.trophy} Level</div><div class="stat-value">${s.level.level}</div><div class="bar" style="margin-top:8px"><i style="width:${s.level.pct}%"></i></div><div class="stat-hint" style="margin-top:6px">Noch ${s.level.need - s.level.into} Punkte bis Level ${s.level.level + 1}</div></div>
         ${Trophies.ORDER.map(t => `<div class="stat"><div class="stat-label">${Trophies.icon(t, 16)} ${Trophies.TIERS[t].label}</div><div class="stat-value" style="color:${Trophies.TIERS[t].color}">${s.counts[t]}</div><div class="stat-hint">${Trophies.TIERS[t].points} Punkte pro Stück</div></div>`).join('')}
       </div>
+      ${vitrineHTML()}
       <div class="two-col section">
         <div><h2 class="section-title">Spiele nach Fortschritt</h2><div class="list-card">${games.length ? games
           .map(g => ({ g, p: Trophies.progress(g.trophies) }))
@@ -2409,6 +2538,7 @@
           : '<div class="list-empty">Noch nichts verdient.</div>'}</div></div>
       </div>
     </div>`;
+    bindVitrine();
   }
 
   /* ---------- Statistik & Jahresrückblick ---------- */
@@ -2635,6 +2765,102 @@
   }
 
   const PLAT_SHOW = 5;
+
+  /* ---------- Sternenhimmel: jeder abgeschlossene Titel ein Stern ---------- */
+  const SKY_TYPES = ['game', 'series', 'anime', 'movie', 'manga'];
+  const SKY_Y = { game: .3, series: .62, anime: .44, movie: .76, manga: .18 };
+  function skyHTML(st, year) {
+    const items = st.finished.filter(i => i.finishedAt);
+    if (!items.length) return '';
+    const narrow = window.matchMedia('(max-width: 820px)').matches;
+    const W = narrow ? 600 : 1000, H = narrow ? 440 : 340, PAD = narrow ? 22 : 34, SZ = narrow ? 1.45 : 1;
+    let t0, t1, ticks;
+    if (st.all) {
+      const ts = items.map(i => new Date(i.finishedAt).getTime());
+      t0 = Math.min(...ts); t1 = Math.max(...ts); if (t1 - t0 < 864e5 * 30) { t0 -= 864e5 * 15; t1 += 864e5 * 15; }
+      const y0 = new Date(t0).getFullYear(), y1 = new Date(t1).getFullYear();
+      ticks = []; for (let y = y0; y <= y1; y++) { const t = new Date(y, 0, 1).getTime(); if (t >= t0) ticks.push([t, String(y)]); }
+      if (!ticks.length) ticks.push([t0, String(y0)]);
+    } else {
+      t0 = new Date(+year, 0, 1).getTime(); t1 = new Date(+year + 1, 0, 1).getTime();
+      ticks = MONTHS.map((m, k) => [new Date(+year, k, 1).getTime(), m]);
+    }
+    const X = t => PAD + (t - t0) / Math.max(1, t1 - t0) * (W - PAD * 2);
+    // Hintergrund-Staub, immer gleich verteilt
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const dust = Array.from({ length: 140 }, () => `<circle cx="${(rnd() * W).toFixed(1)}" cy="${(rnd() * H).toFixed(1)}" r="${(rnd() * .9 + .3).toFixed(2)}" opacity="${(rnd() * .5 + .15).toFixed(2)}"/>`).join('');
+    const pts = items.map(i => {
+      const h = hash(i.id + i.title);
+      const x = Math.max(PAD, Math.min(W - PAD, X(new Date(i.finishedAt).getTime()) + ((h % 9) - 4)));
+      const y = Math.max(22, Math.min(H - 44, (SKY_Y[i.type] ?? .5) * (H - 40) + (((h >> 5) % 101) - 50) * .9));
+      const r = (2.3 + (i.rating || 1.5) * .75) * SZ;
+      return { i, x, y, r, c: CAL_COLOR[i.type] || 'var(--lilac)', d: (h % 40) / 10 };
+    });
+    // Sternbilder: pro Typ zeitlich verbinden
+    const lines = SKY_TYPES.map(type => {
+      const p = pts.filter(q => q.i.type === type).sort((a, b) => a.x - b.x);
+      if (p.length < 2) return '';
+      const d = p.map((q, k) => `${k ? 'L' : 'M'}${q.x.toFixed(1)} ${q.y.toFixed(1)}`).join(' ');
+      return `<path class="sky-line" data-type="${type}" d="${d}" stroke="${CAL_COLOR[type]}" pathLength="1"/>`;
+    }).join('');
+    const stars = pts.map((q, k) => `<g class="sky-star" data-type="${q.i.type}" data-k="${k}" style="--d:${q.d}s;--c:${q.c}">
+      <circle class="sky-halo" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${(q.r * 4.2).toFixed(1)}" fill="url(#skyG-${q.i.type})"/>
+      ${(q.i.rating || 0) >= 4 ? `<path class="sky-spike" d="M${(q.x - q.r * 3.4).toFixed(1)} ${q.y.toFixed(1)}H${(q.x + q.r * 3.4).toFixed(1)}M${q.x.toFixed(1)} ${(q.y - q.r * 3.4).toFixed(1)}V${(q.y + q.r * 3.4).toFixed(1)}" stroke="${q.c}"/>` : ''}
+      <circle class="sky-core" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${q.r.toFixed(1)}" fill="${q.c}"/>
+      <circle class="sky-hit" cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="${narrow ? 20 : 14}"/></g>`).join('');
+    const tickSvg = ticks.map(([t, l]) => `<text x="${X(t).toFixed(1)}" y="${H - 12}">${l}</text>`).join('');
+    const counts = SKY_TYPES.map(t => [t, items.filter(i => i.type === t).length]).filter(([, n]) => n);
+    window.__skyPts = pts.map(q => ({ id: q.i.id, x: q.x / W, y: q.y / H, type: q.i.type }));
+    return `<section class="section"><h2 class="section-title">Dein Sternenhimmel<span class="tiny" style="font-family:var(--font)">${items.length} ${items.length === 1 ? 'Stern' : 'Sterne'} · jeder ist etwas, das du abgeschlossen hast</span></h2>
+      <div class="sky" id="sky">
+        <svg viewBox="0 0 ${W} ${H}" class="${narrow ? 'sky-narrow' : ''}" role="img" aria-label="Sternenhimmel deiner abgeschlossenen Titel">
+          <defs><radialGradient id="skyNeb" cx=".7" cy=".2" r=".8"><stop offset="0" stop-color="#8B5CF6" stop-opacity=".22"/><stop offset="1" stop-color="#8B5CF6" stop-opacity="0"/></radialGradient>
+          ${SKY_TYPES.map(t => `<radialGradient id="skyG-${t}"><stop offset="0" stop-color="${CAL_COLOR[t]}" stop-opacity=".75"/><stop offset=".35" stop-color="${CAL_COLOR[t]}" stop-opacity=".22"/><stop offset="1" stop-color="${CAL_COLOR[t]}" stop-opacity="0"/></radialGradient>`).join('')}
+          <radialGradient id="skyNeb2" cx=".15" cy=".9" r=".7"><stop offset="0" stop-color="#22D3EE" stop-opacity=".10"/><stop offset="1" stop-color="#22D3EE" stop-opacity="0"/></radialGradient></defs>
+          <rect width="${W}" height="${H}" fill="url(#skyNeb)"/><rect width="${W}" height="${H}" fill="url(#skyNeb2)"/>
+          <g class="sky-dust" fill="#EDE9FE">${dust}</g>
+          <g class="sky-ticks">${tickSvg}</g>
+          <g class="sky-lines">${lines}</g>${stars}
+        </svg>
+        <div class="sky-tip" hidden></div>
+      </div>
+      <div class="sky-legend">${counts.map(([t, n]) => `<button class="sky-key" data-type="${t}"><i style="background:${CAL_COLOR[t]}"></i>${TYPES[t].plural || TYPES[t].label} <b>${n}</b></button>`).join('')}</div>
+    </section>`;
+  }
+  function bindSky() {
+    const sky = $('#sky'); if (!sky) return;
+    const tip = sky.querySelector('.sky-tip'), svg = sky.querySelector('svg');
+    const pts = window.__skyPts || [];
+    let cur = null;
+    const show = g => {
+      const p = pts[+g.dataset.k]; const item = p && Store.get(p.id); if (!item) return;
+      sky.querySelectorAll('.sky-star.on').forEach(x => x.classList.remove('on')); g.classList.add('on'); cur = g;
+      tip.innerHTML = `<a href="#/item/${item.id}"><span class="thumb">${coverHTML(item, { noTitle: true })}</span><span class="sky-tip-t"><b>${esc(item.title)}</b>
+        <i>${TYPES[item.type].label} · ${fmtDate(item.finishedAt)}</i>${item.rating ? `<em>${'★'.repeat(item.rating)}</em>` : ''}</span></a>`;
+      tip.hidden = false;
+      const b = sky.getBoundingClientRect(), sb = svg.getBoundingClientRect();
+      const x = sb.left - b.left + p.x * sb.width, y = sb.top - b.top + p.y * sb.height;
+      const tw = tip.offsetWidth, th = tip.offsetHeight;
+      tip.style.left = Math.max(8, Math.min(b.width - tw - 8, x - tw / 2)) + 'px';
+      tip.style.top = (y - th - 16 < 6 ? y + 18 : y - th - 16) + 'px';
+    };
+    const hide = () => { tip.hidden = true; cur?.classList.remove('on'); cur = null; };
+    const touch = () => window.matchMedia('(hover: none)').matches;
+    sky.addEventListener('mouseover', e => { const g = e.target.closest('.sky-star'); if (g && !touch()) show(g); });
+    sky.addEventListener('mouseleave', () => { if (!touch()) hide(); });
+    sky.addEventListener('click', e => {
+      const g = e.target.closest('.sky-star');
+      if (g) { const p = pts[+g.dataset.k]; if (!touch() && p) { location.hash = `#/item/${p.id}`; return; } show(g); return; }
+      if (!e.target.closest('.sky-tip')) hide();
+    });
+    $$('.sky-key').forEach(k => k.onclick = () => {
+      const on = !k.classList.contains('on');
+      $$('.sky-key').forEach(x => x.classList.toggle('on', on && x === k));
+      sky.dataset.focus = on ? k.dataset.type : '';
+      hide();
+    });
+  }
+
   function viewStats() {
     const st = collectStats(statsState.year);
     if (!st.all && !st.years.includes(statsState.year)) statsState.year = st.years[0];
@@ -2652,6 +2878,7 @@
         <div class="stat"><div class="stat-label">${I.tv} Folgen gesehen</div><div class="stat-value">${st.episodes.toLocaleString('de-AT')}</div><div class="stat-hint">Serien und Anime${st.chapters ? ` · ${Math.round(st.chapters).toLocaleString('de-AT')} Manga-Kapitel gelesen` : ''}</div></div>
       </div>
 
+      ${skyHTML(st, statsState.year)}
       <section class="section"><h2 class="section-title">Trophäen ${st.all ? 'pro Jahr' : 'pro Monat'}${st.busiest.b ? `<span class="tiny" style="font-family:var(--font)">Stärkster ${st.all ? 'Jahrgang' : 'Monat'}: ${esc(st.busiest.b.long)} mit ${st.busiest.n}</span>` : ''}</h2>
         <div class="panel chart-panel">${st.trophies.length ? stackedChart(st) : '<div class="list-empty">In diesem Zeitraum hast du noch keine Trophäen mit Datum.</div>'}</div></section>
 
@@ -2693,6 +2920,7 @@
         ${st.undatedFinished ? `<p class="tiny" style="margin-top:8px">${st.undatedFinished} abgeschlossene Einträge haben kein Datum und fehlen deshalb in den Jahren.</p>` : ''}</section>
     </div>`;
 
+    bindSky();
     $$('#yearChips .chip').forEach(c => c.onclick = () => { statsState.year = c.dataset.y; animate = true; render(); animate = false; });
     $('#shareYear').onclick = () => shareYear(st, statsState.year);
     bindChartTips();
