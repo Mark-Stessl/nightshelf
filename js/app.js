@@ -1950,7 +1950,7 @@
     const hasAny = entries.length > 0;
     view.innerHTML = `<div class="${A()}">${head}
       <div class="cal-layout">
-        <div>${legend}<div class="cal-page" id="calPage"><div class="cal-rings" aria-hidden="true"></div>${grid}</div>${hasAny ? '' : `<p class="tiny" style="margin-top:10px">Noch keine Termine bekannt. Lade bei Serien und Anime die Staffeln („Von TVmaze/AniList laden“), dann erscheinen hier die nächsten Folgen.</p>`}</div>
+        <div>${legend}${grid}${hasAny ? '' : `<p class="tiny" style="margin-top:10px">Noch keine Termine bekannt. Lade bei Serien und Anime die Staffeln („Von TVmaze/AniList laden“), dann erscheinen hier die nächsten Folgen.</p>`}</div>
         <aside class="cal-side">
           <div id="calDay">${dayPanel()}</div>
           ${fresh.length ? `<div class="cal-new"><h3>Neu für dich</h3><div class="list-card">${fresh.slice(0, 8).map(newRow).join('')}</div></div>` : ''}
@@ -1959,33 +1959,6 @@
     bindCal();
   }
   const weekStartOf = d => { const s = new Date(d); s.setHours(0, 0, 0, 0); s.setDate(s.getDate() - ((s.getDay() + 6) % 7)); return s.getTime(); };
-  // Kalenderblatt umblättern: vorwärts wird das alte Blatt nach oben weggeklappt, zurück klappt das neue herunter
-  let flipping = false;
-  function flipPage(dir) {
-    const old = $('#calPage');
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!old || reduce || !dir || flipping) { render(); return; }
-    const r = old.getBoundingClientRect();
-    const ghost = old.cloneNode(true);
-    ghost.removeAttribute('id'); ghost.classList.add('cal-ghost');
-    Object.assign(ghost.style, { position: 'fixed', left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', margin: 0, zIndex: dir > 0 ? 40 : 1 });
-    document.body.appendChild(ghost);
-    flipping = true;
-    render();
-    const fresh = $('#calPage');
-    const done = () => { ghost.remove(); fresh?.classList.remove('flip-in'); flipping = false; };
-    if (dir > 0) {
-      ghost.classList.add('flip-away');
-      fresh?.classList.add('flip-under');
-      setTimeout(() => fresh?.classList.remove('flip-under'), 20);
-      ghost.addEventListener('animationend', done, { once: true });
-    } else if (fresh) {
-      fresh.classList.add('flip-in');
-      fresh.addEventListener('animationend', done, { once: true });
-    }
-    setTimeout(() => { if (flipping) done(); }, 1200);
-  }
-
   function bindCal() {
     $$('[data-calmode]').forEach(b => b.onclick = () => { calState.mode = b.dataset.calmode; try { localStorage.setItem('nightshelf.calMode', calState.mode); } catch {} if (calState.mode === 'week' && !calState.weekStart) calState.weekStart = weekStartOf(calState.sel ? new Date(calState.sel + 'T00:00:00') : new Date()); render(); });
     $$('[data-calnav]').forEach(b => b.onclick = () => {
@@ -1993,19 +1966,8 @@
       if (dir === 0) { calState.y = now.getFullYear(); calState.m = now.getMonth(); calState.sel = ymdOf(now); calState.weekStart = weekStartOf(now); }
       else if (calState.mode === 'week') { const s = new Date(calState.weekStart || weekStartOf(now)); s.setDate(s.getDate() + 7 * dir); calState.weekStart = s.getTime(); }
       else { calState.m += dir; if (calState.m < 0) { calState.m = 11; calState.y--; } if (calState.m > 11) { calState.m = 0; calState.y++; } }
-      flipPage(dir);
+      render();
     });
-    // Wischen am Handy blättert ebenfalls
-    const page = $('#calPage');
-    if (page) {
-      let x0 = null, y0 = null;
-      page.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
-      page.addEventListener('touchend', e => {
-        if (x0 == null) return;
-        const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null;
-        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) $(`[data-calnav="${dx < 0 ? 1 : -1}"]`)?.click();
-      }, { passive: true });
-    }
     $$('[data-day]').forEach(c => {
       const pick = e => {
         if (e.target.closest('a')) return; // Klick auf einen Eintrag öffnet ihn
