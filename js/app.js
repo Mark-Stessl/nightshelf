@@ -1226,12 +1226,91 @@
     shelf: '<svg viewBox="0 0 24 24"><path d="M5 5v13M9 7v11M13 4v14M17.5 7.5l2.5 10"/><path d="M3 20h18"/></svg>',
   };
 
+
+  /* ---------- Regal-Welten: Auswahl per 3D-Szene ---------- */
+  const lastShelfType = () => { try { const r = localStorage.getItem('nightshelf.shelf') || 'games'; return ORDER_TYPES.find(t => TYPES[t].route === r) || 'game'; } catch { return 'game'; } };
+  function viewShelves() {
+    const start = lastShelfType();
+    view.innerHTML = `<div class="${A()}">
+      <div class="page-head"><div><h1 class="page-title">Regal</h1><p class="page-sub">Wähle eine Welt · ${window.matchMedia('(hover: none)').matches ? 'zur Seite wischen' : 'Pfeiltasten oder Mausrad'}</p></div></div>
+      <div class="worlds" id="worlds">${ORDER_TYPES.map(t => {
+        const sc = Scenes.byType[t]; const n = Store.all(t).length;
+        return `<a class="world" href="#/${TYPES[t].route}" data-type="${t}" style="--sky:${sc.sky};--glow:${sc.glow}" aria-label="${TYPES[t].plural}, ${n} Einträge">
+          <span class="world-frame">${sc.layers.map(([d, svg]) => `<span class="wl" style="--d:${d}">${svg.replace('<svg viewBox', '<svg preserveAspectRatio="xMidYMid slice" viewBox')}</span>`).join('')}
+          <span class="world-label"><b>${TYPES[t].plural}</b><i>${sc.sub}</i><em>${n}</em></span></span></a>`;
+      }).join('')}</div>
+      <div class="world-dots" id="worldDots">${ORDER_TYPES.map(t => `<button data-go="${t}" aria-label="${TYPES[t].plural}"></button>`).join('')}</div>
+    </div>`;
+    const rail = $('#worlds'), worlds = [...rail.children], dots = [...$('#worldDots').children];
+    let cur = 0;
+    const update = () => {
+      const c = rail.scrollLeft + rail.clientWidth / 2; let best = 0, bd = 1e9;
+      worlds.forEach((w, i) => { const m = w.offsetLeft + w.offsetWidth / 2, d = Math.abs(m - c); if (d < bd) { bd = d; best = i; } w.style.setProperty('--side', (m < c ? 16 : -16) + 'deg'); });
+      cur = best;
+      worlds.forEach((w, i) => w.classList.toggle('center', i === best));
+      dots.forEach((d, i) => d.classList.toggle('on', i === best));
+    };
+    const go = (i, smooth = true) => { i = (i + worlds.length) % worlds.length; const w = worlds[i]; rail.scrollTo({ left: w.offsetLeft - rail.clientWidth / 2 + w.offsetWidth / 2, behavior: smooth ? 'smooth' : 'auto' }); };
+    rail.addEventListener('scroll', () => requestAnimationFrame(update), { passive: true });
+    requestAnimationFrame(() => { go(ORDER_TYPES.indexOf(start), false); update(); });
+    dots.forEach((d, i) => d.onclick = () => go(i));
+    // Mausrad am PC blättert seitlich
+    rail.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { e.preventDefault(); if (!rail._wh) { rail._wh = 1; go(cur + (e.deltaY > 0 ? 1 : -1)); setTimeout(() => rail._wh = 0, 420); } } }, { passive: false });
+    const keys = e => { if (!$('#worlds')) { removeEventListener('keydown', keys); return; } if (e.key === 'ArrowRight') go(cur + 1); if (e.key === 'ArrowLeft') go(cur - 1); if (e.key === 'Enter' && document.activeElement === document.body) enter(worlds[cur]); };
+    addEventListener('keydown', keys);
+    // 3D-Neigen mit Maus
+    rail.addEventListener('pointermove', e => {
+      if (e.pointerType !== 'mouse') return;
+      const w = e.target.closest('.world.center'); if (!w) return;
+      const r = w.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+      w.style.setProperty('--ry', (x * 14) + 'deg'); w.style.setProperty('--rx', (-y * 12) + 'deg'); w.style.setProperty('--px', -x); w.style.setProperty('--py', -y);
+    });
+    rail.addEventListener('pointerleave', () => worlds.forEach(w => ['--rx', '--ry', '--px', '--py'].forEach(v => w.style.removeProperty(v))));
+    // Reinzoomen ins Regal
+    const enter = w => {
+      const f = w.querySelector('.world-frame'), r = f.getBoundingClientRect();
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { location.hash = w.getAttribute('href'); return; }
+      const z = f.cloneNode(true); z.classList.add('world-zoom'); z.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;--sky:${w.style.getPropertyValue('--sky')}`;
+      document.body.appendChild(z);
+      requestAnimationFrame(() => requestAnimationFrame(() => z.classList.add('full')));
+      setTimeout(() => { location.hash = w.getAttribute('href'); z.classList.add('gone'); setTimeout(() => z.remove(), 450); }, 520);
+    };
+    rail.addEventListener('click', e => {
+      const w = e.target.closest('.world'); if (!w) return;
+      e.preventDefault();
+      const i = worlds.indexOf(w);
+      if (i !== cur) { go(i); return; }
+      enter(w);
+    });
+  }
+
+  // Im Regal zur Seite wischen: nächste/vorige Kategorie
+  let shelfSlide = 0;
+  (() => {
+    let x0 = null, y0 = null, t0 = 0;
+    view.addEventListener('touchstart', e => {
+      x0 = null;
+      if (e.touches.length !== 1 || e.target.closest('.shelf-tabs, .chips, .toolbar, input, select, textarea, .shelf-wall .spine.pulled, .modal')) return;
+      if (!ORDER_TYPES.some(t => location.hash === `#/${TYPES[t].route}`)) return;
+      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
+    }, { passive: true });
+    view.addEventListener('touchend', e => {
+      if (x0 == null) return;
+      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null;
+      if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8 || Date.now() - t0 > 700) return;
+      const i = ORDER_TYPES.findIndex(t => location.hash === `#/${TYPES[t].route}`);
+      const n = (i + (dx < 0 ? 1 : -1) + ORDER_TYPES.length) % ORDER_TYPES.length;
+      shelfSlide = dx < 0 ? 1 : -1;
+      location.hash = `#/${TYPES[ORDER_TYPES[n]].route}`;
+    }, { passive: true });
+  })();
+
   function viewLibrary(type) {
     const s = libState[type];
     const items = Store.all(type);
     // Regal: Umschalter zwischen den Arten
     const shelfTabs = `<div class="shelf-tabs" role="tablist">${ORDER_TYPES.map(t => `<a role="tab" href="#/${TYPES[t].route}" class="shelf-tab ${t === type ? 'on' : ''}" aria-selected="${t === type}">${TYPES[t].plural}<span>${Store.all(t).length}</span></a>`).join('')}</div>`;
-    const head = shelfTabs + `<div class="page-head"><div><h1 class="page-title">${TYPES[type].plural}</h1><p class="page-sub">${items.length} ${items.length === 1 ? 'Eintrag' : 'Einträge'}</p></div>
+    const head = `<a class="shelf-back" href="#/shelf">${I.back}<span>Alle Regale</span></a>` + shelfTabs + `<div class="page-head"><div><h1 class="page-title">${TYPES[type].plural}</h1><p class="page-sub">${items.length} ${items.length === 1 ? 'Eintrag' : 'Einträge'}</p></div>
       <div class="head-actions" style="display:flex;gap:8px;flex-wrap:wrap">${type === 'game' && PSN.connected() ? `<button class="btn" data-psnsync>${I.refresh} PlayStation sync</button>` : ''}${type === 'game' && Steam.connected() && Steam.hasProfile() ? `<button class="btn" data-steamsync>${I.refresh} Steam sync</button>` : ''}${type === 'anime' ? `<button class="btn" data-lcimport>${I.paste} LiveChart-Liste einfügen</button>` : ''}${type === 'manga' && items.length ? `<button class="btn" data-mangacheck>${I.refresh} Neue Kapitel prüfen</button>` : ''}${['anime', 'series'].includes(type) && items.length ? `<button class="btn" data-aircheck>${I.refresh} Neue Folgen prüfen</button>` : ''}<button class="btn btn-primary fab" data-add="${type}" aria-label="${TYPES[type].label} hinzufügen">${I.plus}<span>${TYPES[type].label} hinzufügen</span></button></div></div>`;
     if (!items.length) { view.innerHTML = head + emptyState(type); keepTabs(); return; }
 
@@ -3105,11 +3184,12 @@
     const SHELF = ['games', 'series', 'anime', 'manga', 'movies'];
     if (SHELF.includes(active)) { try { localStorage.setItem('nightshelf.shelf', active); } catch {} }
     const lastShelf = (() => { try { return localStorage.getItem('nightshelf.shelf') || 'games'; } catch { return 'games'; } })();
-    const navShelf = $('#navShelf'); if (navShelf) navShelf.href = `#/${lastShelf}`;
-    $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === active || (a.dataset.route === 'shelf' && SHELF.includes(active)) || (a.dataset.route === 'stats' && active === 'trophies')));
+    const navShelf = $('#navShelf'); if (navShelf) navShelf.href = '#/shelf';
+    $$('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === active || (a.dataset.route === 'shelf' && (SHELF.includes(active) || active === 'shelf')) || (a.dataset.route === 'stats' && active === 'trophies')));
     const tipEl = $('#chartTip'); if (tipEl) tipEl.style.opacity = '0';
 
     if (!route) viewHome();
+    else if (route === 'shelf') viewShelves();
     else if (route === 'games') viewLibrary('game');
     else if (route === 'series') viewLibrary('series');
     else if (route === 'movies') viewLibrary('movie');
@@ -3136,6 +3216,7 @@
     render();
     animate = false;
     window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+    if (shelfSlide) { const el = view.firstElementChild; el?.classList.add(shelfSlide > 0 ? 'slide-l' : 'slide-r'); shelfSlide = 0; }
   });
   document.addEventListener('click', e => {
     const add = e.target.closest('[data-add]');
