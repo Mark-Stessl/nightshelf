@@ -292,7 +292,7 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 .trophy-desc { font-size: 13px; color: var(--text-2); margin-top: 2px; }
 .trophy-meta { display: flex; align-items: center; gap: 4px; }
 .rarity { font-size: 11px; color: var(--text-3); white-space: nowrap; }
-.tier-tag { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; }
+.tier-tag { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; }
 .tt-bronze { color: var(--bronze); background: rgba(208, 138, 91, .12); }
 .tt-silver { color: var(--silver); background: rgba(201, 206, 220, .1); }
 .tt-gold { color: var(--gold); background: rgba(233, 190, 88, .12); }
@@ -329,7 +329,7 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
   transform: translate(-50%, -46%) scale(.97); opacity: 0;
   background: var(--surface); border: 1px solid var(--line-2);
   border-radius: 16px; box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .8);
-  transition: all .28s var(--ease); pointer-events: auto;
+  transition: opacity .28s var(--ease), transform .28s var(--ease); pointer-events: auto;
 }
 .modal.wide { width: min(820px, calc(100vw - 32px)); }
 .modal-root.open .modal-backdrop { opacity: 1; }
@@ -1183,7 +1183,7 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   -webkit-clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%); clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%); transition: opacity .35s var(--ease); }
 .vt-plaque { position: relative; z-index: 5; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 38px; margin: -10px auto 18px; padding: 8px 18px; width: fit-content; max-width: 100%;
   border-radius: var(--radius-sm); background: linear-gradient(180deg, rgba(42, 33, 64, .9), rgba(26, 21, 38, .9)); border: 1px solid rgba(196, 181, 253, .2); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 8px 20px rgba(0,0,0,.35);
-  font-size: 12.5px; color: var(--text-3); text-align: center; transition: border-color .25s var(--ease); }
+  font-size: 12.5px; color: var(--text-2); text-align: center; transition: border-color .25s var(--ease); }
 .vt-plaque b { font: 600 13.5px var(--display); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60vw; }
 .vt-plaque i { font-style: normal; font-size: 11.5px; color: var(--cyan); white-space: nowrap; }
 .vt-plaque.on { border-color: rgba(34, 211, 238, .45); }
