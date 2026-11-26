@@ -17,24 +17,14 @@ import { I, TrophyIcon } from '../components/icons.jsx';
 import { CoverBox, SafeImg } from '../components/Cover.jsx';
 import { Msg, StarsInput, StatusPill, cn, confirmDialog, joinDots } from '../components/ui.jsx';
 import { openItemForm } from '../dialogs/ItemForm.jsx';
-import { playtimeEditor, trophyEdit, trophyGenerate, trophyImport, trophyToast } from '../dialogs/trophyDialogs.jsx';
+import { playtimeEditor, toggleTrophy, trophyEdit, trophyGenerate, trophyImport, trophyToast } from '../dialogs/trophyDialogs.jsx';
 import { chapterTotal, seasonEdit } from '../dialogs/misc.jsx';
 import { BusyButton } from './Library.jsx';
 
 /* ---------- Trophäen ---------- */
 function TrophyRow({ t, game }) {
   const isPlat = t.tier === 'platinum';
-  const toggle = () => {
-    const g = Store.get(game.id);
-    if (isPlat) { toast(<Msg title="Platin kommt von allein" sub="Hake alle anderen Trophäen ab" />); return; }
-    const now = new Date().toISOString();
-    const list = g.trophies.map(x => x.id === t.id ? { ...x, done: !x.done, doneAt: !x.done ? now : null } : x);
-    const platChange = Trophies.syncPlatinum(list);
-    Store.update(g.id, { trophies: list, status: platChange === 'earned' ? 'done' : g.status });
-    const me = list.find(x => x.id === t.id);
-    if (me.done) trophyToast(me, g);
-    if (platChange === 'earned') setTimeout(() => trophyToast(list.find(x => x.tier === 'platinum'), g), 500);
-  };
+  const toggle = () => toggleTrophy(game.id, t.id);
   const del = () => { const g = Store.get(game.id); const list = g.trophies.filter(x => x.id !== t.id); Trophies.syncPlatinum(list); Store.update(g.id, { trophies: list }); };
   return (
     <div className={cn('trophy', t.done && 'done')}>
@@ -58,6 +48,12 @@ function TrophyRow({ t, game }) {
 
 function PlayBox({ item }) {
   const h = hoursOf(item), manual = item.playH != null, auto = item.playMin != null;
+  // Ohne Spielzeit nur eine ruhige Zeile, damit die Trophäen weiter oben stehen
+  if (h == null) return (
+    <div className="play-line">{I.clock}<span>Noch keine Spielzeit</span>
+      <span className="tiny">{['Steam', 'PS5', 'PS4'].includes(item.platform) ? 'kommt beim nächsten Sync' : `keine automatische Angabe für ${item.platform || 'diese Plattform'}`}</span>
+      <button type="button" className="link-btn" onClick={() => playtimeEditor(Store.get(item.id))}>Eintragen</button></div>
+  );
   return (
     <section className="section"><div className="play-box">
       <div className="play-icon">{I.clock}</div>
@@ -85,6 +81,7 @@ function TrophySection({ item }) {
   const sorted = list.slice().sort((a, b) => Trophies.ORDER.indexOf(a.tier) - Trophies.ORDER.indexOf(b.tier));
   const filtered = sorted.filter(t => filter === 'all' || (filter === 'open' ? !t.done : t.done));
   const allDone = list.length && list.every(t => t.done);
+  const [more, setMore] = useState(false);
 
   const toggleAll = () => {
     const game = Store.get(item.id); const all = !allDone;
@@ -123,9 +120,12 @@ function TrophySection({ item }) {
     <section className="section">
       <div className="trophy-head">
         <div><h2 className="section-title m-0">Trophäen</h2>{src && <div className="tiny">{src}</div>}</div>
-        <div className="flex gap-2 flex-wrap items-center">
-          {list.length > 0 && <div className="chips">{[['all', 'Alle'], ['open', 'Offen'], ['done', 'Verdient']].map(([k, v]) =>
-            <button key={k} className={cn('chip', filter === k && 'on')} onClick={() => detailFilter.set({ value: k })}>{v}</button>)}</div>}
+        {list.length > 0 && <div className="flex gap-2 items-center">
+          <div className="chips">{[['all', 'Alle'], ['open', 'Offen'], ['done', 'Verdient']].map(([k, v]) =>
+            <button key={k} className={cn('chip', filter === k && 'on')} onClick={() => detailFilter.set({ value: k })}>{v}</button>)}</div>
+          <button type="button" className={cn('btn btn-sm btn-ghost more-btn', more && 'on')} aria-expanded={more} onClick={() => setMore(m => !m)}>Mehr {I.chevron}</button>
+        </div>}
+        <div className={cn('trophy-tools', (more || !list.length) && 'open')}>
           <button className="btn btn-sm" onClick={() => trophyEdit(Store.get(item.id))}>{I.plus} Eigene</button>
           <button className="btn btn-sm" onClick={() => trophyImport(Store.get(item.id))}>{I.paste} Liste einfügen</button>
           {item.psnId && PSN.connected() && <BusyButton className="btn btn-sm" busyText="Lade…" onClick={fromPsn}>{I.refresh} Von PlayStation</BusyButton>}

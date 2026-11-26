@@ -101,8 +101,8 @@ export function Library({ type, animate }) {
     && (type !== 'game' || ((fam === 'all' || familyOf(i.platform) === fam) && (platform === 'all' || i.platform === platform)))
     && (!s.q || i.title.toLowerCase().includes(s.q.toLowerCase())))
     .sort(sorters[s.sort] || sorters.added);
-  // Ohne gespeicherte Wahl: am Desktop das Regal, am Handy das Raster
-  const view = s.view || (isMobileWidth() ? 'grid' : 'shelf');
+  // Ohne gespeicherte Wahl: das Cover-Raster
+  const view = s.view || 'grid';
   const shelf = view === 'shelf';
 
   return <>

@@ -12,6 +12,43 @@ export function trophyToast(t, game) {
   toast(<><div className="tbadge"><TrophyIcon tier={t.tier} /></div><div><b>{t.name}</b><small>{Trophies.TIERS[t.tier].label}-Trophäe · {game.title}</small></div></>, t.tier === 'platinum' ? 'plat' : '');
 }
 
+/* Eine Trophäe abhaken oder wieder öffnen; Platin folgt von allein */
+export function toggleTrophy(gameId, tid) {
+  const g = Store.get(gameId); const t = g?.trophies?.find(x => x.id === tid);
+  if (!t) return;
+  if (t.tier === 'platinum') { toast(<Msg title="Platin kommt von allein" sub="Hake alle anderen Trophäen ab" />); return; }
+  const now = new Date().toISOString();
+  const list = g.trophies.map(x => x.id === tid ? { ...x, done: !x.done, doneAt: !x.done ? now : null } : x);
+  const platChange = Trophies.syncPlatinum(list);
+  Store.update(g.id, { trophies: list, status: platChange === 'earned' ? 'done' : g.status });
+  const me = list.find(x => x.id === tid);
+  if (me.done) trophyToast(me, g);
+  if (platChange === 'earned') setTimeout(() => trophyToast(list.find(x => x.tier === 'platinum'), g), 500);
+}
+
+/* Schnell abhaken von der Übersicht: nur die offenen Trophäen, ohne Umweg über die Detailseite */
+export const trophyQuick = game => openModal(close => <TrophyQuick id={game.id} close={close} />);
+function TrophyQuick({ id, close }) {
+  const [, bump] = useState(0);
+  const [ids] = useState(() => (Store.get(id).trophies || []).filter(t => !t.done && t.tier !== 'platinum')
+    .sort((a, b) => Trophies.ORDER.indexOf(b.tier) - Trophies.ORDER.indexOf(a.tier)).map(t => t.id));
+  const g = Store.get(id);
+  const rows = ids.map(tid => g.trophies.find(t => t.id === tid)).filter(Boolean);
+  return (
+    <ModalFrame title={g.title} close={close}
+      foot={<><a className="btn btn-ghost" href={`#/item/${id}`} onClick={close}>Alle Trophäen</a><button className="btn btn-primary" onClick={close}>Fertig</button></>}>
+      {rows.length ? <div className="trophy-list quick-trophies">{rows.map(t => (
+        <button type="button" key={t.id} className={`trophy${t.done ? ' done' : ''}`} onClick={() => { toggleTrophy(id, t.id); bump(n => n + 1); }}>
+          <span className={`check${t.done ? ' on' : ''}`} aria-hidden="true">{I.check}</span>
+          <span className="tbadge"><TrophyIcon tier={t.tier} /></span>
+          <span className="min-w-0"><span className="trophy-name">{t.name}</span>{t.desc && <span className="trophy-desc">{t.desc}</span>}</span>
+          {t.rarity != null && <span className="rarity">{String(t.rarity).replace('.', ',')} %</span>}
+        </button>))}</div>
+        : <p className="muted m-0">Alles verdient. Hier gibt es nichts mehr abzuhaken.</p>}
+    </ModalFrame>
+  );
+}
+
 /* Vorschau einer eingefügten Liste: Stufe pro Trophäe wählen oder weglassen */
 export function TrophyPreview({ list }) {
   if (!list.length) return null;

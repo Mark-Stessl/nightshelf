@@ -1304,3 +1304,15 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   .hero-bg { inset: -16px -16px 0; }
   .tier-stat, .tier-stat:first-child { border-left: 0; padding: 0; }
 }
+
+/* ---------- Detail: Spielzeit als Zeile, Werkzeuge hinter „Mehr“, Schnell-Abhaken ---------- */
+.play-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 26px; font-size: 14px; color: var(--text-2); }
+.play-line svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; flex: none; }
+.play-line .link-btn { margin-left: auto; }
+.trophy-tools { display: none; }
+.trophy-tools.open { display: flex; flex-wrap: wrap; gap: 8px; flex-basis: 100%; }
+.more-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; transition: transform .2s var(--ease); }
+.more-btn.on svg { transform: rotate(180deg); }
+.check { width: 32px; height: 32px; }
+.quick-trophies .trophy { width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; grid-template-columns: auto auto 1fr auto; }
+.quick-trophies .trophy-desc { display: block; }
