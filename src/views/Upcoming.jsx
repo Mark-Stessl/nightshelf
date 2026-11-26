@@ -91,7 +91,7 @@ export function Upcoming({ animate }) {
     </div>}
   </>;
 
-  if (mode === 'list') return <div className={cn(animate && 'fade-in')}>{head}<div className="max-w-[900px]"><UpcomingList entries={entries} fresh={fresh} /></div></div>;
+  if (mode === 'list') return <div className={cn(animate && 'fade-in')}>{head}<UpcomingList entries={entries} fresh={fresh} /></div>;
 
   let grid;
   if (mode === 'month') {

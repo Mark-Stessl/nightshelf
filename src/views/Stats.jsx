@@ -274,19 +274,18 @@ export function Stats({ animate }) {
   return (
     <div className={animate ? 'fade-in' : ''}>
       <div className="page-head"><div><h1 className="page-title">{st.all ? 'Statistik' : `Dein ${cur}`}</h1><p className="page-sub">{st.all ? 'Alles, was du je gespielt und geschaut hast' : 'Dein Jahresrückblick'}</p></div>
-        <div className="flex flex-col gap-2.5 items-end max-[820px]:items-start min-w-0">
-          <div className="flex gap-2 flex-wrap justify-end max-[820px]:justify-start"><a className="btn" href="#/trophies">{I.trophy} Alle Trophäen</a><button className="btn btn-primary" onClick={share}>{I.share} {st.all ? 'Rückblick teilen' : `${cur} teilen`}</button></div>
-          <div className="chips">{st.years.map(y => <button key={y} className={cn('chip', cur === y && 'on')} onClick={() => statsState.set({ year: y })}>{y}</button>)}<button className={cn('chip', st.all && 'on')} onClick={() => statsState.set({ year: 'all' })}>Gesamt</button></div>
-        </div></div>
+        <div className="head-actions flex gap-2"><button className="btn btn-primary" onClick={share}>{I.share} {st.all ? 'Rückblick teilen' : `${cur} teilen`}</button></div></div>
+      <div className="chips year-chips">{st.years.map(y => <button key={y} className={cn('chip', cur === y && 'on')} onClick={() => statsState.set({ year: y })}>{y}</button>)}<button className={cn('chip', st.all && 'on')} onClick={() => statsState.set({ year: 'all' })}>Gesamt</button></div>
 
       <div className="tally">
         <div><b>{st.trophies.length.toLocaleString("de-AT")}</b><span className="tl-label">{I.trophy} Trophäen {period}</span><small>{["platinum", "gold", "silver", "bronze"].filter(t => st.tierCount[t]).map(t => `${st.tierCount[t]} ${Trophies.TIERS[t].label}`).join(" · ")}</small></div>
         <div><b style={{ color: "var(--platinum)" }}>{st.tierCount.platinum}</b><span className="tl-label"><TrophyIcon tier="platinum" size={14} /> Platin</span><small>{st.allPlats} insgesamt</small></div>
         <div><b>{st.finished.length}</b><span className="tl-label">{I.check} Abgeschlossen</span><small>{fin || "noch nichts mit Datum"}</small></div>
-        <div><b>{st.episodes.toLocaleString("de-AT")}</b><span className="tl-label">{I.tv} Folgen gesehen</span><small>{st.chapters ? `dazu ${Math.round(st.chapters).toLocaleString("de-AT")} Manga-Kapitel` : st.episodes ? "Serien und Anime" : "Gezählt wird jede Folge, die du abhakst"}</small></div>
+        {!st.episodes && st.chapters ? <div><b>{Math.round(st.chapters).toLocaleString("de-AT")}</b><span className="tl-label">{I.book} Kapitel gelesen</span><small>Manga</small></div>
+        : <div><b>{st.episodes.toLocaleString("de-AT")}</b><span className="tl-label">{I.tv} Folgen gesehen</span><small>{st.chapters ? `dazu ${Math.round(st.chapters).toLocaleString("de-AT")} Manga-Kapitel` : st.episodes ? "Serien und Anime" : "Gezählt wird jede Folge, die du abhakst"}</small></div>}
       </div>
 
-      <section className="section"><h2 className="section-title">Trophäen {st.all ? 'pro Jahr' : 'pro Monat'}{st.busiest.b && <span className="tiny" style={{ fontFamily: 'var(--font)' }}>Stärkster {st.all ? 'Jahrgang' : 'Monat'}: {st.busiest.b.long} mit {st.busiest.n}</span>}</h2>
+      <section className="section"><h2 className="section-title">Trophäen {st.all ? 'pro Jahr' : 'pro Monat'}{st.busiest.b && <span className="tiny" style={{ fontFamily: 'var(--font)' }}>Stärkster {st.all ? 'Jahrgang' : 'Monat'}: {st.busiest.b.long} mit {st.busiest.n} {st.busiest.n === 1 ? 'Trophäe' : 'Trophäen'}</span>}</h2>
         <div className="panel chart-panel">{st.trophies.length ? <StackedChart st={st} /> : <div className="list-empty">In diesem Zeitraum hast du noch keine Trophäen mit Datum.</div>}</div></section>
 
       <div className="two-col section">

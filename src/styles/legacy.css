@@ -1437,3 +1437,5 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 
 /* Seltenheit direkt hinter dem Stufen-Etikett statt weit rechts */
 .trophy-name .rarity { margin-left: 8px; font-weight: 500; }
+
+.year-chips { margin: -6px 0 22px; }
