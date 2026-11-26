@@ -28,7 +28,7 @@ function TrophyRow({ t, game }) {
   const del = () => undoable(game.id, 'Trophäe gelöscht', t.name, () => { const g = Store.get(game.id); const list = g.trophies.filter(x => x.id !== t.id); Trophies.syncPlatinum(list); Store.update(g.id, { trophies: list }); });
   return (
     <div className={cn('trophy', t.done && 'done')}>
-      <button className={cn('check', t.done && 'on', isPlat && 'auto')} onClick={toggle} aria-label={t.done ? 'Als offen markieren' : 'Abhaken'} title={isPlat ? 'Wird automatisch verdient' : undefined}>{I.check}</button>
+      <button className={cn('check', t.done && 'on', isPlat && 'auto')} aria-pressed={!!t.done} onClick={toggle} aria-label={t.done ? 'Als offen markieren' : 'Abhaken'} title={isPlat ? 'Wird automatisch verdient' : undefined}>{I.check}</button>
       <div className="tbadge"><TrophyIcon tier={t.tier} /></div>
       <div className="min-w-0">
         <div className="trophy-name">{t.name} <span className={`tier-tag tt-${t.tier}`}>{Trophies.TIERS[t.tier].label}</span>{t.dlc && <> <span className="tier-tag tt-dlc">DLC</span></>}</div>

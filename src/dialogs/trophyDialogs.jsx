@@ -38,7 +38,7 @@ function TrophyQuick({ id, close }) {
     <ModalFrame title={g.title} close={close}
       foot={<><a className="btn btn-ghost" href={`#/item/${id}`} onClick={close}>Alle Trophäen</a><button className="btn btn-primary" onClick={close}>Fertig</button></>}>
       {rows.length ? <div className="trophy-list quick-trophies">{rows.map(t => (
-        <button type="button" key={t.id} className={`trophy${t.done ? ' done' : ''}`} onClick={() => { toggleTrophy(id, t.id); bump(n => n + 1); }}>
+        <button type="button" key={t.id} aria-pressed={!!t.done} className={`trophy${t.done ? ' done' : ''}`} onClick={() => { toggleTrophy(id, t.id); bump(n => n + 1); }}>
           <span className={`check${t.done ? ' on' : ''}`} aria-hidden="true">{I.check}</span>
           <span className="tbadge"><TrophyIcon tier={t.tier} /></span>
           <span className="min-w-0"><span className="trophy-name">{t.name}</span>{t.desc && <span className="trophy-desc">{t.desc}</span>}</span>

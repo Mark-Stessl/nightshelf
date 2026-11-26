@@ -1426,3 +1426,11 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .level-card .tier-counts { margin-top: 4px; justify-content: start; gap: 10px; }
 .lv-help { display: block; margin-top: 6px; font-size: 12px; color: var(--text-3); }
 .lv-help > summary { font-weight: 500; }
+
+/* Leerer Haken besser sichtbar, auf Touch-Geräten größere Trefferfläche ohne größere Optik */
+.check:not(.on) { border-color: rgba(196, 181, 253, .38); }
+@media (pointer: coarse) {
+  .check, .row-actions .btn, .stars button { position: relative; }
+  .check::before, .row-actions .btn::before, .stars button::before { content: ""; position: absolute; inset: -7px; }
+  .stars button::before { inset: -9px -2px; }
+}
