@@ -2,9 +2,9 @@
 import { Store } from '../lib/store.js';
 import { Trophies } from '../lib/trophies.js';
 import {
-  ORDER_TYPES, TYPES, allTrophyStats, currentSeason, episodesBehind, fmtCh, fmtWhen, mangaBehind, newCount, newItems, plusOne, plusOneLabel, recentTrophies, upcomingEntries,
+  ORDER_TYPES, TYPES, currentSeason, episodesBehind, fmtCh, fmtHours, fmtWhen, hoursOf, mangaBehind, newCount, newItems, plusOne, plusOneLabel, recentTrophies, upcomingEntries,
 } from '../lib/util.js';
-import { I, TrophyIcon, typeIcon } from '../components/icons.jsx';
+import { I, typeIcon } from '../components/icons.jsx';
 import { CoverBox } from '../components/Cover.jsx';
 import { NewRow, ShelfWall, TrophyListRow, UpcomingRow } from '../components/items.jsx';
 import { undoable } from '../components/ui.jsx';
@@ -16,7 +16,7 @@ import { trophyQuick } from '../dialogs/trophyDialogs.jsx';
 const Cyan = ({ children }) => <span style={{ color: 'var(--cyan)' }}>{children}</span>;
 
 function activeSub(i) {
-  if (i.type === 'game') { if (!i.trophies?.length) return i.platform || 'Spiel'; const p = Trophies.progress(i.trophies); return `${p.done}/${p.total} Trophäen`; }
+  if (i.type === 'game') { if (!i.trophies?.length) return [i.platform, hoursOf(i) != null && fmtHours(hoursOf(i))].filter(Boolean).join(' · ') || 'Spiel'; const p = Trophies.progress(i.trophies); return `${p.done}/${p.total} Trophäen`; }
   if (i.type === 'manga') { const b = mangaBehind(i); return <>Kapitel {fmtCh(i.chaptersRead || 0)}{i.chapters ? <> von {fmtCh(i.chapters)}</> : ''}{b > 0 && <> · <Cyan>{fmtCh(b)} neu</Cyan></>}</>; }
   if (i.type === 'series' && !i.seasonList?.some(x => x.episodes)) return i.seasons ? `Staffel ${i.seasonSeen || 0}/${i.seasons}` : 'Serie';
   const cur = currentSeason(i), n = episodesBehind(i);
@@ -25,9 +25,14 @@ function activeSub(i) {
 
 /* Große Kachel für „Gerade dabei“: Cover, Stand und ein Tipp für die nächste Folge oder das nächste Kapitel */
 function NowItem({ item }) {
-  const what = plusOneLabel(item);
+  // Spiele ohne offene Trophäen: eine Stunde Spielzeit dazu
+  const what = plusOneLabel(item) || (item.type === 'game' ? 'h' : null);
   const bump = () => {
     if (what === 'Trophäe') { trophyQuick(item); return; }
+    if (what === 'h') {
+      undoable(item.id, () => [`${fmtHours(hoursOf(Store.get(item.id)))} gespielt`, item.title], null, () => { const it = Store.get(item.id); const base = it.playH != null ? it.playH : Math.round(hoursOf(it) || 0); Store.update(it.id, { playH: Math.round((base + 1) * 10) / 10 }); });
+      return;
+    }
     undoable(item.id, x => [what === 'Kapitel' ? `Kapitel ${fmtCh(Store.get(item.id).chaptersRead)} gelesen` : what === 'Staffel' ? `Staffel ${x.staffel} gesehen` : `${x?.label ? `${x.label} · ` : ''}Folge ${x?.seen} gesehen`, item.title], null, () => plusOne(item));
   };
   return (
@@ -37,14 +42,13 @@ function NowItem({ item }) {
       </a>
       <a className="now-title" href={`#/item/${item.id}`}>{item.title}</a>
       <div className="now-sub">{activeSub(item)}</div>
-      {what && <button className="btn btn-sm now-plus" onClick={bump} aria-label={what === 'Trophäe' ? `Trophäe abhaken bei ${item.title}` : `${what === 'Kapitel' ? 'Ein Kapitel' : `Eine ${what}`} weiter bei ${item.title}`}>{I.plus} {what}</button>}
+      {what && <button className="btn btn-sm now-plus" onClick={bump} aria-label={what === 'h' ? `Eine Stunde Spielzeit dazu bei ${item.title}` : what === 'Trophäe' ? `Trophäe abhaken bei ${item.title}` : `${what === 'Kapitel' ? 'Ein Kapitel' : `Eine ${what}`} weiter bei ${item.title}`}>{I.plus} {what === 'h' ? '1 h' : what}</button>}
     </div>
   );
 }
 
 export function Home({ animate }) {
   const all = Store.all();
-  const s = allTrophyStats();
   const hour = new Date().getHours();
   const greet = `${hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Hallo' : 'Guten Abend'} Mark`;
   const fade = animate ? 'fade-in' : '';
@@ -75,9 +79,8 @@ export function Home({ animate }) {
   return (
     <div className={fade}>
       <div className="page-head"><div><h1 className="page-title">{greet}</h1>
-        <p className="page-sub home-tally">{counts.map(([t, n], i) => <span key={t}>{i > 0 && <i aria-hidden="true">·</i>}<a href={`#/${TYPES[t].route}`}>{n} {n === 1 ? one[t] : TYPES[t].plural}</a></span>)}</p>
-        <p className="home-level"><a href="#/trophies">Trophäen-Level <b>{s.level.level}</b></a><i aria-hidden="true">·</i><a href="#/trophies"><TrophyIcon tier="platinum" size={14} /> {s.counts.platinum} Platin</a><i aria-hidden="true">·</i><span>{s.earned} von {s.total} Trophäen</span></p></div>
-        <div className="head-actions flex gap-2"><button className="btn btn-primary" onClick={addPicker}>{I.plus} Hinzufügen</button></div></div>
+        <p className="page-sub home-tally">{counts.map(([t, n], i) => <span key={t}>{i > 0 && <i aria-hidden="true">·</i>}<a href={`#/${TYPES[t].route}`}>{n} {n === 1 ? one[t] : TYPES[t].plural}</a></span>)}</p></div>
+        <div className="head-actions flex gap-2"><button className="btn btn-primary fab" aria-label="Hinzufügen" onClick={addPicker}>{I.plus}<span>Hinzufügen</span></button></div></div>
 
       <section className="section"><h2 className="section-title">Gerade dabei</h2>
         {active.length ? <div className="now-row">{active.map(i => <NowItem key={i.id} item={i} />)}</div>
