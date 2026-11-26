@@ -6,6 +6,7 @@ const S = ({ children, ...p }) => <svg viewBox="0 0 24 24" {...p}>{children}</sv
 export const I = {
   plus: <S><path d="M12 5v14M5 12h14" /></S>,
   search: <S><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></S>,
+  filter: <S><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></S>,
   back: <S><path d="M15 18l-6-6 6-6" /></S>,
   edit: <S><path d="M4 20h4L19 9l-4-4L4 16z" /></S>,
   trash: <S><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></S>,

@@ -60,6 +60,7 @@ export function Library({ type, animate }) {
   const s = libState.use()[type];
   const set = patch => setLib(type, patch);
   const items = Store.all(type);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const head = <>
     <ShelfTabs type={type} />
@@ -103,6 +104,7 @@ export function Library({ type, animate }) {
     .sort(sorters[s.sort] || sorters.added);
   // Ohne gespeicherte Wahl: das Cover-Raster
   const view = s.view || 'grid';
+  const nActive = (fam !== 'all' || platform !== 'all' ? 1 : 0) + (s.sort && s.sort !== 'added' ? 1 : 0);
   const shelf = view === 'shelf';
 
   return <>
@@ -112,6 +114,12 @@ export function Library({ type, animate }) {
       <div className="chips">
         {[['all', 'Alle'], ...Object.entries(STATUS[type])].map(([k, v]) => <button key={k} className={cn('chip', s.status === k && 'on')} onClick={() => set({ status: k })}>{v}</button>)}
       </div>
+      <button type="button" className={cn("btn btn-sm filter-btn", filterOpen && "on")} aria-expanded={filterOpen} onClick={() => setFilterOpen(o => !o)}>{I.filter} Filter{nActive > 0 && <span className="count">{nActive}</span>}</button>
+      <div className="view-seg" role="group" aria-label="Ansicht">
+        {[["grid", "Cover-Raster", I.grid], ["shelf", "Regal", I.shelfView]].map(([v, l, icon]) =>
+          <button key={v} className={view === v ? "on" : ""} title={l} aria-label={l} onClick={() => set({ view: v })}>{icon}</button>)}
+      </div>
+      <div className="toolbar-filters" hidden={!filterOpen}>
       {platforms.length > 1 && <>
         {fams.length > 1 && <select className="input w-auto" value={fam} onChange={e => set({ fam: e.target.value, platform: 'all' })}>
           <option value="all">Alle Plattformen</option>{fams.map(g => <option key={g} value={g}>{g}</option>)}</select>}
@@ -130,9 +138,6 @@ export function Library({ type, animate }) {
           <option value="playLeast">Wenigste Spielzeit</option>
         </>}
       </select>
-      <div className="view-seg" role="group" aria-label="Ansicht">
-        {[['grid', 'Cover-Raster', I.grid], ['shelf', 'Regal', I.shelfView]].map(([v, l, icon]) =>
-          <button key={v} className={view === v ? 'on' : ''} title={l} aria-label={l} onClick={() => set({ view: v })}>{icon}</button>)}
       </div>
     </div>
     {!list.length ? <div className="grid"><div className="list-empty col-span-full">{s.q ? <>Nichts zu „{s.q}“ gefunden.</> : <>Hier ist gerade nichts.</>} <button className="btn btn-sm btn-ghost ml-1 text-(--lilac)" onClick={() => set({ q: "", status: "all", fam: "all", platform: "all" })}>Filter zurücksetzen</button></div></div>
