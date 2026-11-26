@@ -1421,3 +1421,9 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .inline-more { display: inline; }
 .inline-more > summary { display: inline; cursor: pointer; color: var(--lilac); font-weight: 600; }
 .inline-more[open] > summary { display: block; margin-bottom: 4px; }
+
+/* Seitenleiste: Level nur als Abzeichen + Stufen, der volle Block steht auf „Trophäen“ */
+.level-card .level-top > div:last-child { flex: 1; min-width: 0; }
+.level-card .tier-counts { margin-top: 4px; justify-content: start; gap: 10px; }
+.lv-help { display: block; margin-top: 6px; font-size: 12px; color: var(--text-3); }
+.lv-help > summary { font-weight: 500; }

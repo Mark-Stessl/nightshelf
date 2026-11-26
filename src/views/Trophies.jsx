@@ -72,7 +72,7 @@ export function TrophiesView({ animate }) {
       <div className="page-head"><div><h1 className="page-title">Trophäen</h1><p className="page-sub">{s.earned} von {s.total} verdient · {s.pts.toLocaleString('de-AT')} Punkte</p></div><a className="btn" href="#/stats">{I.chart} Statistik & Jahresrückblick</a></div>
       <div className="tally tl-tiers">
         <div className="tl-level"><div className="level-badge">{s.level.level}</div>
-          <div><div className="level-title">Trophäen-Level {s.level.level}</div><div className="bar"><i style={{ width: `${s.level.pct}%` }} /></div><small>Noch {(s.level.need - s.level.into).toLocaleString("de-AT")} Punkte bis Level {s.level.level + 1}</small></div></div>
+          <div><div className="level-title">Trophäen-Level {s.level.level}</div><div className="bar"><i style={{ width: `${s.level.pct}%` }} /></div><small>Noch {(s.level.need - s.level.into).toLocaleString("de-AT")} Punkte bis Level {s.level.level + 1}</small><details className="inline-more lv-help"><summary>Wie zählt das?</summary>{Trophies.ORDER.slice().reverse().map(t => `${Trophies.TIERS[t].label} ${Trophies.TIERS[t].points}`).join(" · ")} Punkte. Level 2 braucht 100 Punkte, jedes weitere 40 mehr als das vorige.</details></div></div>
         {Trophies.ORDER.map(t => <div key={t}><b style={{ color: Trophies.TIERS[t].color }}>{s.counts[t]}</b><span className="tl-label"><TrophyIcon tier={t} size={14} /> {Trophies.TIERS[t].label}</span></div>)}
       </div>
       <Vitrine />
