@@ -11,7 +11,7 @@
   --cyan: #22D3EE;
   --text: #EDE9FE;
   --text-2: #A79BC9;
-  --text-3: #8A80AD;
+  --text-3: #958BB8;
   --danger: #F87171;
 
   --bronze: #D08A5B;
@@ -897,7 +897,7 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .play-big.muted { font-size: 16px; color: var(--text-2); font-family: inherit; font-weight: 600; }
 .play-src { font-size: 12.5px; color: var(--text-3); margin-top: 4px; }
 .play-src b { color: var(--cyan); font-weight: 600; }
-.link-btn { border: 0; background: none; padding: 0; color: var(--lilac); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.link-btn { border: 0; background: none; padding: 0; color: var(--lilac); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
 .play-btns { display: flex; gap: 6px; flex-shrink: 0; }
 .unit-wrap { position: relative; }
 .unit-wrap .input { width: 100%; padding-right: 86px; }
@@ -1034,7 +1034,7 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 /* Abgeschlossen: Bewertung und Notiz */
 .fin-row .grow { min-width: 0; }
 .fin-note { margin-top: 3px; font-size: 12.5px; color: var(--text-2); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fin-stars { flex-shrink: 0; color: var(--gold, #F5C451); font-size: 13px; letter-spacing: 1px; }
+.fin-stars { flex-shrink: 0; color: var(--lilac); font-size: 13px; letter-spacing: 1px; }
 .fin-stars i { font-style: normal; color: var(--text-3); opacity: .35; }
 
 /* Übersicht: oben Trophäen (Level + Platin), darunter die 5 Medien in einer Reihe */
@@ -1456,3 +1456,10 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   .toolbar .chips { display: none; }
   .toolbar-filters .status-select { display: block; }
 }
+
+/* Kleinkram Runde 5 */
+.link-btn:hover { text-decoration: underline; text-underline-offset: 2px; }
+.set-body p { max-width: 68ch; }
+:is(.set-body, .empty, .list-empty) p, .set-credits { text-wrap: pretty; }
+.set-body .sync-options { gap: 22px; }
+.set-body .sync-opt { padding: 0; background: none; border: 0; border-radius: 0; }
