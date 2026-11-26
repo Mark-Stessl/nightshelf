@@ -272,8 +272,9 @@ export function Settings({ animate }) {
   const n = Store.all().length;
   const steam = Steam.connected(), psn = PSN.connected(), sync = Sync.enabled(), app = Pwa.installState() === 'installed';
   return (
-    <div className={animate ? 'fade-in' : ''} style={{ maxWidth: 720 }}>
+    <div className={animate ? 'fade-in' : ''}>
       <div className="page-head"><div><h1 className="page-title">Daten</h1><p className="page-sub">{n} Einträge sind in diesem Browser gespeichert.</p></div></div>
+      <div style={{ maxWidth: 720 }}>
       <h2 className="set-group">Sync & App</h2>
       <div className="set-list">
         <Fold title="Sync zwischen Geräten" status={sync ? 'Verbunden' : 'Aus'} on={sync} open={!sync}><SyncPanel /></Fold>
@@ -293,6 +294,7 @@ export function Settings({ animate }) {
           <button className="btn btn-danger" onClick={() => confirmDialog('Alle Spiele, Serien, Filme und Trophäen in diesem Browser werden gelöscht.', 'Alles löschen', () => { Store.clear(); refresh(); })}>{I.trash} Alles löschen</button></Fold>
       </div>
       <p className="tiny set-credits">Serien-Infos von <Ext href="https://www.tvmaze.com">TVmaze</Ext> (CC BY-SA), Film-Infos von <Ext href="https://www.themoviedb.org">TMDB</Ext>, Spiele-Infos von <Ext href="https://www.wikipedia.org">Wikipedia</Ext> und <Ext href="https://www.wikidata.org">Wikidata</Ext>. Dieses Produkt nutzt die TMDB-API, ist aber nicht von TMDB unterstützt oder zertifiziert.</p>
+      </div>
     </div>
   );
 }

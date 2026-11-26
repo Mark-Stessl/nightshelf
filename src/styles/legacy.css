@@ -283,8 +283,7 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 .check.on { background: var(--violet); border-color: var(--violet); }
 .check.on svg { opacity: 1; transform: scale(1); }
 .check.auto { cursor: default; border-style: dashed; }
-.check.auto.on { border-style: solid; background: var(--platinum); border-color: var(--platinum); }
-.check.auto.on svg { stroke: #0E0B16; }
+.check.auto.on { border-style: solid; background: var(--violet); border-color: var(--violet); }
 .tbadge { width: 40px; height: 40px; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; background: rgba(14, 11, 22, .6); border: 1px solid var(--line); }
 .tbadge svg { width: 22px; height: 22px; }
 .trophy:not(.done) .tbadge { filter: grayscale(.75) brightness(.75); }
