@@ -12,6 +12,7 @@ import { Msg } from '../components/ui.jsx';
 import { lsGet } from '../lib/util.js';
 import { openItemForm } from '../dialogs/ItemForm.jsx';
 import { addPicker } from '../dialogs/misc.jsx';
+import { trophyQuick } from '../dialogs/trophyDialogs.jsx';
 
 const Cyan = ({ children }) => <span style={{ color: 'var(--cyan)' }}>{children}</span>;
 
@@ -27,9 +28,10 @@ function activeSub(i) {
 function NowItem({ item }) {
   const what = plusOneLabel(item);
   const bump = () => {
+    if (what === 'Trophäe') { trophyQuick(item); return; }
     const x = plusOne(item);
     const it = Store.get(item.id);
-    toast(<Msg title={what === 'Kapitel' ? `Kapitel ${fmtCh(it.chaptersRead)} gelesen` : `${x?.label ? `${x.label} · ` : ''}Folge ${x?.seen} gesehen`} sub={item.title} />);
+    toast(<Msg title={what === 'Kapitel' ? `Kapitel ${fmtCh(it.chaptersRead)} gelesen` : what === 'Staffel' ? `Staffel ${x.staffel} gesehen` : `${x?.label ? `${x.label} · ` : ''}Folge ${x?.seen} gesehen`} sub={item.title} />);
   };
   return (
     <div className="now-item">
@@ -38,7 +40,7 @@ function NowItem({ item }) {
       </a>
       <a className="now-title" href={`#/item/${item.id}`}>{item.title}</a>
       <div className="now-sub">{activeSub(item)}</div>
-      {what && <button className="btn btn-sm now-plus" onClick={bump} aria-label={`Eine ${what} weiter bei ${item.title}`}>{I.plus} {what}</button>}
+      {what && <button className="btn btn-sm now-plus" onClick={bump} aria-label={what === 'Trophäe' ? `Trophäe abhaken bei ${item.title}` : `${what === 'Kapitel' ? 'Ein Kapitel' : `Eine ${what}`} weiter bei ${item.title}`}>{I.plus} {what}</button>}
     </div>
   );
 }

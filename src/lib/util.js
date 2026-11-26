@@ -300,6 +300,8 @@ const currentIndex = list => {
 };
 // Was „+1“ bei diesem Eintrag bedeutet, oder null, wenn es nichts weiterzuzählen gibt
 export function plusOneLabel(item) {
+  if (item.type === "game") return (item.trophies || []).some(t => !t.done && t.tier !== "platinum") ? "Trophäe" : null;
+  if (item.type === "series" && !item.seasonList?.some(x => x.episodes)) return item.seasons && (item.seasonSeen || 0) < item.seasons ? "Staffel" : null;
   if (item.type === 'manga') return item.chapters && (item.chaptersRead || 0) >= item.chapters ? null : 'Kapitel';
   if (!['series', 'anime'].includes(item.type)) return null;
   const cur = seasonsOf(item)[currentIndex(seasonsOf(item))];
@@ -308,6 +310,7 @@ export function plusOneLabel(item) {
   return max && (cur.seen || 0) < max ? 'Folge' : null;
 }
 export function plusOne(item) {
+  if (item.type === "series" && !item.seasonList?.some(x => x.episodes)) { const n = Math.min(item.seasons || Infinity, (item.seasonSeen || 0) + 1); Store.update(item.id, { seasonSeen: n }); return { staffel: n }; }
   if (item.type === 'manga') { saveManga(item, { chaptersRead: Math.floor(item.chaptersRead || 0) + 1 }); return; }
   const list = materialize(item), i = currentIndex(seasonsOf(item)), x = list[i];
   x.seen = Math.min(epTotal(x) || Infinity, (x.seen || 0) + 1);
