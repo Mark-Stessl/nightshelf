@@ -290,3 +290,28 @@ export function cropToCover(file) {
     img.src = url;
   });
 }
+
+/* ---------- Schnell weiter: +1 Folge oder Kapitel (Übersicht) ---------- */
+// Index der aktuellen Staffel, gleiche Regel wie currentSeason()
+const currentIndex = list => {
+  let i = list.findIndex(x => (x.seen || 0) > 0 && !seasonDone(x));
+  if (i < 0) i = list.findIndex(x => !seasonDone(x));
+  return i < 0 ? list.length - 1 : i;
+};
+// Was „+1“ bei diesem Eintrag bedeutet, oder null, wenn es nichts weiterzuzählen gibt
+export function plusOneLabel(item) {
+  if (item.type === 'manga') return item.chapters && (item.chaptersRead || 0) >= item.chapters ? null : 'Kapitel';
+  if (!['series', 'anime'].includes(item.type)) return null;
+  const cur = seasonsOf(item)[currentIndex(seasonsOf(item))];
+  if (!cur || cur.format === 'MOVIE' || seasonDone(cur)) return null;
+  const max = epTotal(cur);
+  return max && (cur.seen || 0) < max ? 'Folge' : null;
+}
+export function plusOne(item) {
+  if (item.type === 'manga') { saveManga(item, { chaptersRead: Math.floor(item.chaptersRead || 0) + 1 }); return; }
+  const list = materialize(item), i = currentIndex(seasonsOf(item)), x = list[i];
+  x.seen = Math.min(epTotal(x) || Infinity, (x.seen || 0) + 1);
+  if (!x.episodes || x.seen < x.episodes) x.complete = false;
+  saveSeasons(item, list);
+  return x;
+}
