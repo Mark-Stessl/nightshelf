@@ -1087,12 +1087,15 @@ html.modal-open, html.modal-open body { overflow: hidden; }
    Regal-Ansicht
    ========================================================= */
 .shelf-wall { --row: 214px; --gap: 34px; --plank: 14px; --pt: 26px; position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; column-gap: 3px; row-gap: var(--gap);
-  padding: var(--pt) 22px calc(var(--gap) - var(--plank)); border-radius: var(--radius); border: 1px solid var(--line);
+  padding: var(--pt) 22px calc(var(--gap) - var(--plank)); border-radius: var(--radius); border: 1px solid rgba(196, 181, 253, .08);
+  /* Lackiertes Nacht-Violett: Brett mit heller Vorderkante und Schatten darunter, Rückwand mit leichten Fugen, Licht von oben */
   background:
-    repeating-linear-gradient(180deg, transparent 0 var(--row), #6A5793 var(--row) calc(var(--row) + 2px), #3B2E5C calc(var(--row) + 2px) calc(var(--row) + var(--plank)), rgba(0,0,0,.55) calc(var(--row) + var(--plank)), transparent calc(var(--row) + var(--plank) + 14px), transparent calc(var(--row) + var(--gap))) 0 var(--pt) / 100% calc(var(--row) + var(--gap)) repeat-y,
-    radial-gradient(120% 60% at 50% 0%, rgba(139, 92, 246, .14), transparent 70%),
-    linear-gradient(180deg, #120E1C, #0D0A14);
-  box-shadow: inset 0 0 60px rgba(0,0,0,.55); }
+    radial-gradient(70% 45% at 50% 0%, rgba(196, 181, 253, .11), transparent 70%),
+    linear-gradient(#17111F, #17111F) 0 0 / 100% var(--pt) no-repeat, /* verdeckt das angeschnittene Brett ganz oben */
+    repeating-linear-gradient(180deg, transparent 0 var(--row), rgba(196, 181, 253, .5) var(--row) calc(var(--row) + 1px), #4E3D7A calc(var(--row) + 1px) calc(var(--row) + 4px), #31255A calc(var(--row) + 4px) calc(var(--row) + var(--plank)), rgba(0, 0, 0, .62) calc(var(--row) + var(--plank)), transparent calc(var(--row) + var(--plank) + 18px), transparent calc(var(--row) + var(--gap))) 0 var(--pt) / 100% calc(var(--row) + var(--gap)) repeat-y,
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .022) 0 1px, transparent 1px 160px),
+    linear-gradient(180deg, #17111F, #0C0912);
+  box-shadow: inset 0 0 70px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .04); }
 .shelf-wall .list-empty { width: 100%; }
 .spine { position: relative; height: var(--row); width: var(--w); flex-shrink: 0; display: flex; align-items: flex-end; text-decoration: none; color: inherit; outline: none;
   animation: spineIn .55s var(--ease) both; animation-delay: calc(var(--i) * 16ms); }

@@ -4,7 +4,7 @@ import { Store } from '../lib/store.js';
 import { Trophies } from '../lib/trophies.js';
 import { PSN } from '../lib/psn.js';
 import { Steam } from '../lib/steam.js';
-import { ORDER_TYPES, PLATFORMS, PLATFORM_GROUPS, STATUS, TYPES, familyOf, hoursOf } from '../lib/util.js';
+import { ORDER_TYPES, PLATFORMS, PLATFORM_GROUPS, STATUS, TYPES, familyOf, hoursOf, isMobileWidth } from '../lib/util.js';
 import { libState, setLib, shelfTabs } from '../lib/viewState.js';
 import { checkAllNews, checkManga } from '../lib/watch.jsx';
 import { I, typeIcon } from '../components/icons.jsx';
@@ -101,7 +101,9 @@ export function Library({ type, animate }) {
     && (type !== 'game' || ((fam === 'all' || familyOf(i.platform) === fam) && (platform === 'all' || i.platform === platform)))
     && (!s.q || i.title.toLowerCase().includes(s.q.toLowerCase())))
     .sort(sorters[s.sort] || sorters.added);
-  const shelf = s.view === 'shelf';
+  // Ohne gespeicherte Wahl: am Desktop das Regal, am Handy das Raster
+  const view = s.view || (isMobileWidth() ? 'grid' : 'shelf');
+  const shelf = view === 'shelf';
 
   return <>
     {head}
@@ -130,7 +132,7 @@ export function Library({ type, animate }) {
       </select>
       <div className="view-seg" role="group" aria-label="Ansicht">
         {[['grid', 'Cover-Raster', I.grid], ['shelf', 'Regal', I.shelfView]].map(([v, l, icon]) =>
-          <button key={v} className={(s.view || 'grid') === v ? 'on' : ''} title={l} aria-label={l} onClick={() => set({ view: v })}>{icon}</button>)}
+          <button key={v} className={view === v ? 'on' : ''} title={l} aria-label={l} onClick={() => set({ view: v })}>{icon}</button>)}
       </div>
     </div>
     {!list.length ? <div className="grid"><div className="list-empty col-span-full">Keine Treffer</div></div>

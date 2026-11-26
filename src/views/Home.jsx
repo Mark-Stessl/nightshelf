@@ -7,7 +7,7 @@ import {
 } from '../lib/util.js';
 import { I, TrophyIcon, typeIcon } from '../components/icons.jsx';
 import { CoverBox } from '../components/Cover.jsx';
-import { Card, NewRow, TrophyListRow, UpcomingRow } from '../components/items.jsx';
+import { NewRow, ShelfWall, TrophyListRow, UpcomingRow } from '../components/items.jsx';
 import { Msg } from '../components/ui.jsx';
 import { lsGet } from '../lib/util.js';
 import { openItemForm } from '../dialogs/ItemForm.jsx';
@@ -94,7 +94,7 @@ export function Home({ animate }) {
       </div>
 
       <section className="section"><h2 className="section-title">Zuletzt ins Regal <a href={`#/${lsGet('nightshelf.shelf', 'games')}`}>Zum Regal</a></h2>
-        <div className="home-row">{latest.map(it => <Card key={it.id} item={it} animate={animate} />)}</div></section>
+        <ShelfWall items={latest} /></section>
     </div>
   );
 }
