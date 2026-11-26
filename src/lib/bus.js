@@ -56,3 +56,15 @@ export const modalIsOpen = () => modal.get().open;
 
 /* ---------- Navigation ---------- */
 export const go = hash => { location.hash = hash; };
+
+/* ---------- Trophäen-Meldung (oben, eigene Ebene) ---------- */
+export const unlocks = createBus([]);
+let unlockSeq = 0;
+export function unlock(data) {
+  const id = ++unlockSeq;
+  unlocks.set(list => [...list, { id, ...data, out: false }].slice(-2));
+  setTimeout(() => {
+    unlocks.set(list => list.map(u => u.id === id ? { ...u, out: true } : u));
+    setTimeout(() => unlocks.set(list => list.filter(u => u.id !== id)), 350);
+  }, data.t.tier === 'platinum' ? 5500 : 3800);
+}

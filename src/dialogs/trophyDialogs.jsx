@@ -2,14 +2,14 @@
 import { useRef, useState } from 'react';
 import { Store } from '../lib/store.js';
 import { Trophies } from '../lib/trophies.js';
-import { openModal, toast } from '../lib/bus.js';
+import { openModal, toast, unlock } from '../lib/bus.js';
 import { PLAY_SRC, fmtHours, hoursOf, parseHours } from '../lib/util.js';
 import { aiBlockedToday, aiQuotaText, smartTrophies } from '../lib/watch.jsx';
 import { I, TrophyIcon } from '../components/icons.jsx';
 import { ModalFrame, Msg, Seg } from '../components/ui.jsx';
 
 export function trophyToast(t, game) {
-  toast(<><div className="tbadge"><TrophyIcon tier={t.tier} /></div><div><b>{t.name}</b><small>{Trophies.TIERS[t.tier].label}-Trophäe · {game.title}</small></div></>, t.tier === 'platinum' ? 'plat' : '');
+  unlock({ t: { ...t }, game });
 }
 
 /* Eine Trophäe abhaken oder wieder öffnen; Platin folgt von allein */

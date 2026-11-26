@@ -11,6 +11,7 @@ import { detailFilter } from './lib/viewState.js';
 import { EpisodeWatch, MangaWatch } from './lib/watch.jsx';
 import { I, TrophyIcon } from './components/icons.jsx';
 import { ModalHost, ToastHost, cn } from './components/ui.jsx';
+import { UnlockHost } from './components/Unlock.jsx';
 import { Home } from './views/Home.jsx';
 import { Library } from './views/Library.jsx';
 import { Detail } from './views/Detail.jsx';
@@ -133,6 +134,7 @@ export function App() {
       </div>
       <ModalHost />
       <ToastHost />
+      <UnlockHost />
     </>
   );
 }
