@@ -1236,3 +1236,20 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   .now-row::-webkit-scrollbar { display: none; }
   .home-level { font-size: 12px; }
 }
+
+/* ---------- Layout: Detail und Bibliothek ---------- */
+.play-box .grow { flex: 1; min-width: 0; }
+@media (max-width: 820px) {
+  /* Fortschrittsring und Stufen nebeneinander statt in zwei Zeilen */
+  .ring-wrap { flex-wrap: nowrap; gap: 16px; margin-top: 16px; }
+  .ring, .ring svg { width: 76px; height: 76px; }
+  .ring-label b { font-size: 18px; }
+  .tier-box { flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+  .tier-stat { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 0; background: none; border: 0; min-width: 0; }
+  .tier-stat b { font-size: 15px; }
+  /* Werkzeugleiste: Suche + Ansicht, dann Filter, dann Auswahlfelder je halbe Breite */
+  .toolbar .search { flex: 1 1 0; order: 0; }
+  .toolbar .view-seg { order: 1; margin-left: 0; }
+  .toolbar .chips { order: 2; }
+  .toolbar select.input { order: 3; flex: 1 1 calc(50% - 5px); font-size: 14px; }
+}

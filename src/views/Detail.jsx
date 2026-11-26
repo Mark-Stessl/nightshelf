@@ -59,7 +59,7 @@ function TrophyRow({ t, game }) {
 function PlayBox({ item }) {
   const h = hoursOf(item), manual = item.playH != null, auto = item.playMin != null;
   return (
-    <section className="section"><div className={cn('play-box', h == null && 'empty')}>
+    <section className="section"><div className="play-box">
       <div className="play-icon">{I.clock}</div>
       <div className="grow">{h != null ? <>
         <div className="play-big">{fmtHours(h)}</div>
@@ -126,12 +126,12 @@ function TrophySection({ item }) {
         <div className="flex gap-2 flex-wrap items-center">
           {list.length > 0 && <div className="chips">{[['all', 'Alle'], ['open', 'Offen'], ['done', 'Verdient']].map(([k, v]) =>
             <button key={k} className={cn('chip', filter === k && 'on')} onClick={() => detailFilter.set({ value: k })}>{v}</button>)}</div>}
-          {list.length > 0 && (allDone ? <button className="btn btn-sm" onClick={toggleAll}>Alle zurücksetzen</button> : <button className="btn btn-sm btn-primary" onClick={toggleAll}>{I.check} Alle abhaken</button>)}
           <button className="btn btn-sm" onClick={() => trophyEdit(Store.get(item.id))}>{I.plus} Eigene</button>
           <button className="btn btn-sm" onClick={() => trophyImport(Store.get(item.id))}>{I.paste} Liste einfügen</button>
           {item.psnId && PSN.connected() && <BusyButton className="btn btn-sm" busyText="Lade…" onClick={fromPsn}>{I.refresh} Von PlayStation</BusyButton>}
           {Steam.connected() && (item.steamAppId || ['Steam', 'PC', 'Steam Deck'].includes(item.platform)) && <BusyButton className="btn btn-sm" busyText="Lade…" onClick={fromSteam}>{I.refresh} Von Steam</BusyButton>}
           <button className="btn btn-sm" onClick={() => trophyGenerate(Store.get(item.id))}>{I.sparkle} Erstellen</button>
+          {list.length > 0 && (allDone ? <button className="btn btn-sm btn-ghost" onClick={toggleAll}>Alle zurücksetzen</button> : <button className="btn btn-sm" onClick={toggleAll}>{I.check} Alle abhaken</button>)}
         </div>
       </div>
       {list.length ? <div className="trophy-list">{filtered.length ? filtered.map(t => <TrophyRow key={t.id} t={t} game={item} />) : <div className="list-empty">Nichts in dieser Ansicht</div>}</div>
