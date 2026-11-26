@@ -44,7 +44,7 @@ function UpcomingList({ entries, fresh }) {
     {months.length > 0 && <section className="section"><h2 className="section-title">Später</h2>{months.map(g => <div key={g.k}>
       <div className="season-row-label">{g.k}</div>
       <div className="list-card mb-3.5">{g.list.map((u, i) => <UpcomingRow key={i} u={{ ...u, dateOnly: true }} datePrefix={`${new Date(u.t).getDate()}.`} />)}</div></div>)}</section>}
-    {!entries.length && <div className="empty"><div className="empty-icon">{I.calendar}</div><h3>Gerade nichts angekündigt</h3>
+    {!entries.length && <div className="empty"><div className="empty-icon">{I.calendar}</div><h2>Gerade nichts angekündigt</h2>
       <p>{hasSeasons ? 'Sobald zu deinen Serien, Anime, Filmen oder Spielen ein Termin bekannt ist, steht er hier.' : 'Lade bei deinen Serien und Anime die Staffeln (Button „Von TVmaze laden“ bzw. „Von AniList laden“), dann erscheinen hier die nächsten Folgen.'}</p></div>}
   </>;
 }
@@ -56,7 +56,8 @@ export function Upcoming({ animate }) {
   const todayStr = ymdOf(new Date());
   const byDay = new Map();
   entries.forEach(u => { const k = ymdOf(new Date(u.t)); if (!byDay.has(k)) byDay.set(k, []); byDay.get(k).push(u); });
-  const { mode } = cal;
+  // Ohne einen einzigen Termin gleich die Liste mit Hinweis statt eines leeren Monats
+  const mode = entries.length ? cal.mode : 'list';
   const sel = cal.sel || todayStr;
   const weekStart = cal.weekStart || weekStartOf(new Date());
 
@@ -81,13 +82,13 @@ export function Upcoming({ animate }) {
   const head = <>
     <div className="page-head"><div><h1 className="page-title">Demnächst</h1><p className="page-sub">Neue Folgen, Staffeln, Filme und Spiele aus deinem Regal</p></div>
       <BusyButton onClick={checkAllNews}>{I.refresh} Jetzt prüfen</BusyButton></div>
-    <div className="cal-bar">
+    {entries.length > 0 && <div className="cal-bar">
       {mode !== 'list' ? <>
         <div className="uc-nav"><button className="cal-navbtn" aria-label="Zurück" onClick={() => nav(-1)}>‹</button><button className="cal-navbtn" aria-label="Weiter" onClick={() => nav(1)}>›</button></div>
         <h2 className="uc-title">{titleTxt}</h2><button className="btn btn-sm" onClick={() => nav(0)}>Heute</button>
       </> : <h2 className="uc-title">Alle Termine</h2>}
       <div className="cal-seg">{[['month', 'Monat'], ['week', 'Woche'], ['list', 'Liste']].map(([k, l]) => <button key={k} className={mode === k ? 'on' : ''} onClick={() => setMode(k)}>{l}</button>)}</div>
-    </div>
+    </div>}
   </>;
 
   if (mode === 'list') return <div className={cn(animate && 'fade-in', 'max-w-[900px]')}>{head}<UpcomingList entries={entries} fresh={fresh} /></div>;

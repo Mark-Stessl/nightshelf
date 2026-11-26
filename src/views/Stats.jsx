@@ -102,7 +102,10 @@ function StackedChart({ st }) {
     const total = order.reduce((a, t) => a + b.tiers[t], 0);
     return { total, parts: order.filter(t => b.tiers[t]).map(t => <i key={t} style={{ flex: b.tiers[t], background: Trophies.TIERS[t].hex }} />), rows: [...order.slice().reverse().map(t => `${Trophies.TIERS[t].label}: ${b.tiers[t]}`), `Gesamt: ${total}`] };
   });
-  return <Chart st={st} cols={cols} label={`Verdiente Trophäen ${st.all ? 'pro Jahr' : 'pro Monat'}`}
+  // Im Jahr erst kurz vor dem ersten Monat mit Trophäen anfangen (mindestens 6 Monate zeigen), sonst ist es fast nur leere Achse
+  const first = cols.findIndex(c => c.total > 0);
+  const from = st.all || first < 0 ? 0 : Math.max(0, Math.min(first - 1, cols.length - 6));
+  return <Chart st={{ ...st, buckets: st.buckets.slice(from) }} cols={cols.slice(from)} label={`Verdiente Trophäen ${st.all ? 'pro Jahr' : 'pro Monat'}`}
     legend={<div className="chart-legend">{order.slice().reverse().map(t => <span key={t}><TrophyIcon tier={t} size={14} /> {Trophies.TIERS[t].label}</span>)}</div>} />;
 }
 
