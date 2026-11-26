@@ -38,7 +38,7 @@ function LevelCard() {
   const s = allTrophyStats();
   return (
     <a className="level-card block" href="#/trophies">
-      <div className="level-top"><div className="level-badge">{s.level.level}</div><div><div className="level-title">Trophäen-Level</div><div className="tiny">{s.level.into} / {s.level.need} Punkte</div></div></div>
+      <div className="level-top"><div className="level-badge">{s.level.level}</div><div><div className="level-title">Trophäen-Level</div><div className="tiny">{(s.level.need - s.level.into).toLocaleString("de-AT")} P. bis Level {s.level.level + 1}</div></div></div>
       <div className="bar"><i style={{ width: `${s.level.pct}%` }} /></div>
       <div className="tier-counts">{Trophies.ORDER.map(t => <span key={t} style={{ color: Trophies.TIERS[t].color }}><TrophyIcon tier={t} size={13} /> {s.counts[t]}</span>)}</div>
     </a>

@@ -47,7 +47,7 @@ export function initials(title) {
 export const stars = n => n ? '★'.repeat(n) + '☆'.repeat(5 - n) : '';
 export const statusLabel = item => (STATUS[item.type] || {})[item.status] || '';
 export const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('de-AT', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-export const fmtCh = n => (Math.round(n * 10) / 10).toLocaleString('de-AT');
+export const fmtCh = n => (Math.round(n * 10) / 10).toLocaleString('de-AT', { useGrouping: n >= 10000 });
 export function relTime(iso) {
   if (!iso) return '';
   const d = (Date.now() - Date.parse(iso)) / 1000;

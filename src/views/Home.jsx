@@ -17,7 +17,7 @@ const Cyan = ({ children }) => <span style={{ color: 'var(--cyan)' }}>{children}
 
 function activeSub(i) {
   if (i.type === 'game') { if (!i.trophies?.length) return i.platform || 'Spiel'; const p = Trophies.progress(i.trophies); return `${p.done}/${p.total} Trophäen`; }
-  if (i.type === 'manga') { const b = mangaBehind(i); return <>Kapitel {fmtCh(i.chaptersRead || 0)}/{i.chapters ? fmtCh(i.chapters) : '?'}{b > 0 && <> · <Cyan>{fmtCh(b)} neu</Cyan></>}</>; }
+  if (i.type === 'manga') { const b = mangaBehind(i); return <>Kapitel {fmtCh(i.chaptersRead || 0)}{i.chapters ? <> von {fmtCh(i.chapters)}</> : ''}{b > 0 && <> · <Cyan>{fmtCh(b)} neu</Cyan></>}</>; }
   if (i.type === 'series' && !i.seasonList?.some(x => x.episodes)) return i.seasons ? `Staffel ${i.seasonSeen || 0}/${i.seasons}` : 'Serie';
   const cur = currentSeason(i), n = episodesBehind(i);
   return <>{i.seasonList?.length > 1 ? `${cur.label} · ` : ''}Folge {cur.seen || 0}/{cur.episodes || '?'}{n > 0 && <> · <Cyan>{n} neu</Cyan></>}</>;
@@ -83,13 +83,13 @@ export function Home({ animate }) {
         {active.length ? <div className="now-row">{active.map(i => <NowItem key={i.id} item={i} />)}</div>
           : <div className="list-card"><div className="list-empty">Nichts in Arbeit. Setz bei einem Spiel oder einer Serie den Status auf „Am Spielen“ oder „Am Schauen“.</div></div>}</section>
 
-      <div className="two-col section">
+      <div className={up.length ? 'two-col section' : 'section'}>
         <div>
           {fresh.length > 0 && <div className="mb-8"><h2 className="section-title">Neu für dich <a href="#/upcoming">Alle</a></h2><div className="list-card">{fresh.map(it => <NewRow key={it.id} it={it} />)}</div></div>}
           <h2 className="section-title">Zuletzt verdient <a href="#/trophies">Alle</a></h2><div className="list-card">{recent.length ? recent.map(({ t, g }) => <TrophyListRow key={g.id + t.id} t={t} g={g} />)
             : <div className="list-empty">Hake Trophäen in einem Spiel ab, dann erscheinen sie hier.</div>}</div>
         </div>
-        <div><h2 className="section-title">Demnächst <a href="#/upcoming">Kalender</a></h2><div className="list-card">{up.length ? up.map(u => <UpcomingRow key={u.it.id + u.at} u={u} prefix={fmtWhen(u.at, true).replace(/^am /, '')} />) : <div className="list-empty">Gerade nichts angekündigt.</div>}</div></div>
+        {up.length > 0 && <div><h2 className="section-title">Demnächst <a href="#/upcoming">Kalender</a></h2><div className="list-card">{up.map(u => <UpcomingRow key={u.it.id + u.at} u={u} prefix={fmtWhen(u.at, true).replace(/^am /, '')} />)}</div></div>}
       </div>
 
       <section className="section"><h2 className="section-title">Zuletzt ins Regal <a href={`#/${lsGet('nightshelf.shelf', 'games')}`}>Zum Regal</a></h2>

@@ -47,7 +47,7 @@ function EmptyState({ type, animate }) {
   }[type];
   return (
     <div className={cn('empty', animate && 'fade-in')}>
-      <div className="empty-icon">{typeIcon(type)}</div><h3>{txt[0]}</h3><p>{txt[1]}</p>
+      <div className="empty-icon">{typeIcon(type)}</div><h2>{txt[0]}</h2><p>{txt[1]}</p>
       <div className="flex gap-2 justify-center flex-wrap">
         <button className="btn btn-primary" onClick={() => openItemForm(type)}>{I.plus} {TYPES[type].label} hinzufügen</button>
         {type === 'anime' && <button className="btn" onClick={animeImport}>{I.paste} LiveChart-Liste einfügen</button>}
