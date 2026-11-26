@@ -6,7 +6,7 @@ import { PSN } from '../lib/psn.js';
 import { Steam } from '../lib/steam.js';
 import { Lookup } from '../lib/lookup.js';
 import { Pwa } from '../lib/pwa.js';
-import { refresh, toast } from '../lib/bus.js';
+import { dismissToast, refresh, toast } from '../lib/bus.js';
 import { fmtDate } from '../lib/util.js';
 import { markAiBlocked } from '../lib/watch.jsx';
 import { I } from '../components/icons.jsx';
@@ -235,6 +235,8 @@ function LookupPanel() {
 
 function BackupPanels() {
   const [err, setErr] = useState('');
+  const mergeRef = useRef(null), replaceRef = useRef(null);
+  const askReplace = () => confirmDialog(`Alle ${Store.all().length} Einträge in diesem Browser werden durch die Datei ersetzt. Lade vorher ein Backup herunter, wenn du unsicher bist.`, 'Datei wählen', () => replaceRef.current?.click());
   const exp = () => {
     const blob = new Blob([Store.exportJSON()], { type: 'application/json' });
     const a = document.createElement('a');
@@ -245,15 +247,23 @@ function BackupPanels() {
   const doImport = mode => e => {
     const file = e.target.files[0]; e.target.value = ''; if (!file) return;
     file.text().then(txt => {
-      try { const c = Store.importJSON(txt, mode); setErr(''); toast(<Msg title={`${c} Einträge eingelesen`} />); refresh(); }
+      try {
+        const before = mode === 'replace' ? Store.exportJSON() : null;
+        const c = Store.importJSON(txt, mode); setErr(''); refresh();
+        if (!before) { toast(<Msg title={`${c} Einträge eingelesen`} />); return; }
+        let id = 0;
+        id = toast(<><Msg title={`${c} Einträge eingelesen`} sub="Deine vorherigen Daten sind ersetzt" /><button type="button" className="toast-undo" onClick={() => { Store.importJSON(before, 'replace'); refresh(); dismissToast(id); }}>Rückgängig</button></>, 'has-undo', 10000);
+      }
       catch { setErr('Das ist keine gültige Nightshelf-Datei.'); }
     });
   };
   return (<>
     <p>Lade alle Spiele, Serien, Filme und Trophäen als Datei herunter, oder lies eine Backupdatei ein. Beim Zusammenführen bleiben deine aktuellen Einträge erhalten.</p>
     <Row className=""><button className="btn btn-primary" onClick={exp}>{I.download} Backup herunterladen</button>
-      <label className="btn">{I.upload} Datei zusammenführen<input type="file" accept=".json,application/json" hidden onChange={doImport('merge')} /></label>
-      <label className="btn btn-ghost">Datei ersetzt alles<input type="file" accept=".json,application/json" hidden onChange={doImport('replace')} /></label></Row>
+      <button type="button" className="btn" onClick={() => mergeRef.current?.click()}>{I.upload} Datei zusammenführen</button>
+      <button type="button" className="btn btn-ghost btn-danger" onClick={askReplace}>Alles durch Datei ersetzen</button></Row>
+    <input ref={mergeRef} type="file" accept=".json,application/json" hidden onChange={doImport('merge')} />
+    <input ref={replaceRef} type="file" accept=".json,application/json" hidden onChange={doImport('replace')} />
     <div className="field-error mt-2">{err}</div>
   </>);
 }
