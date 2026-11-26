@@ -1256,3 +1256,12 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   .toolbar .chips { order: 2; }
   .toolbar select.input { order: 3; flex: 1 1 calc(50% - 5px); font-size: 14px; }
 }
+
+/* Weniger Bewegung, wenn das System es wünscht */
+@media (prefers-reduced-motion: reduce) {
+  .fade-in, .modal, .toast, .sheet { animation: none !important; }
+  *, *::before, *::after { transition-duration: 0s !important; scroll-behavior: auto !important; }
+}
+
+/* Ohne Preflight: hidden muss gegen display-Regeln gewinnen */
+[hidden] { display: none !important; }

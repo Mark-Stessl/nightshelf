@@ -266,13 +266,13 @@ export function Stats({ animate }) {
   const byType = t => st.finished.filter(i => i.type === t).length;
   const [platOpen, setPlatOpen] = useState(false);
   const share = () => openModal(close => <ShareYear st={st} year={cur} close={close} />);
-  const fin = [['game', 'Spiele'], ['series', 'Serien'], ['anime', 'Anime'], ['manga', 'Manga'], ['movie', 'Filme']].filter(([t]) => byType(t)).map(([t, l]) => `${byType(t)} ${l}`).join(' · ');
+  const fin = [['game', 'Spiel', 'Spiele'], ['series', 'Serie', 'Serien'], ['anime', 'Anime', 'Anime'], ['manga', 'Manga', 'Manga'], ['movie', 'Film', 'Filme']].filter(([t]) => byType(t)).map(([t, one, many]) => `${byType(t)} ${byType(t) === 1 ? one : many}`).join(' · ');
 
   return (
     <div className={animate ? 'fade-in' : ''}>
       <div className="page-head"><div><h1 className="page-title">{st.all ? 'Statistik' : `Dein ${cur}`}</h1><p className="page-sub">{st.all ? 'Alles, was du je gespielt und geschaut hast' : 'Dein Jahresrückblick'}</p></div>
-        <div className="flex flex-col gap-2.5 items-end min-w-0">
-          <div className="flex gap-2 flex-wrap justify-end"><a className="btn" href="#/trophies">{I.trophy} Alle Trophäen</a><button className="btn btn-primary" onClick={share}>{I.share} {st.all ? 'Rückblick teilen' : `${cur} teilen`}</button></div>
+        <div className="flex flex-col gap-2.5 items-end max-[820px]:items-start min-w-0">
+          <div className="flex gap-2 flex-wrap justify-end max-[820px]:justify-start"><a className="btn" href="#/trophies">{I.trophy} Alle Trophäen</a><button className="btn btn-primary" onClick={share}>{I.share} {st.all ? 'Rückblick teilen' : `${cur} teilen`}</button></div>
           <div className="chips">{st.years.map(y => <button key={y} className={cn('chip', cur === y && 'on')} onClick={() => statsState.set({ year: y })}>{y}</button>)}<button className={cn('chip', st.all && 'on')} onClick={() => statsState.set({ year: 'all' })}>Gesamt</button></div>
         </div></div>
 

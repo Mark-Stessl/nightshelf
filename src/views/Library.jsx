@@ -135,7 +135,7 @@ export function Library({ type, animate }) {
           <button key={v} className={view === v ? 'on' : ''} title={l} aria-label={l} onClick={() => set({ view: v })}>{icon}</button>)}
       </div>
     </div>
-    {!list.length ? <div className="grid"><div className="list-empty col-span-full">Keine Treffer</div></div>
+    {!list.length ? <div className="grid"><div className="list-empty col-span-full">{s.q ? <>Nichts zu „{s.q}“ gefunden.</> : <>Hier ist gerade nichts.</>} <button className="btn btn-sm btn-ghost ml-1 text-(--lilac)" onClick={() => set({ q: "", status: "all", fam: "all", platform: "all" })}>Filter zurücksetzen</button></div></div>
       : shelf ? <ShelfWall items={list} />
       : <div className="grid">{list.map(it => <Card key={it.id} item={it} animate={animate} />)}</div>}
   </>;
