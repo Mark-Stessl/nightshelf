@@ -1439,3 +1439,12 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .trophy-name .rarity { margin-left: 8px; font-weight: 500; }
 
 .year-chips { margin: -6px 0 22px; }
+
+/* Platzhalter-Cover: Typ-Symbol mittig statt Titel */
+.cover-gen:has(.gen-icon) { justify-content: center; align-items: center; }
+.cover-gen:has(.gen-icon) .initials { display: none; }
+.gen-icon { width: 34%; max-width: 64px; aspect-ratio: 1; opacity: .5; }
+.gen-icon svg { width: 100%; height: 100%; fill: none; stroke: #fff; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.list-row .thumb .gen-icon { display: none; }
+.list-row .thumb .cover-gen:has(.gen-icon) .initials { display: block; }
+.season-panel.no-cover { grid-template-columns: 1fr; }

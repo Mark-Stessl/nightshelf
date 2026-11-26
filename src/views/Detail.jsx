@@ -241,7 +241,7 @@ function SeasonSection({ item, animate }) {
   };
   const tabBtn = x => (
     <button key={x.id} className={cn('season-tab', x.id === activeId && 'on', seasonDone(x) && 'done')} role="tab" aria-selected={x.id === activeId} onClick={() => choose(x.id)}>
-      <span>{x.label}</span><small>{seasonDone(x) ? '✓' : x.format === 'MOVIE' ? 'offen' : `${x.seen || 0}/${epTotal(x) || '?'}`}</small></button>
+      <span>{x.label}</span><small>{seasonDone(x) ? '✓' : x.format === 'MOVIE' ? 'offen' : epTotal(x) ? `${x.seen || 0}/${epTotal(x)}` : x.seen ? `${x.seen} gesehen` : 'offen'}</small></button>
   );
 
   return (
@@ -257,8 +257,8 @@ function SeasonSection({ item, animate }) {
       {noEpisodes && <div className="hint-box mb-3.5">{I.info}<div>Lade die Staffeln von {seasonSource(item)}, dann bekommst du Folgenzahlen und Cover pro Staffel. Deine fertigen Staffeln bleiben abgehakt.</div><BusyButton className="btn btn-sm" busyText="Lade…" onClick={load}>{I.refresh} Von {seasonSource(item)} laden</BusyButton></div>}
       {shows.length > 0 && <div className="season-tabs" role="tablist" aria-label="Staffeln">{shows.map(tabBtn)}</div>}
       {films.length > 0 && <><div className="season-row-label">Filme</div><div className="season-tabs" role="tablist" aria-label="Filme">{films.map(tabBtn)}</div></>}
-      <div className={cn('season-panel', animate && 'fade-in')}>
-        <div className="season-cover"><SafeImg src={sea.cover || item.cover} /></div>
+      <div className={cn('season-panel', animate && 'fade-in', !(sea.cover || item.cover) && 'no-cover')}>
+        {(sea.cover || item.cover) && <div className="season-cover"><SafeImg src={sea.cover || item.cover} /></div>}
         <div className="season-body">
           <div className="season-title">{sea.title && sea.title !== item.title ? sea.title : sea.label}</div>
           <div className="card-meta mt-1">{joinDots([sea.title && sea.title !== item.title ? sea.label : '', sea.year, singleMovie ? '' : sea.episodes ? `${sea.episodes} Folgen` : sea.aired ? `${sea.aired} Folgen erschienen` : 'Folgenzahl unbekannt'])}</div>
@@ -266,7 +266,7 @@ function SeasonSection({ item, animate }) {
           {!singleMovie && <div className="ep-stepper">
             <button className="btn icon-btn" aria-label="Eine Folge weniger" onClick={() => setSeen((sea.seen || 0) - 1)}>−</button>
             <div className="ep-count"><input type="number" min="0" max={sea.episodes || undefined} value={epVal} aria-label="Gesehene Folgen"
-              onChange={e => setEpVal(e.target.value)} onBlur={() => setSeen(Math.round(+epVal || 0))} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} /><span>/ {epTotal(sea) || '?'} Folgen</span></div>
+              onChange={e => setEpVal(e.target.value)} onBlur={() => setSeen(Math.round(+epVal || 0))} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} /><span>{epTotal(sea) ? `/ ${epTotal(sea)} Folgen` : 'Folgen'}</span></div>
             <button className="btn icon-btn btn-primary" aria-label="Eine Folge mehr" onClick={plus}>+</button>
           </div>}
           {singleMovie ? <div className={cn('movie-state', seasonDone(sea) && 'on')}>{seasonDone(sea) ? <>{I.check} Gesehen</> : 'Noch nicht gesehen'}</div>
