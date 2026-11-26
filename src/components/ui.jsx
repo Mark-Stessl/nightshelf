@@ -2,7 +2,8 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { I } from './icons.jsx';
 import { STATUS, isCoarse, isMobileWidth } from '../lib/util.js';
-import { modal, closeModal, openModal, toasts } from '../lib/bus.js';
+import { modal, closeModal, openModal, toasts, toast, dismissToast } from '../lib/bus.js';
+import { Store } from '../lib/store.js';
 
 export const cn = (...c) => c.filter(Boolean).join(' ');
 
@@ -169,3 +170,14 @@ export function ToastHost() {
 
 // Standard-Inhalt eines Toasts: fette Zeile plus kleine Zeile darunter
 export const Msg = ({ title, sub }) => <div><b>{title}</b>{sub && <small>{sub}</small>}</div>;
+
+/* Änderung mit „Rückgängig“: vorher den Stand merken, danach Toast mit Knopf.
+   title darf eine Funktion sein, die aus dem Ergebnis von change() [Titel, Unterzeile] macht */
+export function undoable(id, title, sub, change) {
+  const before = structuredClone(Store.get(id));
+  const res = change();
+  if (typeof title === 'function') [title, sub] = title(res);
+  let tid = 0;
+  const undo = () => { Store.restore(before); dismissToast(tid); };
+  tid = toast(<><Msg title={title} sub={sub} /><button type="button" className="toast-undo" onClick={undo}>Rückgängig</button></>, 'has-undo', 5000);
+}

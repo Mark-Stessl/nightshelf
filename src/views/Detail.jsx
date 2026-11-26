@@ -15,7 +15,7 @@ import { detailFilter, seasonTab } from '../lib/viewState.js';
 import { EpisodeWatch, MangaWatch } from '../lib/watch.jsx';
 import { I, TrophyIcon } from '../components/icons.jsx';
 import { CoverBox, SafeImg } from '../components/Cover.jsx';
-import { Msg, StarsInput, StatusPill, cn, confirmDialog, joinDots } from '../components/ui.jsx';
+import { Msg, StarsInput, StatusPill, cn, confirmDialog, joinDots, undoable } from '../components/ui.jsx';
 import { openItemForm } from '../dialogs/ItemForm.jsx';
 import { playtimeEditor, toggleTrophy, trophyEdit, trophyGenerate, trophyImport, trophyToast } from '../dialogs/trophyDialogs.jsx';
 import { chapterTotal, seasonEdit } from '../dialogs/misc.jsx';
@@ -25,7 +25,7 @@ import { BusyButton } from './Library.jsx';
 function TrophyRow({ t, game }) {
   const isPlat = t.tier === 'platinum';
   const toggle = () => toggleTrophy(game.id, t.id);
-  const del = () => { const g = Store.get(game.id); const list = g.trophies.filter(x => x.id !== t.id); Trophies.syncPlatinum(list); Store.update(g.id, { trophies: list }); };
+  const del = () => undoable(game.id, 'Trophäe gelöscht', t.name, () => { const g = Store.get(game.id); const list = g.trophies.filter(x => x.id !== t.id); Trophies.syncPlatinum(list); Store.update(g.id, { trophies: list }); });
   return (
     <div className={cn('trophy', t.done && 'done')}>
       <button className={cn('check', t.done && 'on', isPlat && 'auto')} onClick={toggle} aria-label={t.done ? 'Als offen markieren' : 'Abhaken'} title={isPlat ? 'Wird automatisch verdient' : undefined}>{I.check}</button>
@@ -374,7 +374,8 @@ export function Detail({ id, animate }) {
         <CoverBox item={item} />
         <div className="hero-info">
           <div className="hero-head">
-            <StatusPill item={item} />
+            <label className={cn("status-pill status-pick", { done: "st-done", active: "st-active", planned: "st-planned", paused: "st-planned", dropped: "st-dropped" }[item.status])}>
+              <select id="quickStatus" aria-label="Status" value={item.status} onChange={e => Store.update(item.id, { status: e.target.value })}>{Object.entries(STATUS[item.type]).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>{I.chevron}</label>
             {rel && <span className="status-pill st-upcoming">{I.calendar} {rel.date && !rel.year ? `Erscheint am ${new Date(rel.date + 'T00:00:00').toLocaleDateString('de-AT', { day: 'numeric', month: 'long', year: 'numeric' })}` : releaseLabel(rel)}</span>}
             <h1 className="hero-title">{item.title}</h1>
             <div className="hero-meta">{joinDots(meta)}</div>
@@ -388,7 +389,6 @@ export function Detail({ id, animate }) {
             <div className="mt-[18px] max-w-[360px]"><div className="tiny mb-1.5">Fortschritt: Folge {item.episodesSeen || 0} von {item.episodes}</div><div className="bar"><i style={{ width: `${Math.min(100, Math.round((item.episodesSeen || 0) / item.episodes * 100))}%` }} /></div></div>
           ) : null}
           <div className="hero-actions">
-            <select id="quickStatus" className="input w-auto" value={item.status} onChange={e => Store.update(item.id, { status: e.target.value })}>{Object.entries(STATUS[item.type]).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
             <button id="editBtn" className="btn" onClick={() => openItemForm(item.type, item)}>{I.edit} Bearbeiten</button>
             <button id="delBtn" className="btn btn-ghost btn-danger" aria-label="Löschen" onClick={() => confirmDialog(`„${item.title}“ wird mit allen Trophäen gelöscht.`, 'Löschen', () => { Store.remove(item.id); go(`#/${T.route}`); })}>{I.trash} Löschen</button>
           </div>

@@ -1,14 +1,13 @@
 /* Nightshelf – Übersicht: zuerst, was gerade läuft, dann Neues und die Sammlung */
 import { Store } from '../lib/store.js';
 import { Trophies } from '../lib/trophies.js';
-import { toast } from '../lib/bus.js';
 import {
   ORDER_TYPES, TYPES, allTrophyStats, currentSeason, episodesBehind, fmtCh, fmtWhen, mangaBehind, newCount, newItems, plusOne, plusOneLabel, recentTrophies, upcomingEntries,
 } from '../lib/util.js';
 import { I, TrophyIcon, typeIcon } from '../components/icons.jsx';
 import { CoverBox } from '../components/Cover.jsx';
 import { NewRow, ShelfWall, TrophyListRow, UpcomingRow } from '../components/items.jsx';
-import { Msg } from '../components/ui.jsx';
+import { undoable } from '../components/ui.jsx';
 import { lsGet } from '../lib/util.js';
 import { openItemForm } from '../dialogs/ItemForm.jsx';
 import { addPicker } from '../dialogs/misc.jsx';
@@ -29,9 +28,7 @@ function NowItem({ item }) {
   const what = plusOneLabel(item);
   const bump = () => {
     if (what === 'Trophäe') { trophyQuick(item); return; }
-    const x = plusOne(item);
-    const it = Store.get(item.id);
-    toast(<Msg title={what === 'Kapitel' ? `Kapitel ${fmtCh(it.chaptersRead)} gelesen` : what === 'Staffel' ? `Staffel ${x.staffel} gesehen` : `${x?.label ? `${x.label} · ` : ''}Folge ${x?.seen} gesehen`} sub={item.title} />);
+    undoable(item.id, x => [what === 'Kapitel' ? `Kapitel ${fmtCh(Store.get(item.id).chaptersRead)} gelesen` : what === 'Staffel' ? `Staffel ${x.staffel} gesehen` : `${x?.label ? `${x.label} · ` : ''}Folge ${x?.seen} gesehen`, item.title], null, () => plusOne(item));
   };
   return (
     <div className="now-item">

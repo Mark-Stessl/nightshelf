@@ -49,6 +49,14 @@ export const Store = (() => {
     return item;
   }
 
+  // Einen Eintrag auf einen früheren Stand zurücksetzen (für „Rückgängig“)
+  function restore(snap) {
+    const i = state.items.findIndex(x => x.id === snap.id);
+    if (i < 0) return;
+    state.items[i] = { ...snap, updatedAt: now() };
+    save();
+  }
+
   function remove(id) {
     state.items = state.items.filter(i => i.id !== id);
     tombstone(id);
@@ -89,5 +97,5 @@ export const Store = (() => {
   function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 
   load();
-  return { all, get, add, update, remove, exportJSON, importJSON, clear, subscribe, uid, snapshot, replaceAll };
+  return { all, get, add, update, restore, remove, exportJSON, importJSON, clear, subscribe, uid, snapshot, replaceAll };
 })();

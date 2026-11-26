@@ -25,13 +25,18 @@ export function createBus(initial) {
 // content: React-Knoten oder (für alte Aufrufer wie die PWA) ein HTML-String
 export const toasts = createBus([]);
 let toastSeq = 0;
-export function toast(content, cls = '') {
+export function toast(content, cls = '', ms = 0) {
   const id = ++toastSeq;
   toasts.set(list => [...list, { id, content, cls, out: false }].slice(-3));
   setTimeout(() => {
     toasts.set(list => list.map(t => t.id === id ? { ...t, out: true } : t));
     setTimeout(() => toasts.set(list => list.filter(t => t.id !== id)), 300);
-  }, cls === 'plat' ? 4200 : 2600);
+  }, ms || (cls === 'plat' ? 4200 : 2600));
+  return id;
+}
+export function dismissToast(id) {
+  toasts.set(list => list.map(t => t.id === id ? { ...t, out: true } : t));
+  setTimeout(() => toasts.set(list => list.filter(t => t.id !== id)), 300);
 }
 
 /* ---------- Fenster (Modal) ---------- */

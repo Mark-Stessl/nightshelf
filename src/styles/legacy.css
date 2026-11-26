@@ -1316,3 +1316,17 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .check { width: 32px; height: 32px; }
 .quick-trophies .trophy { width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; grid-template-columns: auto auto 1fr auto; }
 .quick-trophies .trophy-desc { display: block; }
+
+/* Toast mit Rückgängig-Knopf: anklickbar, Knopf rechts */
+.toast.has-undo { pointer-events: auto; }
+.toast-undo { margin-left: auto; padding: 8px 4px 8px 14px; border: 0; background: none; color: var(--lilac); font: 600 13px var(--font); cursor: pointer; white-space: nowrap; }
+.toast-undo:hover { color: var(--text); }
+
+/* Status-Pill ist zugleich das Auswahlfeld */
+.status-pick { position: relative; padding: 0; cursor: pointer; }
+.status-pick::before { margin-left: 10px; }
+.status-pick select { appearance: none; -webkit-appearance: none; background: none; border: 0; color: inherit; font: inherit; padding: 5px 28px 5px 0; cursor: pointer; }
+.status-pick select:focus-visible { outline: none; }
+.status-pick:has(select:focus-visible) { outline: 2px solid var(--violet); outline-offset: 2px; }
+.status-pick option { color: var(--text); background: var(--surface); }
+.status-pick svg { position: absolute; right: 9px; top: 50%; width: 12px; height: 12px; transform: translateY(-50%); pointer-events: none; fill: none; stroke: currentColor; stroke-width: 2; }
