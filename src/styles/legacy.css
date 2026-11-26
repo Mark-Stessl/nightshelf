@@ -1448,3 +1448,11 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 .list-row .thumb .gen-icon { display: none; }
 .list-row .thumb .cover-gen:has(.gen-icon) .initials { display: block; }
 .season-panel.no-cover { grid-template-columns: 1fr; }
+
+/* Handy-Regal: Status wandert in den Filter, nur noch eine Scroll-Reihe (die Regal-Tabs) */
+.toolbar-filters .status-select { display: none; }
+.toolbar .filter-btn.on { background: rgba(139, 92, 246, .22); border-color: rgba(167, 139, 250, .55); color: var(--text); }
+@media (max-width: 820px) {
+  .toolbar .chips { display: none; }
+  .toolbar-filters .status-select { display: block; }
+}

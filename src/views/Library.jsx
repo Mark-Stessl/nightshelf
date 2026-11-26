@@ -104,7 +104,7 @@ export function Library({ type, animate }) {
     .sort(sorters[s.sort] || sorters.added);
   // Ohne gespeicherte Wahl: das Cover-Raster
   const view = s.view || 'grid';
-  const nActive = (fam !== 'all' || platform !== 'all' ? 1 : 0) + (s.sort && s.sort !== 'added' ? 1 : 0);
+  const nActive = (fam !== 'all' || platform !== 'all' ? 1 : 0) + (s.sort && s.sort !== 'added' ? 1 : 0) + (isMobileWidth() && s.status !== 'all' ? 1 : 0);
   const shelf = view === 'shelf';
 
   return <>
@@ -120,6 +120,8 @@ export function Library({ type, animate }) {
           <button key={v} className={view === v ? "on" : ""} title={l} aria-label={l} onClick={() => set({ view: v })}>{icon}</button>)}
       </div>
       <div className="toolbar-filters" hidden={!filterOpen}>
+      <select className="input w-auto status-select" aria-label="Status" value={s.status} onChange={e => set({ status: e.target.value })}>
+        {[['all', 'Alle Status'], ...Object.entries(STATUS[type])].map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
       {platforms.length > 1 && <>
         {fams.length > 1 && <select className="input w-auto" value={fam} onChange={e => set({ fam: e.target.value, platform: 'all' })}>
           <option value="all">Alle Plattformen</option>{fams.map(g => <option key={g} value={g}>{g}</option>)}</select>}
