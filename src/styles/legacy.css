@@ -1398,3 +1398,6 @@ html.modal-open, html.modal-open body { overflow: hidden; }
   .toolbar-filters { order: 3; }
   .toolbar-filters select.input { flex: 1 1 calc(50% - 5px); }
 }
+
+.hint-box > .btn { flex-shrink: 0; align-self: center; margin-left: auto; }
+@media (max-width: 820px) { .hint-box:has(> .btn) { flex-wrap: wrap; } .hint-box > .btn { margin-left: 0; } }

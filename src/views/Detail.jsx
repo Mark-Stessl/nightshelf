@@ -252,17 +252,17 @@ function SeasonSection({ item, animate }) {
           <div className="tiny">{item.type === 'anime' ? unit : `${list.length} ${unit}`}{noEpisodes ? ` · ${list.filter(seasonDone).length} fertig` : ` · ${tot.episodesSeen}/${tot.episodes || '?'} Folgen gesehen${tot.episodes ? ` · ${totPct} %` : ''}`}</div></div>
         <div className="flex gap-2 flex-wrap">
           <button className="btn btn-sm" onClick={() => seasonEdit(Store.get(item.id), true)}>{I.plus} Staffel</button>
-          <BusyButton className={cn('btn btn-sm', noEpisodes && 'btn-primary')} busyText="Lade…" onClick={load}>{I.refresh} Von {seasonSource(item)} laden</BusyButton>
+          {!noEpisodes && <BusyButton className="btn btn-sm btn-ghost" busyText="Lade…" onClick={load}>{I.refresh} Aktualisieren</BusyButton>}
         </div>
       </div>
-      {noEpisodes && <div className="hint-box mb-3.5">{I.info}<div>Lade die Staffeln von {seasonSource(item)}, dann bekommst du Folgenzahlen und Cover pro Staffel. Deine fertigen Staffeln bleiben abgehakt.</div></div>}
+      {noEpisodes && <div className="hint-box mb-3.5">{I.info}<div>Lade die Staffeln von {seasonSource(item)}, dann bekommst du Folgenzahlen und Cover pro Staffel. Deine fertigen Staffeln bleiben abgehakt.</div><BusyButton className="btn btn-sm" busyText="Lade…" onClick={load}>{I.refresh} Von {seasonSource(item)} laden</BusyButton></div>}
       {shows.length > 0 && <div className="season-tabs" role="tablist" aria-label="Staffeln">{shows.map(tabBtn)}</div>}
       {films.length > 0 && <><div className="season-row-label">Filme</div><div className="season-tabs" role="tablist" aria-label="Filme">{films.map(tabBtn)}</div></>}
       <div className={cn('season-panel', animate && 'fade-in')}>
         <div className="season-cover"><SafeImg src={sea.cover || item.cover} /></div>
         <div className="season-body">
-          <div className="season-title">{sea.title || item.title}</div>
-          <div className="card-meta mt-1">{joinDots([sea.label, sea.year, singleMovie ? '' : sea.episodes ? `${sea.episodes} Folgen` : sea.aired ? `${sea.aired} Folgen erschienen` : 'Folgenzahl unbekannt'])}</div>
+          <div className="season-title">{sea.title && sea.title !== item.title ? sea.title : sea.label}</div>
+          <div className="card-meta mt-1">{joinDots([sea.title && sea.title !== item.title ? sea.label : '', sea.year, singleMovie ? '' : sea.episodes ? `${sea.episodes} Folgen` : sea.aired ? `${sea.aired} Folgen erschienen` : 'Folgenzahl unbekannt'])}</div>
           <AirInfo sea={sea} />
           {!singleMovie && <div className="ep-stepper">
             <button className="btn icon-btn" aria-label="Eine Folge weniger" onClick={() => setSeen((sea.seen || 0) - 1)}>−</button>
@@ -275,9 +275,9 @@ function SeasonSection({ item, animate }) {
           <div className="flex gap-2 flex-wrap mt-4">
             {seasonDone(sea) ? <button className="btn btn-sm" onClick={() => withList((l, i) => { l[i].seen = 0; l[i].complete = false; })}>{sea.format === 'MOVIE' ? 'Als ungesehen markieren' : 'Zurücksetzen'}</button>
               : partialAir(sea) && (sea.seen || 0) >= sea.aired ? <div className="movie-state on m-0">{I.check} Auf dem neuesten Stand</div>
-              : <button className="btn btn-sm btn-primary" onClick={done}>{I.check} {sea.format === 'MOVIE' ? 'Gesehen' : partialAir(sea) && sea.aired > 0 ? `Bis Folge ${sea.aired} gesehen` : 'Ganz gesehen'}</button>}
-            <button className="btn btn-sm" onClick={() => seasonEdit(Store.get(item.id))}>{I.edit} Bearbeiten</button>
-            {list.length > 1 && <button className="btn btn-sm btn-ghost btn-danger" onClick={del}>{I.trash} Entfernen</button>}
+              : <button className={cn('btn btn-sm', singleMovie && 'btn-primary')} onClick={done}>{I.check} {sea.format === 'MOVIE' ? 'Gesehen' : partialAir(sea) && sea.aired > 0 ? `Bis Folge ${sea.aired} gesehen` : 'Ganz gesehen'}</button>}
+            <button className="btn btn-sm btn-ghost" onClick={() => seasonEdit(Store.get(item.id))}>{I.edit} {sea.format === 'MOVIE' ? 'Film' : 'Staffel'} bearbeiten</button>
+            {list.length > 1 && <button className="btn btn-sm btn-ghost btn-danger" aria-label={`${sea.label} entfernen`} title={`${sea.label} entfernen`} onClick={del}>{I.trash}</button>}
           </div>
         </div>
       </div>
