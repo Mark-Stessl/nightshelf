@@ -81,7 +81,7 @@ function TrophySection({ item }) {
   const sorted = list.slice().sort((a, b) => Trophies.ORDER.indexOf(a.tier) - Trophies.ORDER.indexOf(b.tier));
   const filtered = sorted.filter(t => filter === 'all' || (filter === 'open' ? !t.done : t.done));
   const allDone = list.length && list.every(t => t.done);
-  const [more, setMore] = useState(false);
+  const [more, setMore] = useState(false), [editing, setEditing] = useState(false);
 
   const toggleAll = () => {
     const game = Store.get(item.id); const all = !allDone;
@@ -131,10 +131,11 @@ function TrophySection({ item }) {
           {item.psnId && PSN.connected() && <BusyButton className="btn btn-sm" busyText="Lade…" onClick={fromPsn}>{I.refresh} Von PlayStation</BusyButton>}
           {Steam.connected() && (item.steamAppId || ['Steam', 'PC', 'Steam Deck'].includes(item.platform)) && <BusyButton className="btn btn-sm" busyText="Lade…" onClick={fromSteam}>{I.refresh} Von Steam</BusyButton>}
           <button className="btn btn-sm" onClick={() => trophyGenerate(Store.get(item.id))}>{I.sparkle} Erstellen</button>
+          {list.length > 0 && <button type="button" className={cn('btn btn-sm edit-toggle', editing && 'on')} aria-pressed={editing} onClick={() => setEditing(e => !e)}>{I.edit} {editing ? 'Fertig' : 'Bearbeiten'}</button>}
           {list.length > 0 && (allDone ? <button className="btn btn-sm btn-ghost" onClick={toggleAll}>Alle zurücksetzen</button> : <button className="btn btn-sm" onClick={toggleAll}>{I.check} Alle abhaken</button>)}
         </div>
       </div>
-      {list.length ? <div className="trophy-list">{filtered.length ? filtered.map(t => <TrophyRow key={t.id} t={t} game={item} />) : <div className="list-empty">Nichts in dieser Ansicht</div>}</div>
+      {list.length ? <div className={cn('trophy-list', editing && 'editing')}>{filtered.length ? filtered.map(t => <TrophyRow key={t.id} t={t} game={item} />) : <div className="list-empty">Nichts in dieser Ansicht</div>}</div>
         : <div className="empty py-11 px-5">
           <div className="empty-icon">{I.trophy}</div><h3>Noch keine Trophäen</h3>
           <p>{isPS(item.platform) ? 'Füge die offizielle Liste ein oder lass eine erstellen.' : 'Für dieses Spiel gibt es keine offiziellen Trophäen? Lass dir eine Liste erstellen.'}</p>
