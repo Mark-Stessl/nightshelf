@@ -70,9 +70,10 @@ export function TrophiesView({ animate }) {
   return (
     <div className={animate ? 'fade-in' : ''}>
       <div className="page-head"><div><h1 className="page-title">Trophäen</h1><p className="page-sub">{s.earned} von {s.total} verdient · {s.pts.toLocaleString('de-AT')} Punkte</p></div><a className="btn" href="#/stats">{I.chart} Statistik & Jahresrückblick</a></div>
-      <div className="stats">
-        <div className="stat feature"><div className="stat-label">{I.trophy} Level</div><div className="stat-value">{s.level.level}</div><div className="bar mt-2"><i style={{ width: `${s.level.pct}%` }} /></div><div className="stat-hint mt-1.5">Noch {s.level.need - s.level.into} Punkte bis Level {s.level.level + 1}</div></div>
-        {Trophies.ORDER.map(t => <div key={t} className="stat"><div className="stat-label"><TrophyIcon tier={t} size={16} /> {Trophies.TIERS[t].label}</div><div className="stat-value" style={{ color: Trophies.TIERS[t].color }}>{s.counts[t]}</div><div className="stat-hint">{Trophies.TIERS[t].points} Punkte pro Stück</div></div>)}
+      <div className="tally tl-tiers">
+        <div className="tl-level"><div className="level-badge">{s.level.level}</div>
+          <div><div className="level-title">Trophäen-Level {s.level.level}</div><div className="bar"><i style={{ width: `${s.level.pct}%` }} /></div><small>Noch {(s.level.need - s.level.into).toLocaleString("de-AT")} Punkte bis Level {s.level.level + 1}</small></div></div>
+        {Trophies.ORDER.map(t => <div key={t}><b style={{ color: Trophies.TIERS[t].color }}>{s.counts[t]}</b><span className="tl-label"><TrophyIcon tier={t} size={14} /> {Trophies.TIERS[t].label}</span></div>)}
       </div>
       <Vitrine />
       <div className="two-col section">

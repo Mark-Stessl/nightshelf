@@ -276,11 +276,11 @@ export function Stats({ animate }) {
           <div className="chips">{st.years.map(y => <button key={y} className={cn('chip', cur === y && 'on')} onClick={() => statsState.set({ year: y })}>{y}</button>)}<button className={cn('chip', st.all && 'on')} onClick={() => statsState.set({ year: 'all' })}>Gesamt</button></div>
         </div></div>
 
-      <div className="stats">
-        <div className="stat feature"><div className="stat-label">{I.trophy} Trophäen {period}</div><div className="stat-value">{st.trophies.length.toLocaleString('de-AT')}</div><div className="stat-hint">{['gold', 'silver', 'bronze'].map(t => `${st.tierCount[t]} ${Trophies.TIERS[t].label}`).join(' · ')}</div></div>
-        <div className="stat"><div className="stat-label"><TrophyIcon tier="platinum" size={16} /> Platin</div><div className="stat-value" style={{ color: 'var(--platinum)' }}>{st.tierCount.platinum}</div><div className="stat-hint">{st.allPlats} insgesamt</div></div>
-        <div className="stat"><div className="stat-label">{I.check} Abgeschlossen</div><div className="stat-value">{st.finished.length}</div><div className="stat-hint">{fin || 'noch nichts mit Datum'}</div></div>
-        <div className="stat"><div className="stat-label">{I.tv} Folgen gesehen</div><div className="stat-value">{st.episodes.toLocaleString('de-AT')}</div><div className="stat-hint">Serien und Anime{st.chapters ? ` · ${Math.round(st.chapters).toLocaleString('de-AT')} Manga-Kapitel gelesen` : ''}</div></div>
+      <div className="tally">
+        <div><b>{st.trophies.length.toLocaleString("de-AT")}</b><span className="tl-label">{I.trophy} Trophäen {period}</span><small>{["gold", "silver", "bronze"].map(t => `${st.tierCount[t]} ${Trophies.TIERS[t].label}`).join(" · ")}</small></div>
+        <div><b style={{ color: "var(--platinum)" }}>{st.tierCount.platinum}</b><span className="tl-label"><TrophyIcon tier="platinum" size={14} /> Platin</span><small>{st.allPlats} insgesamt</small></div>
+        <div><b>{st.finished.length}</b><span className="tl-label">{I.check} Abgeschlossen</span><small>{fin || "noch nichts mit Datum"}</small></div>
+        <div><b>{st.episodes.toLocaleString("de-AT")}</b><span className="tl-label">{I.tv} Folgen gesehen</span><small>{st.chapters ? `dazu ${Math.round(st.chapters).toLocaleString("de-AT")} Manga-Kapitel` : "Serien und Anime"}</small></div>
       </div>
 
       <section className="section"><h2 className="section-title">Trophäen {st.all ? 'pro Jahr' : 'pro Monat'}{st.busiest.b && <span className="tiny" style={{ fontFamily: 'var(--font)' }}>Stärkster {st.all ? 'Jahrgang' : 'Monat'}: {st.busiest.b.long} mit {st.busiest.n}</span>}</h2>

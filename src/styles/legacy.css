@@ -1265,3 +1265,42 @@ html.modal-open, html.modal-open body { overflow: hidden; }
 
 /* Ohne Preflight: hidden muss gegen display-Regeln gewinnen */
 [hidden] { display: none !important; }
+
+/* ---------- Zahlenzeile statt Kacheln (Trophäen, Statistik) ---------- */
+.tally { display: flex; border-block: 1px solid var(--line); margin: 0 0 38px; }
+.tally > div { flex: 1 1 0; min-width: 0; padding: 16px 20px; border-left: 1px solid var(--line); }
+.tally > div:first-child { border-left: 0; padding-left: 2px; }
+.tally b { display: block; font: 700 28px/1 var(--display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.tally .tl-label { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; color: var(--text-2); }
+.tally .tl-label svg { width: 14px; height: 14px; flex: none; }
+.tally .tl-label svg:not([width]) { fill: none; stroke: currentColor; stroke-width: 2; }
+.tally small { display: block; margin-top: 3px; font-size: 12px; color: var(--text-3); line-height: 1.4; }
+.tally .tl-level { flex: 2.2 1 0; display: flex; align-items: center; gap: 14px; }
+.tally .tl-level .level-badge { flex: none; width: 46px; height: 46px; font-size: 20px; }
+.tally .tl-level > div:last-child { flex: 1; min-width: 0; }
+.tally .tl-level .bar { margin: 9px 0 6px; max-width: 260px; }
+@media (max-width: 820px) {
+  .tally { flex-wrap: wrap; margin-bottom: 30px; }
+  .tally > div { flex: 1 1 50%; padding: 13px 14px; }
+  .tally > div:nth-child(odd) { border-left: 0; padding-left: 2px; }
+  .tally > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .tally b { font-size: 24px; }
+  .tally.tl-tiers > div { flex-basis: 25%; padding: 13px 8px; }
+  .tally.tl-tiers > div:nth-child(n) { border-left: 1px solid var(--line); border-top: 1px solid var(--line); }
+  .tally.tl-tiers > .tl-level { flex-basis: 100%; border: 0 !important; padding: 2px 2px 14px; }
+  .tally.tl-tiers > .tl-level + div { border-left: 0; padding-left: 2px; }
+}
+
+/* ---------- Detail-Kopf ohne Glas-Karte: Cover-Schleier läuft weich aus ---------- */
+.hero { background: none; border: 0; border-radius: 0; overflow: visible; isolation: isolate; padding: 6px 0 30px; border-bottom: 1px solid var(--line); }
+.hero-bg { z-index: -1; inset: -60px -30px 0 -30px; opacity: .3; transform: none; filter: blur(48px) saturate(1.2);
+  -webkit-mask-image: radial-gradient(closest-side at 32% 50%, #000 35%, transparent); mask-image: radial-gradient(closest-side at 32% 50%, #000 35%, transparent); }
+.hero .cover { box-shadow: 0 14px 34px rgba(0, 0, 0, .45); }
+.tier-box { gap: 0; }
+.tier-stat { padding: 2px 18px; background: none; border: 0; border-left: 1px solid var(--line); border-radius: 0; min-width: 0; }
+.tier-stat:first-child { border-left: 0; padding-left: 0; }
+@media (max-width: 820px) {
+  .hero { padding: 2px 0 20px; }
+  .hero-bg { inset: -16px -16px 0; }
+  .tier-stat, .tier-stat:first-child { border-left: 0; padding: 0; }
+}
