@@ -55,7 +55,7 @@ function Sidebar({ active }) {
   const [folded, setFolded] = useState(() => lsGet('nightshelf.shelfFold', '0') === '1');
   const fold = v => { setFolded(v); lsSet('nightshelf.shelfFold', v ? '1' : '0'); };
   const lastShelf = lsGet('nightshelf.shelf', 'games');
-  const on = r => active === r || (r === 'shelf' && SHELF.includes(active)) || (r === 'stats' && active === 'trophies');
+  const on = r => active === r || (r === 'shelf' && SHELF.includes(active));
   return (
     <aside className="sidebar">
       <a className="brand" href="#/">
@@ -70,7 +70,8 @@ function Sidebar({ active }) {
         </a>
         {NAV_SUB.map(([r, label, d]) => <a key={r} href={`#/${r}`} className={cn('nav-sub nav-desktop', on(r) && 'active')}><Svg d={d} /><span>{label}</span></a>)}
         <a href="#/upcoming" className={cn(on('upcoming') && 'active')}><Svg d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4" /><span>Demnächst</span></a>
-        <a href="#/stats" className={cn(on('stats') && 'active')}><Svg d="M4 20V10M10 20V4M16 20v-7M22 20H2" /><span>Statistik</span></a>
+        <a href="#/trophies" className={cn(on('trophies') && 'active', active === 'stats' && 'active-m')}><Svg d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M9 17h6" /><span>Trophäen</span></a>
+        <a href="#/stats" className={cn('nav-desktop', on('stats') && 'active')}><Svg d="M4 20V10M10 20V4M16 20v-7M22 20H2" /><span>Statistik</span></a>
         <a href="#/settings" className={cn('nav-settings', on('settings') && 'active')}><Svg><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d={GEAR} /></Svg><span>Daten</span></a>
       </nav>
       <div className="sidebar-level"><LevelCard /></div>
