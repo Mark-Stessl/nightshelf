@@ -1,0 +1,20 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "space grotesk",
+        "createdAt": "2026-11-26T17:50:46.514Z",
+        "reason": "Project design spec in CLAUDE.md (Midnight amethyst) names Space Grotesk for headings"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-11-26T17:50:46.687Z",
+        "reason": "Project design spec in CLAUDE.md names Inter for body text"
+      }
+    ]
+  }
+}

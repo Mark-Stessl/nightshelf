@@ -1,5 +1,7 @@
+import { PSN } from './psn.js';
+import { Sync } from './sync.js';
 /* Nightshelf – als App installieren (Handy und Desktop), Offline-Modus und Push-Benachrichtigungen */
-const Pwa = (() => {
+export const Pwa = (() => {
   let deferred = null;          // Installations-Angebot von Chrome/Edge/Android
   let reg = null;               // Service-Worker-Registrierung
   let ctx = { toast: () => {}, render: () => {} };
@@ -18,14 +20,13 @@ const Pwa = (() => {
   window.addEventListener('appinstalled', () => { deferred = null; ctx.toast('<div><b>Nightshelf ist installiert</b><small>Du findest die App jetzt bei deinen Programmen</small></div>'); emit(); });
 
   /* Neue Version? Beim Zurückkehren in die App prüfen und ggf. neu laden (iOS hält Apps lange im Speicher) */
-  const myVersion = (document.querySelector('script[src*="js/app.js"]')?.getAttribute('src').match(/v=(\d+)/) || [])[1];
+  const myVersion = import.meta.env.DEV ? null : __BUILD__;
   let lastUpdateCheck = 0;
   async function checkUpdate() {
     if (!myVersion || Date.now() - lastUpdateCheck < 60 * 1000) return;
     lastUpdateCheck = Date.now();
     try {
-      const html = await fetch(`index.html?check=${Date.now()}`, { cache: 'reload' }).then(r => r.ok ? r.text() : '');
-      const v = (html.match(/js\/app\.js\?v=(\d+)/) || [])[1];
+      const v = await fetch(`version.json?check=${Date.now()}`, { cache: 'reload' }).then(r => r.ok ? r.json() : {}).then(j => j.v);
       if (v && v !== myVersion && !document.documentElement.classList.contains('modal-open')) location.reload();
     } catch {}
   }
@@ -33,7 +34,7 @@ const Pwa = (() => {
 
   async function init(c) {
     ctx = { ...ctx, ...c };
-    if (!('serviceWorker' in navigator)) return;
+    if (!('serviceWorker' in navigator) || import.meta.env.DEV) return;
     try {
       reg = await navigator.serviceWorker.register('sw.js', { scope: './' });
       navigator.serviceWorker.addEventListener('message', e => { if (e.data?.type === 'open' && e.data.url) location.href = e.data.url; });

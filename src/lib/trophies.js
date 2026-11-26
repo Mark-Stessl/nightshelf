@@ -1,5 +1,6 @@
+import { Store } from './store.js';
 /* Nightshelf – Trophäen: Stufen, Level, Generator und Listen-Import */
-const Trophies = (() => {
+export const Trophies = (() => {
   const TIERS = {
     bronze:   { label: 'Bronze', points: 15,  color: 'var(--bronze)',   hex: '#D08A5B' },
     silver:   { label: 'Silber', points: 30,  color: 'var(--silver)',   hex: '#C9CEDC' },

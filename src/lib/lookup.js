@@ -1,5 +1,7 @@
+import { PSN } from './psn.js';
+import { Sync } from './sync.js';
 /* Nightshelf – automatische Daten: TVmaze (Serien), TMDB (Filme), Wikipedia/Wikidata (Spiele) */
-const Lookup = (() => {
+export const Lookup = (() => {
   const KEY = 'nightshelf.keys';
   function keys() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } }
   function setKeys(k) { try { localStorage.setItem(KEY, JSON.stringify(k)); } catch {} }

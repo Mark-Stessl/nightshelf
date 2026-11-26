@@ -1,5 +1,5 @@
 /* Nightshelf – Datenhaltung (localStorage + Export/Import + Löschmarker für den Geräte-Sync) */
-const Store = (() => {
+export const Store = (() => {
   const KEY = 'nightshelf.v1';
   let state = { items: [], deleted: [], updatedAt: null };
   const listeners = new Set();

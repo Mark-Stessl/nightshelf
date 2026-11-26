@@ -1,5 +1,9 @@
+import { Lookup } from './lookup.js';
+import { Store } from './store.js';
+import { Sync } from './sync.js';
+import { Trophies } from './trophies.js';
 /* Nightshelf – PlayStation-Synchronisierung über den eigenen Cloudflare Worker */
-const PSN = (() => {
+export const PSN = (() => {
   const KEY = 'nightshelf.psn';
   const DEFAULT_WORKER = 'https://nightshelf-psn.stesslmark4.workers.dev';
   let titleCache = null;

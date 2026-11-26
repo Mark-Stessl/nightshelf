@@ -1,6 +1,10 @@
+import { PSN } from './psn.js';
+import { Store } from './store.js';
+import { Sync } from './sync.js';
+import { Trophies } from './trophies.js';
 /* Nightshelf – Steam-Erfolge über den eigenen Server (offizielle Steam Web API).
    Steam kennt keine Stufen: die Stufe kommt aus der Seltenheit, Platin gibt es für alle Erfolge. */
-const Steam = (() => {
+export const Steam = (() => {
   const LS = 'nightshelf.steam';
   let state = (() => { try { return JSON.parse(localStorage.getItem(LS) || '{}'); } catch { return {}; } })();
   const save = s => { state = s || {}; try { localStorage.setItem(LS, JSON.stringify(state)); } catch {} };

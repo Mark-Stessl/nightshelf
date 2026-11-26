@@ -1,6 +1,6 @@
 /* Nightshelf – Ausstrahlungsdaten: welche Folgen sind erschienen, was kommt als Nächstes.
    Anime über AniList (nextAiringEpisode, airingSchedule), Serien über TVmaze (Episodenliste mit Sendezeit). */
-const Airing = (() => {
+export const Airing = (() => {
   const ANILIST = 'https://graphql.anilist.co';
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 

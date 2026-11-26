@@ -1,12 +1,11 @@
 /* Nightshelf – Service Worker: App offline verfügbar machen und Benachrichtigungen anzeigen */
-const VERSION = '97';
+const VERSION = '__BUILD__'; // wird beim Build ersetzt
 const SHELL = `nightshelf-shell-${VERSION}`;
 const IMAGES = 'nightshelf-img';
 const FONTS = 'nightshelf-fonts';
 const FILES = [
   './', 'index.html', 'manifest.webmanifest',
-  `styles.css?v=${VERSION}`,
-  ...['store', 'trophies', 'lookup', 'airing', 'psn', 'steam', 'sync', 'pwa', 'app'].map(f => `js/${f}.js?v=${VERSION}`),
+  ...self.__ASSETS__, // gehashte Dateien aus dem Build
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/badge-96.png',
 ];
 
@@ -46,13 +45,13 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Eigene Dateien: versionierte Dateien ändern sich nie, also direkt aus dem Speicher
-  if (url.origin === self.location.origin) {
+  // Eigene Dateien: gehashte Build-Dateien und Icons ändern sich nie, also direkt aus dem Speicher
+  if (url.origin === self.location.origin && !url.pathname.endsWith('version.json')) {
     e.respondWith((async () => {
       const hit = await caches.match(req);
       if (hit) return hit;
       const res = await fetch(req);
-      if (res.ok && (url.search.includes('v=') || url.pathname.includes('/icons/'))) (await caches.open(SHELL)).put(req, res.clone());
+      if (res.ok && (url.pathname.includes('/assets/') || url.pathname.includes('/icons/'))) (await caches.open(SHELL)).put(req, res.clone());
       return res;
     })());
     return;
