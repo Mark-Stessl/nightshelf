@@ -31,12 +31,11 @@ function TrophyRow({ t, game }) {
       <button className={cn('check', t.done && 'on', isPlat && 'auto')} aria-pressed={!!t.done} onClick={toggle} aria-label={t.done ? 'Als offen markieren' : 'Abhaken'} title={isPlat ? 'Wird automatisch verdient' : undefined}>{I.check}</button>
       <div className="tbadge"><TrophyIcon tier={t.tier} /></div>
       <div className="min-w-0">
-        <div className="trophy-name">{t.name} <span className={`tier-tag tt-${t.tier}`}>{Trophies.TIERS[t.tier].label}</span>{t.dlc && <> <span className="tier-tag tt-dlc">DLC</span></>}</div>
+        <div className="trophy-name">{t.name} <span className={`tier-tag tt-${t.tier}`}>{Trophies.TIERS[t.tier].label}</span>{t.dlc && <> <span className="tier-tag tt-dlc">DLC</span></>}{t.rarity != null && <span className="rarity">{String(t.rarity).replace('.', ',')} %</span>}</div>
         {t.desc && <div className="trophy-desc">{t.desc}</div>}
         {t.done && t.doneAt && <div className="tiny mt-0.5">Verdient am {fmtDate(t.doneAt)}</div>}
       </div>
       <div className="trophy-meta">
-        {t.rarity != null && <span className="rarity">{String(t.rarity).replace('.', ',')} %</span>}
         <div className="row-actions">
           <button className="btn btn-ghost" aria-label="Bearbeiten" onClick={() => trophyEdit(Store.get(game.id), t)}>{I.edit}</button>
           <button className="btn btn-ghost btn-danger" aria-label="Löschen" onClick={del}>{I.trash}</button>
